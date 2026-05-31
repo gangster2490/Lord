@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#090b0f" />
+  <title>TikTok Shop Creator</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="header-inner">
+      <span class="logo">⚡ TikTok Shop Creator</span>
+      <span class="badge">SparDirekt DE</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Upload Card -->
+    <section class="card" id="upload-card">
+      <h2 class="card-title">Produktbild</h2>
+      <div class="drop-zone" id="drop-zone" tabindex="0" role="button" aria-label="Bild auswählen oder hierher ziehen">
+        <div class="drop-zone-inner" id="drop-zone-inner">
+          <svg class="drop-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 16V4m0 0L8 8m4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 16.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5" stroke-linecap="round"/>
+          </svg>
+          <p class="drop-text">Bild hierher ziehen<br /><span>oder tippen zum Auswählen</span></p>
+        </div>
+        <img class="preview-img" id="preview-img" alt="Vorschau" />
+        <input type="file" id="file-input" accept="image/*" />
+      </div>
+    </section>
+
+    <!-- Options Card -->
+    <section class="card" id="options-card">
+      <h2 class="card-title">Einstellungen</h2>
+      <div class="options-grid">
+        <div class="field">
+          <label for="category">Kategorie</label>
+          <select id="category">
+            <option value="Mode & Accessoires">Mode &amp; Accessoires</option>
+            <option value="Beauty & Kosmetik">Beauty &amp; Kosmetik</option>
+            <option value="Elektronik & Gadgets">Elektronik &amp; Gadgets</option>
+            <option value="Haushalt & Küche">Haushalt &amp; Küche</option>
+            <option value="Sport & Outdoor">Sport &amp; Outdoor</option>
+            <option value="Gesundheit & Wellness">Gesundheit &amp; Wellness</option>
+            <option value="Kinder & Familie">Kinder &amp; Familie</option>
+            <option value="Heimtiere">Heimtiere</option>
+            <option value="Lebensmittel & Getränke">Lebensmittel &amp; Getränke</option>
+            <option value="Allgemein">Allgemein</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="videoStyle">Video-Stil</label>
+          <select id="videoStyle">
+            <option value="Trendy & viral">Trendy &amp; viral</option>
+            <option value="Aesthetic & ruhig">Aesthetic &amp; ruhig</option>
+            <option value="Energetisch & schnell">Energetisch &amp; schnell</option>
+            <option value="Storytelling">Storytelling</option>
+            <option value="Unboxing">Unboxing</option>
+            <option value="Tutorial / How-to">Tutorial / How-to</option>
+            <option value="Before & After">Before &amp; After</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="audience">Zielgruppe</label>
+          <select id="audience">
+            <option value="Gen Z (16–24)">Gen Z (16–24)</option>
+            <option value="Millennials (25–34)">Millennials (25–34)</option>
+            <option value="Eltern & Familie">Eltern &amp; Familie</option>
+            <option value="Berufstätige (30–45)">Berufstätige (30–45)</option>
+            <option value="Senioren (50+)">Senioren (50+)</option>
+            <option value="Allgemein">Allgemein</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tone">Ton</label>
+          <select id="tone">
+            <option value="Freundlich & persönlich">Freundlich &amp; persönlich</option>
+            <option value="Professionell & seriös">Professionell &amp; seriös</option>
+            <option value="Humorvoll & locker">Humorvoll &amp; locker</option>
+            <option value="Aufgeregt & enthusiastisch">Aufgeregt &amp; enthusiastisch</option>
+            <option value="Inspirierend & motivierend">Inspirierend &amp; motivierend</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Backend URL Card -->
+    <section class="card" id="config-card">
+      <h2 class="card-title">Backend URL</h2>
+      <div class="field">
+        <label for="backend-url">Server-Adresse</label>
+        <input type="url" id="backend-url" placeholder="https://dein-backend.railway.app" autocomplete="off" spellcheck="false" />
+        <p style="font-size:12px;color:#475569;margin-top:6px">Trage hier die URL deines laufenden Backends ein. Lokal: http://localhost:3001</p>
+      </div>
+    </section>
+
+    <!-- Generate Button -->
+    <button class="btn-generate" id="btn-generate">
+      <span id="btn-label">⚡ Content generieren</span>
+      <span id="btn-spinner" class="spinner" hidden></span>
+    </button>
+
+    <!-- Error Box -->
+    <div class="error-box" id="error-box" hidden>
+      <strong>Fehler:</strong> <span id="error-msg"></span>
+    </div>
+
+    <!-- Results Section -->
+    <section class="results" id="results" hidden>
+      <div class="results-header">
+        <h2>Ergebnisse</h2>
+        <button class="btn-copy-all" id="btn-copy-all">Alles kopieren</button>
+      </div>
+
+      <!-- Title Card -->
+      <div class="result-card">
+        <div class="result-card-header">
+          <span class="result-label">🎬 TikTok Titel</span>
+          <button class="btn-copy" data-target="title-content">Kopieren</button>
+        </div>
+        <div class="result-content title-content" id="title-content"></div>
+      </div>
+
+      <!-- Hashtags Card -->
+      <div class="result-card">
+        <div class="result-card-header">
+          <span class="result-label"># Hashtags</span>
+          <button class="btn-copy" data-target="hashtags-content">Kopieren</button>
+        </div>
+        <div class="result-content" id="hashtags-content"></div>
+      </div>
+
+      <!-- Banner Card -->
+      <div class="result-card">
+        <div class="result-card-header">
+          <span class="result-label">📌 Banner-Text</span>
+          <button class="btn-copy" data-target="banner-content">Kopieren</button>
+        </div>
+        <div class="result-content" id="banner-content"></div>
+      </div>
+
+      <!-- Veo Card -->
+      <div class="result-card">
+        <div class="result-card-header">
+          <span class="result-label">🎥 Veo 3.1 Prompt</span>
+          <button class="btn-copy" data-target="veo-content">Kopieren</button>
+        </div>
+        <div class="result-content veo-content" id="veo-content"></div>
+      </div>
+
+      <!-- Live Script Card -->
+      <div class="result-card">
+        <div class="result-card-header">
+          <span class="result-label">🔴 Live-Skript</span>
+          <button class="btn-copy" data-target="live-content">Kopieren</button>
+        </div>
+        <div class="result-content" id="live-content"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
