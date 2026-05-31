@@ -1,0 +1,6 @@
+{
+  "appId": "de.spardirekt.tiktokshop",
+  "appName": "TikTok Shop Creator",
+  "webDir": ".",
+  "server": { "androidScheme": "https" }
+}
