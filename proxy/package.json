@@ -1,10 +1,12 @@
 {
   "name": "tiktok-shop-creator-proxy",
   "version": "1.0.0",
-  "description": "Minimal CORS proxy – forwards Anthropic API calls from the browser",
+  "description": "Zero-dependency CORS proxy for Anthropic API browser calls",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }

@@ -5,57 +5,61 @@ const https = require('https');
 
 const PORT = process.env.PORT || 3001;
 
-// Origins allowed to call this proxy
-const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:5173',
-  'https://gangster2490.github.io',
-  // add your custom domain here if needed
-];
+// Body size limit: 20 MB (for base64 images)
+const MAX_BODY = 20 * 1024 * 1024;
 
-function corsHeaders(origin) {
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+function corsHeaders() {
   return {
-    'Access-Control-Allow-Origin':  allowed,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-api-key-fwd',
     'Access-Control-Max-Age':       '86400',
   };
 }
 
 const server = http.createServer((req, res) => {
-  const origin = req.headers['origin'] || '';
 
-  // ── CORS preflight ──
+  // ── CORS preflight ──────────────────────────────────────────────────────────
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, corsHeaders(origin));
+    res.writeHead(204, corsHeaders());
     res.end();
     return;
   }
 
-  // ── Health check ──
+  // ── Health check ────────────────────────────────────────────────────────────
   if (req.method === 'GET' && req.url === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json', ...corsHeaders(origin) });
-    res.end(JSON.stringify({ status: 'ok' }));
+    res.writeHead(200, { 'Content-Type': 'application/json', ...corsHeaders() });
+    res.end(JSON.stringify({ status: 'ok', service: 'tiktok-shop-creator-proxy' }));
     return;
   }
 
-  // ── Main proxy endpoint ──
+  // ── Proxy endpoint ──────────────────────────────────────────────────────────
   if (req.method === 'POST' && req.url === '/api/generate') {
+
     const apiKey = req.headers['x-api-key-fwd'];
     if (!apiKey || !apiKey.startsWith('sk-ant-')) {
-      res.writeHead(401, { 'Content-Type': 'application/json', ...corsHeaders(origin) });
-      res.end(JSON.stringify({ error: 'Missing or invalid API key. Send it in x-api-key-fwd header.' }));
+      res.writeHead(401, { 'Content-Type': 'application/json', ...corsHeaders() });
+      res.end(JSON.stringify({ error: 'Missing or invalid Anthropic API key in x-api-key-fwd header.' }));
       return;
     }
 
     let body = '';
-    req.on('data', chunk => { body += chunk; });
+    let size = 0;
+
+    req.on('data', chunk => {
+      size += chunk.length;
+      if (size > MAX_BODY) {
+        req.destroy();
+        res.writeHead(413, { 'Content-Type': 'application/json', ...corsHeaders() });
+        res.end(JSON.stringify({ error: 'Request body too large (max 20 MB).' }));
+        return;
+      }
+      body += chunk;
+    });
+
     req.on('end', () => {
-      // Validate JSON before forwarding
       try { JSON.parse(body); } catch {
-        res.writeHead(400, { 'Content-Type': 'application/json', ...corsHeaders(origin) });
+        res.writeHead(400, { 'Content-Type': 'application/json', ...corsHeaders() });
         res.end(JSON.stringify({ error: 'Invalid JSON body.' }));
         return;
       }
@@ -68,7 +72,7 @@ const server = http.createServer((req, res) => {
         headers: {
           'Content-Type':      'application/json',
           'Content-Length':    Buffer.byteLength(body),
-          'x-api-key':         apiKey,       // forwarded from browser, never stored
+          'x-api-key':         apiKey,
           'anthropic-version': '2023-06-01',
         },
       };
@@ -77,17 +81,18 @@ const server = http.createServer((req, res) => {
         let data = '';
         proxyRes.on('data', chunk => { data += chunk; });
         proxyRes.on('end', () => {
+          console.log(`[proxy] ${new Date().toISOString()} status=${proxyRes.statusCode} bytes=${data.length}`);
           res.writeHead(proxyRes.statusCode, {
             'Content-Type': 'application/json',
-            ...corsHeaders(origin),
+            ...corsHeaders(),
           });
           res.end(data);
         });
       });
 
       proxyReq.on('error', err => {
-        console.error('[Proxy] Anthropic request error:', err.message);
-        res.writeHead(502, { 'Content-Type': 'application/json', ...corsHeaders(origin) });
+        console.error('[proxy] upstream error:', err.message);
+        res.writeHead(502, { 'Content-Type': 'application/json', ...corsHeaders() });
         res.end(JSON.stringify({ error: `Upstream error: ${err.message}` }));
       });
 
@@ -98,13 +103,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── 404 ──
-  res.writeHead(404, { 'Content-Type': 'application/json', ...corsHeaders(origin) });
+  // ── 404 ────────────────────────────────────────────────────────────────────
+  res.writeHead(404, { 'Content-Type': 'application/json', ...corsHeaders() });
   res.end(JSON.stringify({ error: 'Not found.' }));
 });
 
-server.listen(PORT, () => {
-  console.log(`✅ TikTok Shop Creator Proxy running on http://localhost:${PORT}`);
-  console.log(`   API key: provided per-request by the browser (never stored)`);
-  console.log(`   Allowed origins: ${ALLOWED_ORIGINS.join(', ')}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ TikTok Shop Creator Proxy`);
+  console.log(`   Port   : ${PORT}`);
+  console.log(`   CORS   : * (all origins)`);
+  console.log(`   Key    : per-request via x-api-key-fwd (never stored)`);
 });

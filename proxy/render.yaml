@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: tiktok-shop-creator-proxy
+    runtime: node
+    rootDir: proxy
+    buildCommand: "echo 'no build needed'"
+    startCommand: "node server.js"
+    plan: free
+    envVars:
+      - key: PORT
+        value: 10000
