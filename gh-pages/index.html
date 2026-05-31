@@ -27,7 +27,7 @@
           </svg>
         </button>
       </div>
-      <p class="hint">Dein Key bleibt nur im Browser. Er wird nie gespeichert oder weitergegeben.</p>
+      <p class="hint">Dein Key bleibt nur im Browser – er wird nie gespeichert oder weitergegeben.</p>
     </section>
 
     <!-- Upload -->
@@ -105,9 +105,9 @@
     <!-- Proxy URL -->
     <section class="card">
       <div class="card-label">🔗 Proxy URL</div>
-      <input type="url" id="proxyUrl" placeholder="http://localhost:3001" autocomplete="off" spellcheck="false" />
-      <p class="hint">Lokaler CORS-Proxy erforderlich. Anthropic blockiert direkte Browser-Anfragen.<br>
-      Starte: <code style="background:#111;padding:1px 6px;border-radius:4px;color:#39ff14">cd proxy && npm install && npm start</code></p>
+      <input type="url" id="proxyUrl" placeholder="https://your-proxy.onrender.com" autocomplete="off" spellcheck="false" />
+      <p class="hint">CORS-Proxy erforderlich (Anthropic blockiert direkte Browser-Anfragen).<br>
+      Lokal: <code style="background:#111;padding:1px 6px;border-radius:4px;color:#39ff14">cd proxy &amp;&amp; node server.js</code></p>
     </section>
 
     <!-- Button -->
@@ -129,6 +129,7 @@
         <button class="btn-copyall" id="btnCopyAll">Alles kopieren</button>
       </div>
 
+      <!-- TikTok Title -->
       <div class="rcard" id="rc-title">
         <div class="rcard-head">
           <span>🎬 TikTok Titel</span>
@@ -137,6 +138,7 @@
         <div class="rcard-body title-out" id="out-title"></div>
       </div>
 
+      <!-- Hashtags -->
       <div class="rcard" id="rc-tags">
         <div class="rcard-head">
           <span># Hashtags</span>
@@ -145,6 +147,7 @@
         <div class="rcard-body" id="out-tags"></div>
       </div>
 
+      <!-- Banner -->
       <div class="rcard" id="rc-banner">
         <div class="rcard-head">
           <span>📌 Banner Text</span>
@@ -153,6 +156,7 @@
         <div class="rcard-body" id="out-banner"></div>
       </div>
 
+      <!-- Veo Prompt -->
       <div class="rcard" id="rc-veo">
         <div class="rcard-head">
           <span>🎥 Veo 3.1 Prompt</span>
@@ -161,6 +165,34 @@
         <div class="rcard-body veo-out" id="out-veo"></div>
       </div>
 
+      <!-- Voiceover -->
+      <div class="rcard" id="rc-voiceover">
+        <div class="rcard-head">
+          <span>🎙 Voiceover Text</span>
+          <button class="btn-copy" data-src="rc-voiceover">Kopieren</button>
+        </div>
+        <div class="rcard-body voiceover-out" id="out-voiceover"></div>
+      </div>
+
+      <!-- Music -->
+      <div class="rcard" id="rc-music">
+        <div class="rcard-head">
+          <span>🎵 Music Suggestion</span>
+          <button class="btn-copy" data-src="rc-music">Kopieren</button>
+        </div>
+        <div class="rcard-body" id="out-music"></div>
+      </div>
+
+      <!-- Sound Effects -->
+      <div class="rcard" id="rc-sfx">
+        <div class="rcard-head">
+          <span>🔊 Sound Effects</span>
+          <button class="btn-copy" data-src="rc-sfx">Kopieren</button>
+        </div>
+        <div class="rcard-body" id="out-sfx"></div>
+      </div>
+
+      <!-- Live Script -->
       <div class="rcard" id="rc-live">
         <div class="rcard-head">
           <span>🔴 TikTok Live Script</span>
