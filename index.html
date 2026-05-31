@@ -30,10 +30,10 @@
       <p class="hint">Dein Key bleibt nur im Browser – er wird nie gespeichert oder weitergegeben.</p>
     </section>
 
-    <!-- Image 1: Product Image -->
+    <!-- Image 1 -->
     <section class="card">
       <div class="card-label">📸 Bild 1 – Produktbild <span class="required-badge">Pflichtfeld</span></div>
-      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Produktbild hochladen">
+      <div class="dropzone" id="dropzone" tabindex="0" role="button">
         <div class="dz-inner" id="dzInner">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M12 16V4m0 0L8 8m4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -42,20 +42,20 @@
           <p class="dz-text">Produktbild hierher ziehen</p>
           <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
         </div>
-        <img id="preview" class="preview" alt="Produktvorschau" />
+        <img id="preview" class="preview" alt="" />
         <input type="file" id="fileInput" accept="image/*" />
       </div>
       <div class="img-meta" id="imgMeta" hidden>
         <span class="img-name" id="imgName"></span>
-        <button class="btn-remove" id="btnRemove" aria-label="Bild entfernen">✕ Entfernen</button>
+        <button class="btn-remove" id="btnRemove">✕ Entfernen</button>
       </div>
     </section>
 
-    <!-- Image 2: Description / Specs -->
+    <!-- Image 2 -->
     <section class="card">
-      <div class="card-label">📋 Bild 2 – Produktbeschreibung / Spezifikationen <span class="optional-badge">Optional</span></div>
-      <p class="hint" style="margin-bottom:10px">Screenshot oder Foto der Produktbeschreibung mit Titel, Features, Spezifikationen, Material, Größe, Anwendung etc.</p>
-      <div class="dropzone" id="dropzone2" tabindex="0" role="button" aria-label="Beschreibungsbild hochladen">
+      <div class="card-label">📋 Bild 2 – Beschreibung / Spezifikationen <span class="optional-badge">Optional</span></div>
+      <p class="hint" style="margin-bottom:10px">Screenshot der Produktbeschreibung mit Features, Spezifikationen, Material, Maße etc.</p>
+      <div class="dropzone" id="dropzone2" tabindex="0" role="button">
         <div class="dz-inner" id="dzInner2">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M9 12h6m-6 4h6m-6-8h6M5 20h14a2 2 0 0 0 2-2V8l-5-5H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
@@ -63,20 +63,20 @@
           <p class="dz-text">Beschreibungsfoto hierher ziehen</p>
           <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
         </div>
-        <img id="preview2" class="preview" alt="Beschreibungsvorschau" />
+        <img id="preview2" class="preview" alt="" />
         <input type="file" id="fileInput2" accept="image/*" />
       </div>
       <div class="img-meta" id="imgMeta2" hidden>
         <span class="img-name" id="imgName2"></span>
-        <button class="btn-remove" id="btnRemove2" aria-label="Beschreibungsbild entfernen">✕ Entfernen</button>
+        <button class="btn-remove" id="btnRemove2">✕ Entfernen</button>
       </div>
     </section>
 
-    <!-- Image 3: Extra / Packaging / Label -->
+    <!-- Image 3 -->
     <section class="card">
-      <div class="card-label">🖼️ Bild 3 – Zusatzbild / Verpackung / Etikett <span class="optional-badge">Optional</span></div>
-      <p class="hint" style="margin-bottom:10px">Weiteres Foto mit zusätzlichen Informationen – Verpackungsrückseite, Etikett, Zertifizierungen, Lieferumfang etc.</p>
-      <div class="dropzone" id="dropzone3" tabindex="0" role="button" aria-label="Zusatzbild hochladen">
+      <div class="card-label">🖼️ Bild 3 – Verpackung / Etikett / Zusatz <span class="optional-badge">Optional</span></div>
+      <p class="hint" style="margin-bottom:10px">Verpackungsrückseite, Etikett, Zertifizierungen, Lieferumfang etc.</p>
+      <div class="dropzone" id="dropzone3" tabindex="0" role="button">
         <div class="dz-inner" id="dzInner3">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
@@ -84,12 +84,12 @@
           <p class="dz-text">Zusatzbild hierher ziehen</p>
           <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
         </div>
-        <img id="preview3" class="preview" alt="Zusatzbildvorschau" />
+        <img id="preview3" class="preview" alt="" />
         <input type="file" id="fileInput3" accept="image/*" />
       </div>
       <div class="img-meta" id="imgMeta3" hidden>
         <span class="img-name" id="imgName3"></span>
-        <button class="btn-remove" id="btnRemove3" aria-label="Zusatzbild entfernen">✕ Entfernen</button>
+        <button class="btn-remove" id="btnRemove3">✕ Entfernen</button>
       </div>
     </section>
 
@@ -126,13 +126,13 @@
     <section class="card">
       <div class="card-label">🔗 Proxy URL</div>
       <input type="url" id="proxyUrl" placeholder="https://your-proxy.onrender.com" autocomplete="off" spellcheck="false" />
-      <p class="hint">CORS-Proxy erforderlich (Anthropic blockiert direkte Browser-Anfragen).<br>
+      <p class="hint">CORS-Proxy erforderlich.<br>
       Lokal: <code style="background:#111;padding:1px 6px;border-radius:4px;color:#39ff14">cd proxy &amp;&amp; node server.js</code></p>
     </section>
 
     <!-- Button -->
     <button class="btn-gen" id="btnGen">
-      <span id="btnLabel">⚡ Content generieren</span>
+      <span id="btnLabel">⚡ Hooks &amp; Daten generieren</span>
       <span id="btnSpinner" class="spinner" hidden></span>
     </button>
 
@@ -158,13 +158,12 @@
         <div class="rcard-body" id="out-facts"></div>
       </div>
 
-      <!-- 2. TikTok Titel -->
-      <div class="rcard" id="rc-title">
+      <!-- 2. 5 Hook Ideas -->
+      <div class="rcard" id="rc-hooks">
         <div class="rcard-head">
-          <span>✏️ TikTok Titel</span>
-          <button class="btn-copy" data-src="rc-title">Kopieren</button>
+          <span>🎣 5 Hook Ideas</span>
         </div>
-        <div class="rcard-body title-out" id="out-title"></div>
+        <div class="rcard-body" id="out-hooks"></div>
       </div>
 
       <!-- 3. Hashtags -->
@@ -176,8 +175,17 @@
         <div class="rcard-body" id="out-hashtags"></div>
       </div>
 
-      <!-- 4. Banner Text -->
-      <div class="rcard" id="rc-banner">
+      <!-- 4. TikTok Titel (step 2) -->
+      <div class="rcard" id="rc-title" hidden>
+        <div class="rcard-head">
+          <span>✏️ TikTok Titel</span>
+          <button class="btn-copy" data-src="rc-title">Kopieren</button>
+        </div>
+        <div class="rcard-body title-out" id="out-title"></div>
+      </div>
+
+      <!-- 5. Banner Text (step 2) -->
+      <div class="rcard" id="rc-banner" hidden>
         <div class="rcard-head">
           <span>🖼️ Banner Text</span>
           <button class="btn-copy" data-src="rc-banner">Kopieren</button>
@@ -185,8 +193,8 @@
         <div class="rcard-body" id="out-banner"></div>
       </div>
 
-      <!-- 5. Veo 3.1 Master Prompt -->
-      <div class="rcard" id="rc-veo">
+      <!-- 6. Veo Prompt (step 2) -->
+      <div class="rcard" id="rc-veo" hidden>
         <div class="rcard-head">
           <span>🎥 Veo 3.1 Master Prompt</span>
           <button class="btn-copy" data-src="rc-veo">Kopieren</button>
@@ -194,8 +202,8 @@
         <div class="rcard-body veo-out" id="out-veo"></div>
       </div>
 
-      <!-- 6. TikTok Live Script -->
-      <div class="rcard" id="rc-live">
+      <!-- 7. TikTok Live Script (step 2) -->
+      <div class="rcard" id="rc-live" hidden>
         <div class="rcard-head">
           <span>🔴 TikTok Live Script</span>
           <button class="btn-copy" data-src="rc-live">Kopieren</button>
@@ -203,8 +211,8 @@
         <div class="rcard-body" id="out-live"></div>
       </div>
 
-      <!-- 7. Banner Prompt -->
-      <div class="rcard" id="rc-banner-prompt">
+      <!-- 8. Banner Prompt (step 2) -->
+      <div class="rcard" id="rc-banner-prompt" hidden>
         <div class="rcard-head">
           <span>🎨 Banner Prompt</span>
           <button class="btn-copy" data-src="rc-banner-prompt">Kopieren</button>
