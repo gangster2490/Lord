@@ -4,6 +4,7 @@
 const apiKeyEl   = document.getElementById('apiKey');
 const btnEye     = document.getElementById('btnEye');
 const eyeIcon    = document.getElementById('eyeIcon');
+const proxyUrlEl = document.getElementById('proxyUrl');
 const dropzone   = document.getElementById('dropzone');
 const dzInner    = document.getElementById('dzInner');
 const fileInput  = document.getElementById('fileInput');
@@ -26,7 +27,16 @@ const outLive   = document.getElementById('out-live');
 let imageBase64 = null;
 let imageMime   = 'image/jpeg';
 
-/* ── API Key eye toggle ── */
+/* ── Persist proxy URL ── */
+(function init() {
+  const saved = localStorage.getItem('proxyUrl');
+  proxyUrlEl.value = saved || 'http://localhost:3001';
+})();
+proxyUrlEl.addEventListener('input', () => {
+  localStorage.setItem('proxyUrl', proxyUrlEl.value.trim());
+});
+
+/* ── Eye toggle ── */
 btnEye.addEventListener('click', () => {
   const show = apiKeyEl.type === 'password';
   apiKeyEl.type = show ? 'text' : 'password';
@@ -39,7 +49,8 @@ dropzone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === '
 dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
 dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
 dropzone.addEventListener('drop', e => {
-  e.preventDefault(); dropzone.classList.remove('over');
+  e.preventDefault();
+  dropzone.classList.remove('over');
   if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
 });
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
@@ -59,8 +70,8 @@ function loadFile(file) {
   reader.readAsDataURL(file);
 }
 
-/* ── Error helpers ── */
-function showErr(msg) { errMsg.textContent = msg; errbox.hidden = false; }
+/* ── Helpers ── */
+function showErr(msg) { errMsg.innerHTML = msg; errbox.hidden = false; }
 function hideErr()    { errbox.hidden = true; }
 function setLoading(on) {
   btnGen.disabled = on;
@@ -73,7 +84,10 @@ btnGen.addEventListener('click', generate);
 
 async function generate() {
   hideErr();
-  const key = apiKeyEl.value.trim();
+
+  const key      = apiKeyEl.value.trim();
+  const proxyUrl = (proxyUrlEl.value.trim() || 'http://localhost:3001').replace(/\/$/, '');
+
   if (!key)         return showErr('Bitte Anthropic API Key eingeben.');
   if (!imageBase64) return showErr('Bitte zuerst ein Produktbild hochladen.');
 
@@ -85,7 +99,10 @@ async function generate() {
   setLoading(true);
   results.hidden = true;
 
-  const systemPrompt = `Du bist ein TikTok-Shop-Marketing-Experte für den deutschen Markt.
+  const payload = {
+    model:      'claude-opus-4-5',
+    max_tokens: 2048,
+    system: `Du bist ein TikTok-Shop-Marketing-Experte für den deutschen Markt.
 REGELN: Keine Preise, keine Rabatte, keine falschen Versprechen, TikTok-safe.
 Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor oder danach, keine Markdown-Codeblöcke.
 
@@ -96,59 +113,71 @@ Gib exakt dieses JSON zurück:
   "banner": ["Zeile 1 (max 28 Zeichen)","Zeile 2","Zeile 3","Call-to-Action"],
   "veo": "Ausführlicher englischer Veo 3.1 Prompt für 10-Sekunden 9:16 TikTok-Produktvideo",
   "live": "0:00 | Hook\\n0:15 | Produktvorstellung\\n0:30 | Feature 1\\n0:45 | Feature 2\\n1:00 | Feature 3\\n1:15 | Nutzen\\n1:30 | Call-to-Action\\n1:45 | Abschluss"
-}`;
-
-  const userPrompt = `Analysiere dieses Produktbild und erstelle TikTok-Shop-Content für Deutschland.
-
-Kategorie: ${category}
-Video-Stil: ${style}
-Zielgruppe: ${audience}
-Ton: ${tone}
-
-1. title – Mitreißender Titel mit Emoji, max 80 Zeichen
-2. hashtags – Genau 5 deutsche TikTok-Hashtags
-3. banner – 4 kurze Zeilen: 3 Highlights + 1 CTA (je max 28 Zeichen)
-4. veo – Detaillierter Veo 3.1 Prompt auf Englisch: Kamera, Licht, Bewegung, Stil, Sound für 10-Sek. 9:16 Video
-5. live – 2-Minuten-Live-Skript mit Timestamps "M:SS | Text"
-
-Nur JSON zurückgeben.`;
+}`,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: imageMime, data: imageBase64 } },
+        { type: 'text', text: `Analysiere dieses Produktbild und erstelle TikTok-Shop-Content für Deutschland.\n\nKategorie: ${category}\nVideo-Stil: ${style}\nZielgruppe: ${audience}\nTon: ${tone}\n\nNur JSON zurückgeben.` },
+      ],
+    }],
+  };
 
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type':         'application/json',
-        'x-api-key':            key,
-        'anthropic-version':    '2023-06-01',
-        'anthropic-dangerous-direct-browser-calls': 'true',
-      },
-      body: JSON.stringify({
-        model:      'claude-opus-4-8',
-        max_tokens: 2048,
-        system:     systemPrompt,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: imageMime, data: imageBase64 } },
-            { type: 'text',  text: userPrompt },
-          ],
-        }],
-      }),
-    });
+    console.log('[TikTok Creator] Sending request to proxy:', proxyUrl);
 
-    if (!resp.ok) {
-      const e = await resp.json().catch(() => ({}));
-      throw new Error(e.error?.message || `API-Fehler ${resp.status}`);
+    let resp;
+    try {
+      resp = await fetch(`${proxyUrl}/api/generate`, {
+        method:  'POST',
+        headers: {
+          'Content-Type':   'application/json',
+          'x-api-key-fwd': key,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (networkErr) {
+      console.error('[TikTok Creator] Network / CORS error:', networkErr);
+      const isCors = networkErr instanceof TypeError;
+      if (isCors) {
+        throw new Error(
+          `Proxy nicht erreichbar (<code>${proxyUrl}</code>).<br>` +
+          `<b>Starte den Proxy lokal:</b><br>` +
+          `<code>cd proxy &amp;&amp; npm install &amp;&amp; node server.js</code><br>` +
+          `Danach diese Seite neu laden.`
+        );
+      }
+      throw new Error(`Netzwerkfehler: ${networkErr.message}`);
     }
 
-    const data = await resp.json();
-    const raw  = data.content?.[0]?.text?.trim() || '';
-    const json = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-    const parsed = JSON.parse(json);
+    const text = await resp.text();
+    console.log('[TikTok Creator] Proxy response status:', resp.status);
+    console.log('[TikTok Creator] Proxy response body:', text);
+
+    let data;
+    try { data = JSON.parse(text); } catch {
+      throw new Error(`Ungültige Antwort vom Proxy (Status ${resp.status}):<br><code>${text.slice(0, 200)}</code>`);
+    }
+
+    if (!resp.ok) {
+      throw new Error(`Fehler ${resp.status}: ${data.error?.message || data.error || JSON.stringify(data)}`);
+    }
+
+    const rawText = data.content?.[0]?.text?.trim() || '';
+    if (!rawText) throw new Error('Anthropic hat eine leere Antwort zurückgegeben.');
+
+    const jsonStr = rawText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    let parsed;
+    try { parsed = JSON.parse(jsonStr); } catch {
+      console.error('[TikTok Creator] JSON parse failed. Raw text:', rawText);
+      throw new Error(`Claude-Antwort ist kein gültiges JSON:<br><code>${rawText.slice(0, 300)}</code>`);
+    }
+
     render(parsed);
 
   } catch (err) {
-    showErr(err.message || 'Unbekannter Fehler. API Key prüfen.');
+    console.error('[TikTok Creator] Error:', err);
+    showErr(err.message || 'Unbekannter Fehler.');
   } finally {
     setLoading(false);
   }
