@@ -19,19 +19,15 @@ function $clear(el) { if (el) el.innerHTML = ''; }
 function $append(el, child) { if (el && child) el.appendChild(child); }
 
 const outFacts        = $id('out-facts');
-const outHooks        = $id('out-hooks');
-const outHashtags     = $id('out-hashtags');
 const outTitle        = $id('out-title');
+const outHashtags     = $id('out-hashtags');
 const outBanner       = $id('out-banner');
 const outVeo          = $id('out-veo');
+const outVoiceover    = $id('out-voiceover');
+const outMusic        = $id('out-music');
+const outSfx          = $id('out-sfx');
 const outLive         = $id('out-live');
 const outBannerPrompt = $id('out-banner-prompt');
-
-const rcTitle        = $id('rc-title');
-const rcBanner       = $id('rc-banner');
-const rcVeo          = $id('rc-veo');
-const rcLive         = $id('rc-live');
-const rcBannerPrompt = $id('rc-banner-prompt');
 
 /* ── Image slots ── */
 const images = [
@@ -39,9 +35,6 @@ const images = [
   { base64: null, mime: 'image/jpeg' },
   { base64: null, mime: 'image/jpeg' },
 ];
-
-/* ── State ── */
-let step1Data = null;
 
 /* ── Proxy URL persistence ── */
 (function () {
@@ -78,9 +71,9 @@ function readImageFile(file, onDone) {
 }
 
 function wireSlot(idx, dzId, inputId, previewId, dzInnerId, metaId, nameId, removeId) {
-  const dz      = $id(dzId),   input  = $id(inputId);
+  const dz      = $id(dzId),   input   = $id(inputId);
   const preview = $id(previewId), dzInner = $id(dzInnerId);
-  const meta    = $id(metaId), name   = $id(nameId), btnRem = $id(removeId);
+  const meta    = $id(metaId), name    = $id(nameId), btnRem = $id(removeId);
   if (!dz || !input) return;
   wireDropzone(dz, input, file => {
     readImageFile(file, (dataUrl, mime, fname) => {
@@ -137,25 +130,40 @@ async function callClaude(payload) {
   }
 }
 
-/* ═══════════════════════════════════
-   STEP 1 – Produktdaten + Hooks
-═══════════════════════════════════ */
-const SYSTEM_STEP1 = `Du bist ein TikTok-Shop-Marketing-Experte für den deutschen Markt.
+/* ═══════════════════════════════════════════════════
+   SYSTEM PROMPT – Single request, all outputs
+═══════════════════════════════════════════════════ */
+const SYSTEM_PROMPT = `Du bist ein TikTok-Shop-Marketing-Experte und Videoproduktions-Spezialist für den deutschen Markt.
 
 BILDNUTZUNG (OCR auf allen hochgeladenen Bildern):
 - Bild 1: Produktbild – erkenne Aussehen, Farbe, Form, Verpackung.
-- Bild 2 (falls vorhanden): Produktbeschreibung – extrahiere alle lesbaren Fakten via OCR.
+- Bild 2 (falls vorhanden): Produktbeschreibung – extrahiere alle lesbaren Texte und Fakten via OCR.
 - Bild 3 (falls vorhanden): Zusatzbild – extrahiere weitere Fakten via OCR.
-Fakten aus allen Bildern zusammenführen.
+Fakten aus allen Bildern zusammenführen und konsolidieren.
 
-PRODUKTFAKTEN: Nur aus sichtbaren Informationen. Unbekannte Werte = "Nicht erkennbar".
+PRODUKTFAKTEN: Nur aus sichtbaren oder lesbaren Informationen. Unbekannte Werte = "Nicht erkennbar".
 
-5 HOOKS:
-- Auf Deutsch, maximal 6 Wörter, scroll-stopping
-- Verschiedene psychologische Winkel: Pain, Curiosity, Convenience, Benefit, Emotional
-- Keine Markennamen, keine Preise, kein Clickbait
+TIKTOK TITEL: Auf Deutsch, mit Emoji, maximal 80 Zeichen, scroll-stopping, kein Preis.
 
 HASHTAGS: 7 relevante deutsche TikTok-Hashtags.
+
+BANNER TEXT: 4 kurze Zeilen für ein visuelles Banner (Deutsch). Zeile 1-3 max. 28 Zeichen. Zeile 4 = CTA.
+
+VEO 3.1 PROMPT: Englisch. Detaillierter Videoproduktions-Prompt für ein 8-Sekunden 9:16 TikTok-Video.
+Beschreibe Szenen, Kameraführung, Beleuchtung, Bildkomposition und On-Screen Text Overlays.
+Kein Preis, keine Rabatte. Zeige das reale Produkt.
+
+VOICEOVER TEXT: Deutsches Voiceover-Skript für das 8-Sekunden-Video. Männliche Stimme. Mit Timing (0s, 2s, 4s, 6s).
+
+MUSIC SUGGESTION: Genre, BPM, Stimmung, Stil. Auf Deutsch.
+
+SOUND EFFECTS: Liste relevanter Sound-Effekte mit Timing. Auf Deutsch.
+
+TIKTOK LIVE SCRIPT: Moderationsplan für eine Live-Session. Zeitplan im Format "0:00 | Beschreibung". Auf Deutsch.
+
+BANNER PROMPT: Englisch. Prompt für einen KI-Bildgenerator. 9:16, schwarzer Hintergrund, Neon-Grün (#39FF14), kein Preis.
+
+REGELN: Keine Preise, keine Rabatte, keine falschen Versprechen. TikTok-safe.
 
 Antworte NUR mit einem gültigen JSON-Objekt ohne Markdown-Blöcke:
 {
@@ -171,26 +179,26 @@ Antworte NUR mit einem gültigen JSON-Objekt ohne Markdown-Blöcke:
     "warnings": [],
     "useCases": []
   },
+  "title": "TikTok-Titel mit Emoji",
   "hashtags": ["#Tag1","#Tag2","#Tag3","#Tag4","#Tag5","#Tag6","#Tag7"],
-  "hooks": [
-    {"angle": "Pain",        "text": "Hook-Text"},
-    {"angle": "Curiosity",   "text": "Hook-Text"},
-    {"angle": "Convenience", "text": "Hook-Text"},
-    {"angle": "Benefit",     "text": "Hook-Text"},
-    {"angle": "Emotional",   "text": "Hook-Text"}
-  ]
+  "bannerText": ["Zeile 1","Zeile 2","Zeile 3","CTA"],
+  "veoPrompt": "Complete English Veo 3.1 production prompt describing scenes, camera, lighting, text overlays...",
+  "voiceoverText": "0s – Erster Satz\n2s – Zweiter Satz\n4s – Dritter Satz\n6s – CTA",
+  "musicSuggestion": "Genre, BPM, Stimmung und Stil",
+  "soundEffects": "0s – Effekt 1\n2s – Effekt 2\n4s – Effekt 3",
+  "liveScript": "0:00 | Hook-Eröffnung\n0:15 | Produktvorstellung\n0:30 | Feature 1\n0:45 | Feature 2\n1:00 | Feature 3\n1:15 | Nutzen\n1:30 | Community-Frage\n1:45 | CTA",
+  "bannerPrompt": "English AI image generation prompt for 9:16 banner..."
 }`;
 
-btnGen.addEventListener('click', runStep1);
+/* ── Generate ── */
+btnGen.addEventListener('click', generate);
 
-async function runStep1() {
+async function generate() {
   hideErr();
   if (!apiKeyEl.value.trim()) return showErr('Bitte Anthropic API Key eingeben.');
   if (!images[0].base64)      return showErr('Bitte zuerst ein Produktbild hochladen (Bild 1).');
 
-  step1Data = null;
   if (results) results.hidden = true;
-  [rcTitle, rcBanner, rcVeo, rcLive, rcBannerPrompt].forEach(el => { if (el) el.hidden = true; });
   setLoading(true);
 
   const active   = images.filter(img => img.base64);
@@ -200,17 +208,21 @@ async function runStep1() {
   active.forEach(img => userContent.push({ type: 'image', source: { type: 'base64', media_type: img.mime, data: img.base64 } }));
 
   const imgDesc = imgCount === 1
-    ? 'Nur Bild 1 vorhanden (Produktbild). Setze alle productFacts auf "Nicht erkennbar".'
+    ? 'Nur Bild 1 vorhanden (Produktbild). Setze alle productFacts auf "Nicht erkennbar" sofern nicht sichtbar.'
     : imgCount === 2
-      ? 'Bild 1 = Produktbild. Bild 2 = Beschreibung/Spezifikationen – OCR verwenden.'
-      : 'Bild 1 = Produktbild. Bild 2 = Beschreibung/Spezifikationen. Bild 3 = Zusatzbild. OCR auf Bild 2 und 3 anwenden und Fakten zusammenführen.';
+      ? 'Bild 1 = Produktbild. Bild 2 = Beschreibung/Spezifikationen – OCR anwenden und Fakten extrahieren.'
+      : 'Bild 1 = Produktbild. Bild 2 = Beschreibung/Spezifikationen. Bild 3 = Zusatzbild. OCR auf Bild 2 und 3 anwenden und alle Fakten zusammenführen.';
 
   userContent.push({ type: 'text', text: `${imgDesc}\n\nVideo-Stil: ${$id('style').value}\nTon: ${$id('tone').value}\n\nNur JSON zurückgeben.` });
 
   try {
-    const parsed = await callClaude({ model: 'claude-opus-4-5', max_tokens: 1800, system: SYSTEM_STEP1, messages: [{ role: 'user', content: userContent }] });
-    step1Data = parsed;
-    renderStep1(parsed);
+    const parsed = await callClaude({
+      model: 'claude-opus-4-5',
+      max_tokens: 4000,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userContent }],
+    });
+    renderResults(parsed);
     if (results) { results.hidden = false; results.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   } catch (err) {
     showErr(err.message || 'Unbekannter Fehler.');
@@ -219,15 +231,29 @@ async function runStep1() {
   }
 }
 
-function renderStep1(d) {
-  /* Produktdaten */
-  const pf = d.productFacts || {};
+/* ── Render ── */
+function renderResults(d) {
+  renderFacts(d.productFacts || {});
+  $set(outTitle, 'textContent', d.title || '—');
+  renderHashtags(d.hashtags || []);
+  renderBanner(d.bannerText || []);
+  $set(outVeo, 'textContent', d.veoPrompt || '—');
+  renderVoiceover(d.voiceoverText || '');
+  $set(outMusic, 'textContent', d.musicSuggestion || '—');
+  renderSfx(d.soundEffects || '');
+  renderLive(d.liveScript || '');
+  $set(outBannerPrompt, 'textContent', d.bannerPrompt || '—');
+}
+
+function renderFacts(pf) {
   $clear(outFacts);
   const grid = document.createElement('div'); grid.className = 'facts-grid';
   function addRow(label, val) {
     const row = document.createElement('div'); row.className = 'fact-row';
     const k = document.createElement('span'); k.className = 'fact-key'; k.textContent = label;
-    const v = document.createElement('span'); v.className = 'fact-val' + (!val || val === 'Nicht erkennbar' ? ' unknown' : ''); v.textContent = val || 'Nicht erkennbar';
+    const v = document.createElement('span');
+    v.className = 'fact-val' + (!val || val === 'Nicht erkennbar' ? ' unknown' : '');
+    v.textContent = val || 'Nicht erkennbar';
     row.appendChild(k); row.appendChild(v); grid.appendChild(row);
   }
   function addTags(label, arr) {
@@ -243,134 +269,60 @@ function renderStep1(d) {
   addTags('Lieferumfang', pf.includedItems); addTags('Features', pf.keyFeatures);
   addTags('Warnhinweise', pf.warnings); addTags('Anwendung', pf.useCases);
   $append(outFacts, grid);
+}
 
-  /* Hooks */
-  $clear(outHooks);
-  const list = document.createElement('div'); list.className = 'hook-list';
-  (d.hooks || []).forEach((hook, idx) => {
-    const item = document.createElement('div'); item.className = 'hook-item';
-    const meta = document.createElement('div'); meta.className = 'hook-meta';
-    const angle = document.createElement('div'); angle.className = 'hook-angle'; angle.textContent = hook.angle || '';
-    const text  = document.createElement('div'); text.className  = 'hook-text';  text.textContent  = hook.text  || '';
-    meta.appendChild(angle); meta.appendChild(text);
-    const btn = document.createElement('button'); btn.className = 'btn-hook'; btn.textContent = `Hook ${idx + 1}`;
-    btn.addEventListener('click', () => onHookSelect(idx, btn));
-    item.appendChild(meta); item.appendChild(btn); list.appendChild(item);
-  });
-  const hint = document.createElement('p'); hint.className = 'hook-hint'; hint.textContent = '👆 Wähle einen Hook – Content wird generiert';
-  $append(outHooks, list); $append(outHooks, hint);
-
-  /* Hashtags */
+function renderHashtags(tags) {
   $clear(outHashtags);
-  const tagWrap = document.createElement('div'); tagWrap.className = 'tag-wrap';
-  (d.hashtags || []).forEach(t => { const s = document.createElement('span'); s.className = 'tag'; s.textContent = t; tagWrap.appendChild(s); });
-  $append(outHashtags, tagWrap);
-
-  [rcTitle, rcBanner, rcVeo, rcLive, rcBannerPrompt].forEach(el => { if (el) el.hidden = true; });
+  const wrap = document.createElement('div'); wrap.className = 'tag-wrap';
+  tags.forEach(t => { const s = document.createElement('span'); s.className = 'tag'; s.textContent = t; wrap.appendChild(s); });
+  $append(outHashtags, wrap);
 }
 
-/* ═══════════════════════════════════
-   STEP 2 – Hook → Full Content
-═══════════════════════════════════ */
-const SYSTEM_STEP2 = `Du bist ein TikTok-Shop-Marketing-Experte und Videoproduktions-Spezialist für den deutschen Markt.
-
-Der ausgewählte Hook ist die kreative Hauptrichtung für allen generierten Content.
-
-VEO 3.1 MASTER PROMPT:
-Der veoPrompt enthält den vollständigen Produktionsplan für ein 8-Sekunden 9:16 TikTok-Video:
-- Szenen-Timing: 0s-2s Hook/Intro, 2s-4s Produktreveal, 4s-6s Feature, 6s-8s CTA
-- Kamerabewegungen pro Szene
-- Beleuchtung und Bildkomposition
-- On-Screen Text Overlays (Deutsch, mit Zeitangaben)
-- Voiceover: Männliche deutsche Stimme, vollständiges Skript mit Timing (0s – Satz, 2s – Satz usw.)
-- Hintergrundmusik: Genre, BPM, Stimmung
-- Sound Effects: Timing und Beschreibung
-Schreibe veoPrompt auf Englisch.
-
-BANNER PROMPT: Nur für KI-Bildgeneratoren. Englisch, 9:16, schwarzer Hintergrund, Neongrün (#39FF14), kein Preis, keine Rabatte.
-
-REGELN: Keine Preise, Rabatte, falschen Versprechen. TikTok-safe.
-title und bannerText auf Deutsch. veoPrompt und bannerPrompt auf Englisch.
-Antworte NUR mit einem gültigen JSON-Objekt ohne Markdown-Blöcke:
-{
-  "title": "TikTok-Titel mit Emoji, max 80 Zeichen",
-  "bannerText": ["Zeile 1 max 28 Zeichen","Zeile 2","Zeile 3","CTA"],
-  "veoPrompt": "Complete English production prompt...",
-  "live": "0:00 | Hook-Eröffnung\\n0:15 | Produktvorstellung\\n0:30 | Feature 1\\n0:45 | Feature 2\\n1:00 | Feature 3\\n1:15 | Nutzen\\n1:30 | Community-Frage\\n1:45 | CTA",
-  "bannerPrompt": "English AI image generation prompt..."
-}`;
-
-function onHookSelect(idx, clickedBtn) {
-  if (!step1Data) return;
-  const hook = step1Data.hooks?.[idx];
-  if (!hook) return;
-
-  document.querySelectorAll('.hook-item').forEach(el => el.classList.remove('selected'));
-  document.querySelectorAll('.btn-hook').forEach(el => el.classList.remove('selected'));
-  clickedBtn.closest('.hook-item')?.classList.add('selected');
-  clickedBtn.classList.add('selected');
-
-  const hint = outHooks?.querySelector('.hook-hint');
-  if (hint) hint.innerHTML = `<div class="hook-generating"><span class="spinner"></span><span>Content wird generiert…</span></div>`;
-
-  [rcTitle, rcBanner, rcVeo, rcLive, rcBannerPrompt].forEach(el => { if (el) el.hidden = true; });
-
-  const pf = step1Data.productFacts || {};
-  const facts = [
-    `Name: ${pf.name || 'Nicht erkennbar'}`,
-    `Maße: ${pf.dimensions || 'Nicht erkennbar'}`,
-    `Material: ${pf.material || 'Nicht erkennbar'}`,
-    `Gewicht: ${pf.weight || 'Nicht erkennbar'}`,
-    `Farbe: ${pf.color || 'Nicht erkennbar'}`,
-    `Features: ${(pf.keyFeatures || []).join(', ') || 'Nicht erkennbar'}`,
-    `Anwendung: ${(pf.useCases || []).join(', ') || 'Nicht erkennbar'}`,
-  ].join('\n');
-
-  callClaude({
-    model: 'claude-opus-4-5', max_tokens: 3000,
-    system: SYSTEM_STEP2,
-    messages: [{
-      role: 'user',
-      content: [{ type: 'text', text: `Hook: "${hook.text}" (${hook.angle})\n\nProduktfakten:\n${facts}\n\nVideo-Stil: ${$id('style').value}\nTon: ${$id('tone').value}\n\nNur JSON zurückgeben.` }],
-    }],
-  }).then(parsed => {
-    renderStep2(parsed, hook);
-  }).catch(err => {
-    showErr(err.message || 'Fehler bei der Content-Generierung.');
-    if (hint) hint.textContent = '👆 Wähle einen Hook – Content wird generiert';
-  });
-}
-
-function renderStep2(d, hook) {
-  const hint = outHooks?.querySelector('.hook-hint');
-  if (hint) hint.textContent = `✓ Hook "${hook.text}" aktiv`;
-
-  $set(outTitle, 'textContent', d.title || '—');
-  if (rcTitle) rcTitle.hidden = false;
-
+function renderBanner(lines) {
   $clear(outBanner);
-  (d.bannerText || []).forEach(line => {
-    const b = document.createElement('div'); b.className = 'bline'; b.textContent = line; $append(outBanner, b);
+  lines.forEach(line => {
+    const b = document.createElement('div'); b.className = 'bline'; b.textContent = line;
+    $append(outBanner, b);
   });
-  if (rcBanner) rcBanner.hidden = false;
+}
 
-  $set(outVeo, 'textContent', d.veoPrompt || '—');
-  if (rcVeo) rcVeo.hidden = false;
+function renderVoiceover(text) {
+  $clear(outVoiceover);
+  (text || '').split('\n').forEach(line => {
+    const span = document.createElement('span'); span.className = 'live-line';
+    const m = line.match(/^(\d+s)\s*[–-]\s*(.*)/);
+    if (m) {
+      const ts = document.createElement('span'); ts.className = 'live-ts'; ts.textContent = m[1];
+      span.appendChild(ts); span.appendChild(document.createTextNode(m[2].trim()));
+    } else { span.textContent = line; }
+    $append(outVoiceover, span);
+  });
+}
 
+function renderSfx(text) {
+  $clear(outSfx);
+  (text || '').split('\n').forEach(line => {
+    const span = document.createElement('span'); span.className = 'live-line';
+    const m = line.match(/^(\d+s)\s*[–-]\s*(.*)/);
+    if (m) {
+      const ts = document.createElement('span'); ts.className = 'live-ts'; ts.textContent = m[1];
+      span.appendChild(ts); span.appendChild(document.createTextNode(m[2].trim()));
+    } else { span.textContent = line; }
+    $append(outSfx, span);
+  });
+}
+
+function renderLive(text) {
   $clear(outLive);
-  (d.live || '').split('\n').forEach(line => {
+  (text || '').split('\n').forEach(line => {
     const span = document.createElement('span'); span.className = 'live-line';
     const m = line.match(/^(\d+:\d+)\s*\|(.*)/);
-    if (m) { const ts = document.createElement('span'); ts.className = 'live-ts'; ts.textContent = m[1]; span.appendChild(ts); span.appendChild(document.createTextNode(m[2].trim())); }
-    else { span.textContent = line; }
+    if (m) {
+      const ts = document.createElement('span'); ts.className = 'live-ts'; ts.textContent = m[1];
+      span.appendChild(ts); span.appendChild(document.createTextNode(m[2].trim()));
+    } else { span.textContent = line; }
     $append(outLive, span);
   });
-  if (rcLive) rcLive.hidden = false;
-
-  $set(outBannerPrompt, 'textContent', d.bannerPrompt || '—');
-  if (rcBannerPrompt) rcBannerPrompt.hidden = false;
-
-  rcTitle?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 /* ── Copy ── */
@@ -383,16 +335,18 @@ document.addEventListener('click', e => {
 
 btnCopyAll?.addEventListener('click', () => {
   const sections = [
-    ['Produktdaten',          outFacts],
-    ['TikTok Titel',          outTitle],
-    ['Hashtags',              outHashtags],
-    ['Banner Text',           outBanner],
-    ['Veo 3.1 Master Prompt', outVeo],
-    ['TikTok Live Script',    outLive],
-    ['Banner Prompt',         outBannerPrompt],
+    ['Produktdaten',     outFacts],
+    ['TikTok Titel',     outTitle],
+    ['Hashtags',         outHashtags],
+    ['Banner Text',      outBanner],
+    ['Veo 3.1 Prompt',   outVeo],
+    ['Voiceover Text',   outVoiceover],
+    ['Music Suggestion', outMusic],
+    ['Sound Effects',    outSfx],
+    ['Live Script',      outLive],
+    ['Banner Prompt',    outBannerPrompt],
   ];
   const all = sections
-    .filter(([, el]) => el && !el.closest('.rcard')?.hidden)
     .map(([label, el]) => `=== ${label} ===\n${el?.innerText || ''}`)
     .join('\n\n');
   clip(all, btnCopyAll);
