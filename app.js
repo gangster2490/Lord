@@ -1,17 +1,18 @@
 'use strict';
 
 /* ── DOM ── */
-const apiKeyEl   = document.getElementById('apiKey');
-const btnEye     = document.getElementById('btnEye');
-const eyeIcon    = document.getElementById('eyeIcon');
-const proxyUrlEl = document.getElementById('proxyUrl');
-const btnGen     = document.getElementById('btnGen');
-const btnLabel   = document.getElementById('btnLabel');
-const btnSpinner = document.getElementById('btnSpinner');
-const errbox     = document.getElementById('errbox');
-const errMsg     = document.getElementById('errMsg');
-const results    = document.getElementById('results');
-const btnCopyAll = document.getElementById('btnCopyAll');
+const apiKeyEl      = document.getElementById('apiKey');
+const btnEye        = document.getElementById('btnEye');
+const eyeIcon       = document.getElementById('eyeIcon');
+const proxyUrlEl    = document.getElementById('proxyUrl');
+const btnGen        = document.getElementById('btnGen');
+const btnLabel      = document.getElementById('btnLabel');
+const btnSpinner    = document.getElementById('btnSpinner');
+const errbox        = document.getElementById('errbox');
+const errMsg        = document.getElementById('errMsg');
+const results       = document.getElementById('results');
+const btnCopyAll    = document.getElementById('btnCopyAll');
+const btnNeueHooks  = document.getElementById('btnNeueHooks');
 
 /* ── Safe helpers ── */
 function $id(id) {
@@ -46,8 +47,9 @@ const images = [
 ];
 
 /* ── Workflow state ── */
-let step1Data       = null; // { productFacts, hashtags, hooks }
-let selectedHookIdx = null;
+let step1Data        = null;  // { productFacts, hashtags, hooks }
+let allHookBatches   = [];    // array of hook arrays, one per generation
+let selectedHookGlobal = null; // { batchIdx, hookIdx, hook }
 
 /* ── Persist proxy URL ── */
 (function init() {
@@ -72,8 +74,7 @@ function wireDropzone(dz, input, onFile) {
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
   dz.addEventListener('dragleave', () => dz.classList.remove('over'));
   dz.addEventListener('drop', e => {
-    e.preventDefault();
-    dz.classList.remove('over');
+    e.preventDefault(); dz.classList.remove('over');
     if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
   });
   input.addEventListener('change', () => { if (input.files[0]) onFile(input.files[0]); });
@@ -133,7 +134,7 @@ function setLoading(on) {
 /* ── API call helper ── */
 async function callClaude(payload) {
   const key      = apiKeyEl.value.trim();
-  const proxyUrl = (proxyUrlEl.value.trim() || 'http://localhost:3001').replace(/\/$/, '');
+  const proxyUrl = (proxyUrlEl.value.trim() || 'http://localhost:3001').replace(/\/$/,  '');
 
   let resp;
   try {
@@ -169,34 +170,45 @@ async function callClaude(payload) {
   }
 }
 
-/* ══════════════════════════════
-   STEP 1 – Produktdaten + Hooks
-══════════════════════════════ */
+/* ══════════════════════════════════════
+   STEP 1 – Produktdaten + Hooks + Tags
+══════════════════════════════════════ */
+const HOOK_RULES = `HOOK-REGELN (strikt einhalten):
+- Genau 5 Hooks, einen pro psychologischem Winkel
+- Maximal 6 Wörter pro Hook
+- Sprache: Deutsch
+- Plattform: TikTok Shop Deutschland
+- Videolänge: 8 Sekunden
+- GROSSBUCHSTABEN für den Hook-Text
+- Bewerte jeden Hook von 0–100 nach Scroll-Stop-Potenzial
+- Stärksten Hook zuerst (höchste Punktzahl zuerst sortieren)
+- Psychologische Winkel: Pain, Curiosity, Convenience, Benefit, Emotional
+
+VERBOTEN:
+- Keine Emojis im Hook-Text
+- Keine Markennamen
+- Keine Rabatt- oder Preis-Sprache
+- Keine generischen Marketing-Phrasen
+- Kein Clickbait der nicht beweisbar ist
+- Keine erfundenen Produkteigenschaften
+
+FOKUS: Echte Kundenschmerzpunkte, konkrete Vorteile, ehrliche Neugier.`;
+
 const SYSTEM_STEP1 = `Du bist ein TikTok-Shop-Marketing-Experte für den deutschen Markt.
 
 BILDNUTZUNG (OCR auf allen hochgeladenen Bildern):
 - Bild 1: Produktbild – visuelle Erkennung (Aussehen, Farbe, Form, Verpackung).
 - Bild 2 (falls vorhanden): Produktbeschreibung / Spezifikationen – extrahiere alle lesbaren Fakten.
-- Bild 3 (falls vorhanden): Zusatzbild – extrahiere weitere Fakten (Verpackung, Etikett, Lieferumfang, Zertifizierungen).
+- Bild 3 (falls vorhanden): Zusatzbild – weitere Fakten (Verpackung, Etikett, Lieferumfang, Zertifizierungen).
 
 PRODUKTFAKTEN: Nur aus sichtbaren Informationen. Nicht erkennbare Werte = "Nicht erkennbar". Nichts erfinden.
 
-5 HOOKS – Anforderungen:
-- Maximal 6 Wörter
-- Auf Deutsch
-- Scroll-stopping, für TikTok Shop geeignet
-- Jeder Hook hat einen anderen Winkel:
-  • Pain – spricht einen Schmerzpunkt an
-  • Curiosity – weckt Neugier
-  • Convenience – betont Bequemlichkeit/Einfachheit
-  • Benefit – hebt den konkreten Nutzen hervor
-  • Emotional – erzeugt eine emotionale Reaktion
+${HOOK_RULES}
 
 HASHTAGS: 7 relevante deutsche TikTok-Hashtags.
 
-REGELN:
-- Keine Preise, Rabatte, falschen Versprechen. TikTok-safe.
-- Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor/danach, keine Markdown-Blöcke.
+REGELN: Keine Preise, Rabatte, falschen Versprechen. TikTok-safe.
+Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor/danach, keine Markdown-Blöcke.
 
 Gib exakt dieses JSON zurück:
 {
@@ -214,11 +226,11 @@ Gib exakt dieses JSON zurück:
   },
   "hashtags": ["#Tag1","#Tag2","#Tag3","#Tag4","#Tag5","#Tag6","#Tag7"],
   "hooks": [
-    {"angle": "Pain",        "text": "Hook max 6 Wörter"},
-    {"angle": "Curiosity",   "text": "Hook max 6 Wörter"},
-    {"angle": "Convenience", "text": "Hook max 6 Wörter"},
-    {"angle": "Benefit",     "text": "Hook max 6 Wörter"},
-    {"angle": "Emotional",   "text": "Hook max 6 Wörter"}
+    {"score": 95, "angle": "Pain",        "text": "HOOK TEXT MAX 6 WÖRTER"},
+    {"score": 92, "angle": "Curiosity",   "text": "HOOK TEXT MAX 6 WÖRTER"},
+    {"score": 89, "angle": "Convenience", "text": "HOOK TEXT MAX 6 WÖRTER"},
+    {"score": 86, "angle": "Benefit",     "text": "HOOK TEXT MAX 6 WÖRTER"},
+    {"score": 82, "angle": "Emotional",   "text": "HOOK TEXT MAX 6 WÖRTER"}
   ]
 }`;
 
@@ -234,10 +246,12 @@ async function runStep1() {
   const style = document.getElementById('style').value;
   const tone  = document.getElementById('tone').value;
 
-  // Reset workflow state
-  step1Data       = null;
-  selectedHookIdx = null;
+  // Reset workflow
+  step1Data           = null;
+  allHookBatches      = [];
+  selectedHookGlobal  = null;
   if (results) results.hidden = true;
+  if (btnNeueHooks) btnNeueHooks.hidden = true;
   [rcTitle, rcBanner, rcVeo, rcLive, rcBannerPrompt].forEach(el => { if (el) el.hidden = true; });
 
   setLoading(true);
@@ -254,7 +268,7 @@ async function runStep1() {
     ? 'Bild 1 = Produktbild (visuell). Kein Beschreibungsbild – setze alle productFacts-Felder auf "Nicht erkennbar".'
     : imgCount === 2
       ? 'Bild 1 = Produktbild (visuell). Bild 2 = Beschreibung/Spezifikationen – extrahiere alle sichtbaren Fakten via OCR. Erfinde nichts.'
-      : 'Bild 1 = Produktbild (visuell). Bild 2 = Beschreibung/Spezifikationen. Bild 3 = Zusatzbild (Verpackung/Etikett). Extrahiere und merge alle Fakten aus Bild 2 und Bild 3 via OCR. Erfinde nichts.';
+      : 'Bild 1 = Produktbild (visuell). Bild 2 = Beschreibung/Spezifikationen. Bild 3 = Zusatzbild. Extrahiere und merge alle Fakten aus Bild 2 und 3 via OCR. Erfinde nichts.';
 
   userContent.push({
     type: 'text',
@@ -263,13 +277,13 @@ async function runStep1() {
 
   try {
     const parsed = await callClaude({
-      model:      'claude-opus-4-5',
-      max_tokens: 2000,
-      system:     SYSTEM_STEP1,
-      messages:   [{ role: 'user', content: userContent }],
+      model: 'claude-opus-4-5', max_tokens: 2000,
+      system: SYSTEM_STEP1,
+      messages: [{ role: 'user', content: userContent }],
     });
 
     step1Data = parsed;
+    allHookBatches = [parsed.hooks || []];
     renderStep1(parsed);
 
     if (results) {
@@ -300,7 +314,6 @@ function renderStep1(d) {
     v.textContent = val || 'Nicht erkennbar';
     row.appendChild(k); row.appendChild(v); factsGrid.appendChild(row);
   }
-
   function addFactTags(label, arr) {
     if (!arr || !arr.length) { addFactRow(label, 'Nicht erkennbar'); return; }
     const row = document.createElement('div'); row.className = 'fact-row';
@@ -327,44 +340,10 @@ function renderStep1(d) {
 
   /* Hooks */
   $clear(outHooks);
-  const hookList = document.createElement('div');
-  hookList.className = 'hook-list';
+  renderHookBatch(d.hooks || [], 0, true);
 
-  (d.hooks || []).forEach((hook, idx) => {
-    const item = document.createElement('div');
-    item.className = 'hook-item';
-
-    const meta = document.createElement('div');
-    meta.className = 'hook-meta';
-
-    const angle = document.createElement('div');
-    angle.className = 'hook-angle';
-    angle.textContent = hook.angle || '';
-
-    const text = document.createElement('div');
-    text.className = 'hook-text';
-    text.textContent = hook.text || '';
-
-    meta.appendChild(angle);
-    meta.appendChild(text);
-
-    const btn = document.createElement('button');
-    btn.className = 'btn-hook';
-    btn.textContent = `Hook ${idx + 1}`;
-    btn.dataset.hookIdx = idx;
-    btn.addEventListener('click', () => selectHook(idx, d.hooks));
-
-    item.appendChild(meta);
-    item.appendChild(btn);
-    hookList.appendChild(item);
-  });
-
-  const hint = document.createElement('p');
-  hint.className = 'hook-hint';
-  hint.textContent = '👆 Wähle einen Hook – der Content wird automatisch generiert';
-
-  $append(outHooks, hookList);
-  $append(outHooks, hint);
+  /* Show Neue Hooks button */
+  if (btnNeueHooks) btnNeueHooks.hidden = false;
 
   /* Hashtags */
   $clear(outHashtags);
@@ -376,9 +355,156 @@ function renderStep1(d) {
   });
   $append(outHashtags, tagWrap);
 
-  /* Hide step-2 cards until hook is selected */
+  /* Hide step-2 cards */
   [rcTitle, rcBanner, rcVeo, rcLive, rcBannerPrompt].forEach(el => { if (el) el.hidden = true; });
 }
+
+/* ── Render a hook batch ── */
+function renderHookBatch(hooks, batchIdx, isFirst) {
+  if (!isFirst) {
+    /* Divider between batches */
+    const div = document.createElement('div');
+    div.className = 'hook-batch-divider';
+    div.textContent = `Batch ${batchIdx + 1}`;
+    $append(outHooks, div);
+  }
+
+  const list = document.createElement('div');
+  list.className = 'hook-batch';
+  list.dataset.batchIdx = batchIdx;
+
+  hooks.forEach((hook, hookIdx) => {
+    const item = document.createElement('div');
+    item.className = 'hook-item';
+    item.dataset.batchIdx = batchIdx;
+    item.dataset.hookIdx  = hookIdx;
+
+    const meta = document.createElement('div');
+    meta.className = 'hook-meta';
+
+    const top = document.createElement('div');
+    top.className = 'hook-top';
+
+    const score = document.createElement('span');
+    score.className = 'hook-score';
+    score.textContent = `${hook.score}/100`;
+
+    const angle = document.createElement('span');
+    angle.className = 'hook-angle';
+    angle.textContent = hook.angle || '';
+
+    top.appendChild(score);
+    top.appendChild(angle);
+
+    const text = document.createElement('div');
+    text.className = 'hook-text';
+    text.textContent = hook.text || '';
+
+    meta.appendChild(top);
+    meta.appendChild(text);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-hook';
+    btn.textContent = `Hook ${hookIdx + 1}`;
+    btn.addEventListener('click', () => onHookSelect(batchIdx, hookIdx, btn));
+
+    item.appendChild(meta);
+    item.appendChild(btn);
+    list.appendChild(item);
+  });
+
+  $append(outHooks, list);
+
+  /* Hint line (only after last batch) */
+  const existing = outHooks?.querySelector('.hook-hint');
+  if (existing) existing.remove();
+  const hint = document.createElement('p');
+  hint.className = 'hook-hint';
+  hint.textContent = '👆 Wähle einen Hook – der Content wird automatisch generiert';
+  $append(outHooks, hint);
+}
+
+/* ── Hook selection ── */
+function onHookSelect(batchIdx, hookIdx, clickedBtn) {
+  const hook = allHookBatches[batchIdx]?.[hookIdx];
+  if (!hook || !step1Data) return;
+
+  /* Update visual selection state */
+  document.querySelectorAll('.hook-item').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.btn-hook').forEach(el => el.classList.remove('selected'));
+  clickedBtn.closest('.hook-item')?.classList.add('selected');
+  clickedBtn.classList.add('selected');
+
+  selectedHookGlobal = { batchIdx, hookIdx, hook };
+
+  runStep2(hook);
+}
+
+/* ══════════════════════════════
+   NEUE HOOKS – no image re-scan
+══════════════════════════════ */
+const SYSTEM_NEUE_HOOKS = `Du bist ein TikTok-Shop-Marketing-Experte für den deutschen Markt.
+
+${HOOK_RULES}
+
+Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor/danach, keine Markdown-Blöcke.
+
+Gib exakt dieses JSON zurück:
+{
+  "hooks": [
+    {"score": 95, "angle": "Pain",        "text": "HOOK TEXT MAX 6 WÖRTER"},
+    {"score": 92, "angle": "Curiosity",   "text": "HOOK TEXT MAX 6 WÖRTER"},
+    {"score": 89, "angle": "Convenience", "text": "HOOK TEXT MAX 6 WÖRTER"},
+    {"score": 86, "angle": "Benefit",     "text": "HOOK TEXT MAX 6 WÖRTER"},
+    {"score": 82, "angle": "Emotional",   "text": "HOOK TEXT MAX 6 WÖRTER"}
+  ]
+}`;
+
+btnNeueHooks?.addEventListener('click', async () => {
+  if (!step1Data) return;
+
+  btnNeueHooks.disabled = true;
+  btnNeueHooks.textContent = '…';
+
+  const pf = step1Data.productFacts || {};
+  const prev = allHookBatches.flat().map(h => h.text).join(', ');
+
+  const factsText = [
+    `Produktname: ${pf.name || 'Nicht erkennbar'}`,
+    `Features: ${(pf.keyFeatures || []).join(', ') || 'Nicht erkennbar'}`,
+    `Anwendung: ${(pf.useCases || []).join(', ') || 'Nicht erkennbar'}`,
+    `Material: ${pf.material || 'Nicht erkennbar'}`,
+  ].join('\n');
+
+  try {
+    const parsed = await callClaude({
+      model: 'claude-opus-4-5', max_tokens: 800,
+      system: SYSTEM_NEUE_HOOKS,
+      messages: [{
+        role: 'user',
+        content: [{
+          type: 'text',
+          text: `Generiere 5 NEUE, völlig andere Hooks für dieses Produkt.\n\nProduktfakten:\n${factsText}\n\nBereits verwendete Hooks (NICHT wiederholen):\n${prev}\n\nErstelle komplett andere Hooks mit anderen Formulierungen und Perspektiven.\nNur JSON zurückgeben.`,
+        }],
+      }],
+    });
+
+    const newHooks = parsed.hooks || [];
+    const newBatchIdx = allHookBatches.length;
+    allHookBatches.push(newHooks);
+    renderHookBatch(newHooks, newBatchIdx, false);
+
+    /* Scroll to new batch */
+    outHooks?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  } catch (err) {
+    console.error('[TikTok Creator] Neue Hooks error:', err);
+    showErr(err.message || 'Fehler beim Generieren neuer Hooks.');
+  } finally {
+    btnNeueHooks.disabled = false;
+    btnNeueHooks.textContent = '🎣 Neue Hooks';
+  }
+});
 
 /* ══════════════════════════════
    STEP 2 – Hook → Full Content
@@ -386,61 +512,44 @@ function renderStep1(d) {
 const SYSTEM_STEP2 = `Du bist ein TikTok-Shop-Marketing-Experte und Videoproduktions-Spezialist für den deutschen Markt.
 
 Der ausgewählte Hook ist die kreative Hauptrichtung für ALLEN generierten Content.
-Nutze den Hook als Hauptüberschrift und rote Linie durch alle Outputs.
+Der Hook ist die Eröffnung, das Leitmotiv und die rote Linie durch alle Outputs.
 
 VEO 3.1 MASTER PROMPT REGELN:
-Der veoPrompt muss ALLES enthalten – er ist der vollständige Produktionsplan:
+Der veoPrompt muss ALLES enthalten – vollständiger Produktionsplan:
 - Szenenaufbau: Kamerabewegungen, Beleuchtung, Bildkomposition (9:16 vertikal)
-- Timing: Exakte Sekunden-Beats für jede Szene (0s, 2s, 4s, 6s, 8s, 10s)
-- On-Screen Text: Exakte deutsche Overlays mit echten Produktfakten
-- Voiceover: Männliche deutsche Stimme, Skript mit Timing-Beats, Hook als Opening
+- Timing: Exakte Sekunden-Beats (0s, 2s, 4s, 6s, 8s)
+- On-Screen Text: Hook als erstes Overlay, dann echte Produktfakten
+- Voiceover: Männliche deutsche Stimme, Skript mit Timing-Beats, Hook als Eröffnungszeile
 - Hintergrundmusik: Genre, BPM, Energie, Stimmung
 - Sound Effects: Timing-Beats mit Beschreibung
 Schreibe veoPrompt auf Englisch, detailliert und produktionsfähig.
 
-BANNER PROMPT: NUR für KI-Bildgeneratoren (kein Video). Englisch, 9:16, schwarzer Hintergrund, Neongrün (#39FF14), kein Preis, keine Rabatte.
+BANNER PROMPT: NUR für KI-Bildgeneratoren. Englisch, 9:16, schwarzer Hintergrund, Neongrün (#39FF14), kein Preis, keine Rabatte.
 
 REGELN:
-- Hook als kreative Richtlinie für alle Outputs verwenden.
-- Keine Preise, Rabatte, falschen Versprechen. TikTok-safe.
+- Hook als kreative Richtlinie. Keine erfundenen Fakten. TikTok-safe.
 - title und bannerText auf Deutsch. veoPrompt und bannerPrompt auf Englisch.
 - Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor/danach, keine Markdown-Blöcke.
 
 Gib exakt dieses JSON zurück:
 {
-  "title": "TikTok-Titel mit Emoji, max 80 Zeichen, basierend auf dem Hook",
-  "bannerText": ["Zeile 1 (Hook oder Variante, max 28 Zeichen)","Zeile 2","Zeile 3","CTA-Zeile"],
-  "veoPrompt": "Complete English Veo 3.1 production prompt. Opens with the hook as first on-screen text and voiceover line. [SCENE TIMING] 0s-2s hook intro, 2s-4s product reveal, 4s-6s feature, 6s-8s benefit, 8s-10s CTA. [CAMERA] movements. [LIGHTING] setup. [ON-SCREEN TEXT] German overlays. [GERMAN MALE VOICEOVER] full script starting with hook. [BACKGROUND MUSIC] genre, BPM, mood. [SOUND EFFECTS] timed.",
+  "title": "TikTok-Titel ohne Emoji, max 80 Zeichen, Hook als Grundlage",
+  "bannerText": ["Hook-Text oder Variante (max 28 Zeichen)","Zeile 2","Zeile 3","CTA-Zeile"],
+  "veoPrompt": "Complete English Veo 3.1 production prompt for 8-second 9:16 TikTok video. Opens with hook as first on-screen overlay and voiceover. [SCENE TIMING] 0s-2s hook, 2s-4s product, 4s-6s feature, 6s-8s CTA. [CAMERA] movements per scene. [LIGHTING] setup. [ON-SCREEN TEXT] German overlays. [GERMAN MALE VOICEOVER] full script. [BACKGROUND MUSIC] genre, BPM, mood. [SOUND EFFECTS] timed.",
   "live": "0:00 | Hook-Eröffnung\\n0:15 | Produktvorstellung\\n0:30 | Feature 1\\n0:45 | Feature 2\\n1:00 | Feature 3\\n1:15 | Nutzen & Mehrwert\\n1:30 | Community-Frage\\n1:45 | CTA & Abschluss",
-  "bannerPrompt": "English AI image generation prompt for 9:16 vertical TikTok Shop product banner. Hook text as headline. Pure black background, neon green #39FF14 accent, product centered and dramatically lit, SparDirekt DE minimal style, no prices, no discounts, photorealistic."
+  "bannerPrompt": "English AI image generation prompt for 9:16 TikTok Shop product banner. Hook text as main headline. Pure black background, neon green #39FF14 accent, product centered and lit, SparDirekt DE style, no prices, no discounts, photorealistic."
 }`;
 
-async function selectHook(idx, hooks) {
-  if (!step1Data) return;
-
-  selectedHookIdx = idx;
-
-  /* Update button states */
-  document.querySelectorAll('.btn-hook').forEach((btn, i) => {
-    btn.classList.toggle('selected', i === idx);
-  });
-
-  /* Show step-2 loading spinner inside hooks card hint area */
+async function runStep2(hook) {
+  /* Loading state inside hooks card */
   const hint = outHooks?.querySelector('.hook-hint');
   if (hint) {
-    hint.innerHTML = `
-      <div class="step2-spinner">
-        <span class="spinner"></span>
-        <span>Content wird generiert…</span>
-      </div>`;
+    hint.innerHTML = `<div class="step2-spinner"><span class="spinner"></span><span>Content wird generiert…</span></div>`;
   }
 
-  /* Hide step-2 cards while loading */
   [rcTitle, rcBanner, rcVeo, rcLive, rcBannerPrompt].forEach(el => { if (el) el.hidden = true; });
 
-  const hook = hooks[idx];
-  const pf   = step1Data.productFacts || {};
-
+  const pf = step1Data?.productFacts || {};
   const factsText = [
     `Produktname: ${pf.name || 'Nicht erkennbar'}`,
     `Maße: ${pf.dimensions || 'Nicht erkennbar'}`,
@@ -457,14 +566,13 @@ async function selectHook(idx, hooks) {
 
   try {
     const parsed = await callClaude({
-      model:      'claude-opus-4-5',
-      max_tokens: 3000,
-      system:     SYSTEM_STEP2,
+      model: 'claude-opus-4-5', max_tokens: 3000,
+      system: SYSTEM_STEP2,
       messages: [{
         role: 'user',
         content: [{
           type: 'text',
-          text: `Ausgewählter Hook: "${hook.text}" (Winkel: ${hook.angle})\n\nProduktfakten:\n${factsText}\n\nVideo-Stil: ${style}\nTon: ${tone}\n\nGeneriere TikTok Titel, Banner Text, Veo 3.1 Master Prompt, TikTok Live Script und Banner Prompt basierend auf diesem Hook.\nNur JSON zurückgeben – kein erklärender Text.`,
+          text: `Ausgewählter Hook: "${hook.text}" (Winkel: ${hook.angle}, Score: ${hook.score}/100)\n\nProduktfakten:\n${factsText}\n\nVideo-Stil: ${style}\nTon: ${tone}\n\nGeneriere TikTok Titel, Banner Text, Veo 3.1 Master Prompt, TikTok Live Script und Banner Prompt basierend auf diesem Hook.\nNur JSON zurückgeben.`,
         }],
       }],
     });
@@ -473,36 +581,30 @@ async function selectHook(idx, hooks) {
 
   } catch (err) {
     console.error('[TikTok Creator] Step 2 error:', err);
-    showErr(err.message || 'Unbekannter Fehler bei der Content-Generierung.');
+    showErr(err.message || 'Fehler bei der Content-Generierung.');
     if (hint) hint.textContent = '👆 Wähle einen Hook – der Content wird automatisch generiert';
   }
 }
 
 /* ── Render Step 2 ── */
 function renderStep2(d, hook) {
-  /* Restore hint */
   const hint = outHooks?.querySelector('.hook-hint');
-  if (hint) hint.textContent = `✓ Hook "${hook.text}" verwendet`;
+  if (hint) hint.textContent = `✓ Hook "${hook.text}" aktiv`;
 
-  /* TikTok Titel */
   $set(outTitle, 'textContent', d.title || '—');
   if (rcTitle) rcTitle.hidden = false;
 
-  /* Banner Text */
   $clear(outBanner);
   (d.bannerText || []).forEach(line => {
     const bline = document.createElement('div');
-    bline.className = 'bline';
-    bline.textContent = line;
+    bline.className = 'bline'; bline.textContent = line;
     $append(outBanner, bline);
   });
   if (rcBanner) rcBanner.hidden = false;
 
-  /* Veo 3.1 Master Prompt */
   $set(outVeo, 'textContent', d.veoPrompt || '—');
   if (rcVeo) rcVeo.hidden = false;
 
-  /* TikTok Live Script */
   $clear(outLive);
   (d.live || '').split('\n').forEach(line => {
     const span = document.createElement('span');
@@ -510,22 +612,17 @@ function renderStep2(d, hook) {
     const m = line.match(/^(\d+:\d+)\s*\|(.*)/);
     if (m) {
       const ts = document.createElement('span');
-      ts.className = 'live-ts';
-      ts.textContent = m[1];
+      ts.className = 'live-ts'; ts.textContent = m[1];
       span.appendChild(ts);
       span.appendChild(document.createTextNode(m[2].trim()));
-    } else {
-      span.textContent = line;
-    }
+    } else { span.textContent = line; }
     $append(outLive, span);
   });
   if (rcLive) rcLive.hidden = false;
 
-  /* Banner Prompt */
   $set(outBannerPrompt, 'textContent', d.bannerPrompt || '—');
   if (rcBannerPrompt) rcBannerPrompt.hidden = false;
 
-  /* Scroll to first new card */
   rcTitle?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
