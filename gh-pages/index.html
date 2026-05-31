@@ -30,9 +30,9 @@
       <p class="hint">Dein Key bleibt nur im Browser – er wird nie gespeichert oder weitergegeben.</p>
     </section>
 
-    <!-- Product Image Upload -->
+    <!-- Image 1: Product Image -->
     <section class="card">
-      <div class="card-label">📸 Produktbild <span class="required-badge">Pflichtfeld</span></div>
+      <div class="card-label">📸 Bild 1 – Produktbild <span class="required-badge">Pflichtfeld</span></div>
       <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Produktbild hochladen">
         <div class="dz-inner" id="dzInner">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -51,9 +51,9 @@
       </div>
     </section>
 
-    <!-- Description Image Upload -->
+    <!-- Image 2: Description / Specs -->
     <section class="card">
-      <div class="card-label">📋 Beschreibungsfoto / Produktbeschreibung <span class="optional-badge">Optional</span></div>
+      <div class="card-label">📋 Bild 2 – Produktbeschreibung / Spezifikationen <span class="optional-badge">Optional</span></div>
       <p class="hint" style="margin-bottom:10px">Screenshot oder Foto der Produktbeschreibung mit Titel, Features, Spezifikationen, Material, Größe, Anwendung etc.</p>
       <div class="dropzone" id="dropzone2" tabindex="0" role="button" aria-label="Beschreibungsbild hochladen">
         <div class="dz-inner" id="dzInner2">
@@ -72,26 +72,31 @@
       </div>
     </section>
 
+    <!-- Image 3: Extra / Packaging / Label -->
+    <section class="card">
+      <div class="card-label">🖼️ Bild 3 – Zusatzbild / Verpackung / Etikett <span class="optional-badge">Optional</span></div>
+      <p class="hint" style="margin-bottom:10px">Weiteres Foto mit zusätzlichen Informationen – Verpackungsrückseite, Etikett, Zertifizierungen, Lieferumfang etc.</p>
+      <div class="dropzone" id="dropzone3" tabindex="0" role="button" aria-label="Zusatzbild hochladen">
+        <div class="dz-inner" id="dzInner3">
+          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="dz-text">Zusatzbild hierher ziehen</p>
+          <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
+        </div>
+        <img id="preview3" class="preview" alt="Zusatzbildvorschau" />
+        <input type="file" id="fileInput3" accept="image/*" />
+      </div>
+      <div class="img-meta" id="imgMeta3" hidden>
+        <span class="img-name" id="imgName3"></span>
+        <button class="btn-remove" id="btnRemove3" aria-label="Zusatzbild entfernen">✕ Entfernen</button>
+      </div>
+    </section>
+
     <!-- Options -->
     <section class="card">
       <div class="card-label">🎨 Einstellungen</div>
       <div class="grid2">
-        <div class="field">
-          <label for="category">Kategorie</label>
-          <select id="category">
-            <option value="auto">🔍 Automatisch erkennen</option>
-            <option>Elektronik &amp; Gadgets</option>
-            <option>Mode &amp; Accessoires</option>
-            <option>Beauty &amp; Kosmetik</option>
-            <option>Sport &amp; Outdoor</option>
-            <option>Haushalt &amp; Küche</option>
-            <option>Gesundheit &amp; Wellness</option>
-            <option>Kinder &amp; Familie</option>
-            <option>Heimtiere</option>
-            <option>Lebensmittel</option>
-            <option>Allgemein</option>
-          </select>
-        </div>
         <div class="field">
           <label for="style">Video-Stil</label>
           <select id="style">
@@ -102,17 +107,6 @@
             <option>Unboxing</option>
             <option>Tutorial / How-to</option>
             <option>Before &amp; After</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="audience">Zielgruppe</label>
-          <select id="audience">
-            <option>Gen Z (16–24)</option>
-            <option>Millennials (25–34)</option>
-            <option>Berufstätige (30–45)</option>
-            <option>Eltern &amp; Familie</option>
-            <option>Senioren (50+)</option>
-            <option>Allgemein</option>
           </select>
         </div>
         <div class="field">
@@ -155,7 +149,7 @@
         <button class="btn-copyall" id="btnCopyAll">Alles kopieren</button>
       </div>
 
-      <!-- Produktdaten -->
+      <!-- 1. Produktdaten -->
       <div class="rcard" id="rc-facts">
         <div class="rcard-head">
           <span>📋 Produktdaten</span>
@@ -164,103 +158,58 @@
         <div class="rcard-body" id="out-facts"></div>
       </div>
 
-      <!-- Auto Category -->
-      <div class="rcard" id="rc-category">
+      <!-- 2. TikTok Titel -->
+      <div class="rcard" id="rc-title">
         <div class="rcard-head">
-          <span>🏷️ Auto-Kategorie</span>
-          <button class="btn-copy" data-src="rc-category">Kopieren</button>
+          <span>✏️ TikTok Titel</span>
+          <button class="btn-copy" data-src="rc-title">Kopieren</button>
         </div>
-        <div class="rcard-body" id="out-category"></div>
+        <div class="rcard-body title-out" id="out-title"></div>
       </div>
 
-      <!-- Detected Audience -->
-      <div class="rcard" id="rc-audience">
+      <!-- 3. Hashtags -->
+      <div class="rcard" id="rc-hashtags">
         <div class="rcard-head">
-          <span>👥 Erkannte Zielgruppe</span>
-          <button class="btn-copy" data-src="rc-audience">Kopieren</button>
+          <span>#️⃣ Hashtags</span>
+          <button class="btn-copy" data-src="rc-hashtags">Kopieren</button>
         </div>
-        <div class="rcard-body" id="out-audience"></div>
+        <div class="rcard-body" id="out-hashtags"></div>
       </div>
 
-      <!-- Variant A -->
-      <div class="rcard" id="rc-varA">
+      <!-- 4. Banner Text -->
+      <div class="rcard" id="rc-banner">
         <div class="rcard-head">
-          <span>🅰️ Variante A – Conversion</span>
-          <button class="btn-copy" data-src="rc-varA">Kopieren</button>
+          <span>🖼️ Banner Text</span>
+          <button class="btn-copy" data-src="rc-banner">Kopieren</button>
         </div>
-        <div class="rcard-body" id="out-varA"></div>
+        <div class="rcard-body" id="out-banner"></div>
       </div>
 
-      <!-- Variant B -->
-      <div class="rcard" id="rc-varB">
-        <div class="rcard-head">
-          <span>🅱️ Variante B – Viral</span>
-          <button class="btn-copy" data-src="rc-varB">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-varB"></div>
-      </div>
-
-      <!-- Variant C -->
-      <div class="rcard" id="rc-varC">
-        <div class="rcard-head">
-          <span>🔴 Variante C – TikTok Live</span>
-          <button class="btn-copy" data-src="rc-varC">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-varC"></div>
-      </div>
-
-      <!-- Banner Prompt -->
-      <div class="rcard" id="rc-banner-prompt">
-        <div class="rcard-head">
-          <span>🎨 Banner Prompt</span>
-          <button class="btn-copy" data-src="rc-banner-prompt">Kopieren</button>
-        </div>
-        <div class="rcard-body veo-out" id="out-banner-prompt"></div>
-      </div>
-
-      <!-- Veo Prompt -->
+      <!-- 5. Veo 3.1 Master Prompt -->
       <div class="rcard" id="rc-veo">
         <div class="rcard-head">
-          <span>🎥 Veo 3.1 Prompt</span>
+          <span>🎥 Veo 3.1 Master Prompt</span>
           <button class="btn-copy" data-src="rc-veo">Kopieren</button>
         </div>
         <div class="rcard-body veo-out" id="out-veo"></div>
       </div>
 
-      <!-- Voiceover -->
-      <div class="rcard" id="rc-voiceover">
-        <div class="rcard-head">
-          <span>🎙 Voiceover Text</span>
-          <button class="btn-copy" data-src="rc-voiceover">Kopieren</button>
-        </div>
-        <div class="rcard-body voiceover-out" id="out-voiceover"></div>
-      </div>
-
-      <!-- Music -->
-      <div class="rcard" id="rc-music">
-        <div class="rcard-head">
-          <span>🎵 Music Suggestion</span>
-          <button class="btn-copy" data-src="rc-music">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-music"></div>
-      </div>
-
-      <!-- Sound Effects -->
-      <div class="rcard" id="rc-sfx">
-        <div class="rcard-head">
-          <span>🔊 Sound Effects</span>
-          <button class="btn-copy" data-src="rc-sfx">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-sfx"></div>
-      </div>
-
-      <!-- Live Script -->
+      <!-- 6. TikTok Live Script -->
       <div class="rcard" id="rc-live">
         <div class="rcard-head">
           <span>🔴 TikTok Live Script</span>
           <button class="btn-copy" data-src="rc-live">Kopieren</button>
         </div>
         <div class="rcard-body" id="out-live"></div>
+      </div>
+
+      <!-- 7. Banner Prompt -->
+      <div class="rcard" id="rc-banner-prompt">
+        <div class="rcard-head">
+          <span>🎨 Banner Prompt</span>
+          <button class="btn-copy" data-src="rc-banner-prompt">Kopieren</button>
+        </div>
+        <div class="rcard-body veo-out" id="out-banner-prompt"></div>
       </div>
 
     </section>
