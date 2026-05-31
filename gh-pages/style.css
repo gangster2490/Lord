@@ -86,6 +86,37 @@ input:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
 .btn-eye svg{width:15px;height:15px}
 .hint{margin-top:8px;font-size:11.5px;color:var(--dim)}
 
+/* ── Upload badges ── */
+.required-badge{
+  display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+  color:#f87171;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.28);
+  padding:1px 7px;border-radius:20px;margin-left:7px;vertical-align:middle;
+}
+.optional-badge{
+  display:inline-block;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--mid);background:rgba(138,143,152,.10);border:1px solid rgba(138,143,152,.22);
+  padding:1px 7px;border-radius:20px;margin-left:7px;vertical-align:middle;
+}
+
+/* ── Image meta row (filename + remove) ── */
+.img-meta{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:9px;gap:10px;
+}
+.img-name{
+  font-size:11.5px;color:var(--mid);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;
+  font-family:'Courier New',monospace;
+}
+.btn-remove{
+  flex-shrink:0;
+  background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.25);border-radius:6px;
+  color:#f87171;font-size:10px;font-weight:800;
+  padding:3px 10px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;
+  transition:background .18s,border-color .18s;
+}
+.btn-remove:hover{background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.45)}
+
 /* ── Dropzone ── */
 .dropzone{
   position:relative;
