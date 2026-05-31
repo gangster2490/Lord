@@ -27,18 +27,28 @@ const errMsg        = document.getElementById('errMsg');
 const results       = document.getElementById('results');
 const btnCopyAll    = document.getElementById('btnCopyAll');
 
-const outFacts        = document.getElementById('out-facts');
-const outCategory     = document.getElementById('out-category');
-const outAudience     = document.getElementById('out-audience');
-const outVarA         = document.getElementById('out-varA');
-const outVarB         = document.getElementById('out-varB');
-const outVarC         = document.getElementById('out-varC');
-const outBannerPrompt = document.getElementById('out-banner-prompt');
-const outVeo          = document.getElementById('out-veo');
-const outVoiceover    = document.getElementById('out-voiceover');
-const outMusic        = document.getElementById('out-music');
-const outSfx          = document.getElementById('out-sfx');
-const outLive         = document.getElementById('out-live');
+/* ── Safe element lookup ── */
+function $id(id) {
+  const el = document.getElementById(id);
+  if (!el) console.warn('[TikTok Creator] Missing DOM element: #' + id);
+  return el;
+}
+function $set(el, prop, val) { if (el) el[prop] = val; }
+function $clear(el) { if (el) el.innerHTML = ''; }
+function $append(el, child) { if (el && child) el.appendChild(child); }
+
+const outFacts        = $id('out-facts');
+const outCategory     = $id('out-category');
+const outAudience     = $id('out-audience');
+const outVarA         = $id('out-varA');
+const outVarB         = $id('out-varB');
+const outVarC         = $id('out-varC');
+const outBannerPrompt = $id('out-banner-prompt');
+const outVeo          = $id('out-veo');
+const outVoiceover    = $id('out-voiceover');
+const outMusic        = $id('out-music');
+const outSfx          = $id('out-sfx');
+const outLive         = $id('out-live');
 
 /* ── State ── */
 let productImageBase64     = null;
@@ -129,8 +139,8 @@ btnRemove2.addEventListener('click', () => {
 });
 
 /* ── Helpers ── */
-function showErr(msg) { errMsg.innerHTML = msg; errbox.hidden = false; }
-function hideErr()    { errbox.hidden = true; }
+function showErr(msg) { if (errMsg) errMsg.innerHTML = msg; if (errbox) errbox.hidden = false; }
+function hideErr()    { if (errbox) errbox.hidden = true; }
 function setLoading(on) {
   btnGen.disabled = on;
   btnLabel.hidden = on;
@@ -231,7 +241,7 @@ async function generate() {
   const autoCategory = categoryVal === 'auto';
 
   setLoading(true);
-  results.hidden = true;
+  if (results) results.hidden = true;
 
   const userContent = [
     {
@@ -339,7 +349,7 @@ Nur JSON zurückgeben – kein erklärender Text.`,
 function render(d) {
   /* Produktdaten */
   const pf = d.productFacts || {};
-  outFacts.innerHTML = '';
+  $clear(outFacts);
   const factsGrid = document.createElement('div');
   factsGrid.className = 'facts-grid';
 
@@ -388,17 +398,17 @@ function render(d) {
   addFactTags('Warnhinweise',  pf.warnings);
   addFactTags('Anwendung',     pf.useCases);
 
-  outFacts.appendChild(factsGrid);
+  $append(outFacts, factsGrid);
 
   /* Auto Category */
-  outCategory.innerHTML = '';
+  $clear(outCategory);
   const catVal = document.createElement('div');
   catVal.className = 'detect-val';
   catVal.textContent = d.detectedCategory || '—';
-  outCategory.appendChild(catVal);
+  $append(outCategory, catVal);
 
   /* Detected Audience */
-  outAudience.innerHTML = '';
+  $clear(outAudience);
   const audText = d.detectedAudience || '';
   const dashIdx = audText.indexOf(' – ');
   if (dashIdx > -1) {
@@ -408,23 +418,24 @@ function render(d) {
     const ar = document.createElement('div');
     ar.className = 'detect-reason';
     ar.textContent = audText.slice(dashIdx + 3);
-    outAudience.appendChild(av);
-    outAudience.appendChild(ar);
+    $append(outAudience, av);
+    $append(outAudience, ar);
   } else {
     const av = document.createElement('div');
     av.className = 'detect-val';
     av.textContent = audText || '—';
-    outAudience.appendChild(av);
+    $append(outAudience, av);
   }
 
   /* Variants */
   const variantDefs = [
-    { el: outVarA, key: 'A', accentClass: '' },
-    { el: outVarB, key: 'B', accentClass: '' },
-    { el: outVarC, key: 'C', accentClass: '' },
+    { el: outVarA, key: 'A' },
+    { el: outVarB, key: 'B' },
+    { el: outVarC, key: 'C' },
   ];
   variantDefs.forEach(({ el, key }) => {
-    el.innerHTML = '';
+    $clear(el);
+    if (!el) return;
     const v = d.variants?.[key] || {};
 
     /* Title */
@@ -438,7 +449,7 @@ function render(d) {
     titleEl.textContent = v.title || '—';
     secTitle.appendChild(lblTitle);
     secTitle.appendChild(titleEl);
-    el.appendChild(secTitle);
+    $append(el, secTitle);
 
     /* Hashtags */
     const secTags = document.createElement('div');
@@ -455,9 +466,9 @@ function render(d) {
     });
     secTags.appendChild(lblTags);
     secTags.appendChild(tagWrap);
-    el.appendChild(secTags);
+    $append(el, secTags);
 
-    el.appendChild(document.createElement('hr')).className = 'variant-divider';
+    const hr1 = document.createElement('hr'); hr1.className = 'variant-divider'; $append(el, hr1);
 
     /* Banner */
     const secBanner = document.createElement('div');
@@ -471,9 +482,9 @@ function render(d) {
       bline.className = 'bline'; bline.textContent = l;
       secBanner.appendChild(bline);
     });
-    el.appendChild(secBanner);
+    $append(el, secBanner);
 
-    el.appendChild(document.createElement('hr')).className = 'variant-divider';
+    const hr2 = document.createElement('hr'); hr2.className = 'variant-divider'; $append(el, hr2);
 
     /* Voiceover */
     const secVo = document.createElement('div');
@@ -494,23 +505,23 @@ function render(d) {
       } else { row.textContent = line; }
       secVo.appendChild(row);
     });
-    el.appendChild(secVo);
+    $append(el, secVo);
 
     /* CTA */
     const ctaBox = document.createElement('div');
     ctaBox.className = 'cta-box';
     ctaBox.textContent = v.cta || '—';
-    el.appendChild(ctaBox);
+    $append(el, ctaBox);
   });
 
   /* Banner Prompt */
-  outBannerPrompt.textContent = d.bannerPrompt || '—';
+  $set(outBannerPrompt, 'textContent', d.bannerPrompt || '—');
 
   /* Veo Prompt */
-  outVeo.textContent = d.veoPrompt || d.veo || '—';
+  $set(outVeo, 'textContent', d.veoPrompt || d.veo || '—');
 
   /* Voiceover – render timing beats */
-  outVoiceover.innerHTML = '';
+  $clear(outVoiceover);
   const voText = d.voiceoverText || d.voiceover || '';
   if (voText) {
     voText.split('\n').forEach(line => {
@@ -525,17 +536,17 @@ function render(d) {
       } else {
         row.textContent = line;
       }
-      outVoiceover.appendChild(row);
+      $append(outVoiceover, row);
     });
   } else {
-    outVoiceover.textContent = '—';
+    $set(outVoiceover, 'textContent', '—');
   }
 
   /* Music */
-  outMusic.textContent = d.musicSuggestion || d.music || '—';
+  $set(outMusic, 'textContent', d.musicSuggestion || d.music || '—');
 
   /* Sound Effects – render timing beats */
-  outSfx.innerHTML = '';
+  $clear(outSfx);
   const sfxText = d.soundEffects || d.sfx || '';
   if (sfxText) {
     sfxText.split('\n').forEach(line => {
@@ -550,14 +561,14 @@ function render(d) {
       } else {
         row.textContent = line;
       }
-      outSfx.appendChild(row);
+      $append(outSfx, row);
     });
   } else {
-    outSfx.textContent = '—';
+    $set(outSfx, 'textContent', '—');
   }
 
   /* Live Script */
-  outLive.innerHTML = '';
+  $clear(outLive);
   (d.live || '').split('\n').forEach(line => {
     const span = document.createElement('span');
     span.className = 'live-line';
@@ -568,11 +579,10 @@ function render(d) {
       span.appendChild(ts);
       span.appendChild(document.createTextNode(m[2].trim()));
     } else { span.textContent = line; }
-    outLive.appendChild(span);
+    $append(outLive, span);
   });
 
-  results.hidden = false;
-  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (results) { results.hidden = false; results.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 }
 
 /* ── Copy ── */
@@ -583,20 +593,20 @@ document.addEventListener('click', e => {
   if (card) clip(card.querySelector('.rcard-body')?.innerText || '', btn);
 });
 
-btnCopyAll.addEventListener('click', () => {
+btnCopyAll?.addEventListener('click', () => {
   const all = [
-    '=== Produktdaten ===\n'         + (outFacts.innerText        || ''),
-    '=== Auto-Kategorie ===\n'       + (outCategory.innerText     || ''),
-    '=== Erkannte Zielgruppe ===\n'  + (outAudience.innerText     || ''),
-    '=== Variante A – Conversion ===\n' + (outVarA.innerText      || ''),
-    '=== Variante B – Viral ===\n'   + (outVarB.innerText         || ''),
-    '=== Variante C – Live ===\n'    + (outVarC.innerText         || ''),
-    '=== Banner Prompt ===\n'        + (outBannerPrompt.innerText || ''),
-    '=== Veo 3.1 Prompt ===\n'       + (outVeo.innerText          || ''),
-    '=== Voiceover Text ===\n'       + (outVoiceover.innerText    || ''),
-    '=== Music Suggestion ===\n'     + (outMusic.innerText        || ''),
-    '=== Sound Effects ===\n'        + (outSfx.innerText          || ''),
-    '=== TikTok Live Script ===\n'   + (outLive.innerText         || ''),
+    '=== Produktdaten ===\n'         + (outFacts?.innerText        || ''),
+    '=== Auto-Kategorie ===\n'       + (outCategory?.innerText     || ''),
+    '=== Erkannte Zielgruppe ===\n'  + (outAudience?.innerText     || ''),
+    '=== Variante A – Conversion ===\n' + (outVarA?.innerText      || ''),
+    '=== Variante B – Viral ===\n'   + (outVarB?.innerText         || ''),
+    '=== Variante C – Live ===\n'    + (outVarC?.innerText         || ''),
+    '=== Banner Prompt ===\n'        + (outBannerPrompt?.innerText || ''),
+    '=== Veo 3.1 Prompt ===\n'       + (outVeo?.innerText          || ''),
+    '=== Voiceover Text ===\n'       + (outVoiceover?.innerText    || ''),
+    '=== Music Suggestion ===\n'     + (outMusic?.innerText        || ''),
+    '=== Sound Effects ===\n'        + (outSfx?.innerText          || ''),
+    '=== TikTok Live Script ===\n'   + (outLive?.innerText         || ''),
   ].join('\n\n');
   clip(all, btnCopyAll);
 });
