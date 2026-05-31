@@ -79,6 +79,7 @@
         <div class="field">
           <label for="category">Kategorie</label>
           <select id="category">
+            <option value="auto">🔍 Automatisch erkennen</option>
             <option>Elektronik &amp; Gadgets</option>
             <option>Mode &amp; Accessoires</option>
             <option>Beauty &amp; Kosmetik</option>
@@ -163,31 +164,58 @@
         <div class="rcard-body" id="out-facts"></div>
       </div>
 
-      <!-- TikTok Title -->
-      <div class="rcard" id="rc-title">
+      <!-- Auto Category -->
+      <div class="rcard" id="rc-category">
         <div class="rcard-head">
-          <span>🎬 TikTok Titel</span>
-          <button class="btn-copy" data-src="rc-title">Kopieren</button>
+          <span>🏷️ Auto-Kategorie</span>
+          <button class="btn-copy" data-src="rc-category">Kopieren</button>
         </div>
-        <div class="rcard-body title-out" id="out-title"></div>
+        <div class="rcard-body" id="out-category"></div>
       </div>
 
-      <!-- Hashtags -->
-      <div class="rcard" id="rc-tags">
+      <!-- Detected Audience -->
+      <div class="rcard" id="rc-audience">
         <div class="rcard-head">
-          <span># Hashtags</span>
-          <button class="btn-copy" data-src="rc-tags">Kopieren</button>
+          <span>👥 Erkannte Zielgruppe</span>
+          <button class="btn-copy" data-src="rc-audience">Kopieren</button>
         </div>
-        <div class="rcard-body" id="out-tags"></div>
+        <div class="rcard-body" id="out-audience"></div>
       </div>
 
-      <!-- Banner -->
-      <div class="rcard" id="rc-banner">
+      <!-- Variant A -->
+      <div class="rcard" id="rc-varA">
         <div class="rcard-head">
-          <span>📌 Banner Text</span>
-          <button class="btn-copy" data-src="rc-banner">Kopieren</button>
+          <span>🅰️ Variante A – Conversion</span>
+          <button class="btn-copy" data-src="rc-varA">Kopieren</button>
         </div>
-        <div class="rcard-body" id="out-banner"></div>
+        <div class="rcard-body" id="out-varA"></div>
+      </div>
+
+      <!-- Variant B -->
+      <div class="rcard" id="rc-varB">
+        <div class="rcard-head">
+          <span>🅱️ Variante B – Viral</span>
+          <button class="btn-copy" data-src="rc-varB">Kopieren</button>
+        </div>
+        <div class="rcard-body" id="out-varB"></div>
+      </div>
+
+      <!-- Variant C -->
+      <div class="rcard" id="rc-varC">
+        <div class="rcard-head">
+          <span>🔴 Variante C – TikTok Live</span>
+          <button class="btn-copy" data-src="rc-varC">Kopieren</button>
+        </div>
+        <div class="rcard-body" id="out-varC"></div>
+      </div>
+
+      <!-- Banner Prompt -->
+      <div class="rcard" id="rc-banner-prompt">
+        <div class="rcard-head">
+          <span>🎨 Banner Prompt</span>
+          <button class="btn-copy" data-src="rc-banner-prompt">Kopieren</button>
+        </div>
+        <div class="rcard-body veo-out" id="out-banner-prompt"></div>
       </div>
 
       <!-- Veo Prompt -->
