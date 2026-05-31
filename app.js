@@ -1,189 +1,234 @@
 'use strict';
 
-// ── DOM refs ────────────────────────────────────────────────────────────────────────────────
-const dropZone      = document.getElementById('drop-zone');
-const dropZoneInner = document.getElementById('drop-zone-inner');
-const fileInput     = document.getElementById('file-input');
-const previewImg    = document.getElementById('preview-img');
-const backendUrlInput = document.getElementById('backend-url');
-const btnGenerate   = document.getElementById('btn-generate');
-const btnLabel      = document.getElementById('btn-label');
-const btnSpinner    = document.getElementById('btn-spinner');
-const errorBox      = document.getElementById('error-box');
-const errorMsg      = document.getElementById('error-msg');
-const resultsSection = document.getElementById('results');
-const btnCopyAll    = document.getElementById('btn-copy-all');
+/* ── DOM ── */
+const apiKeyEl   = document.getElementById('apiKey');
+const btnEye     = document.getElementById('btnEye');
+const eyeIcon    = document.getElementById('eyeIcon');
+const dropzone   = document.getElementById('dropzone');
+const dzInner    = document.getElementById('dzInner');
+const fileInput  = document.getElementById('fileInput');
+const preview    = document.getElementById('preview');
+const btnGen     = document.getElementById('btnGen');
+const btnLabel   = document.getElementById('btnLabel');
+const btnSpinner = document.getElementById('btnSpinner');
+const errbox     = document.getElementById('errbox');
+const errMsg     = document.getElementById('errMsg');
+const results    = document.getElementById('results');
+const btnCopyAll = document.getElementById('btnCopyAll');
 
-const titleContent    = document.getElementById('title-content');
-const hashtagsContent = document.getElementById('hashtags-content');
-const bannerContent   = document.getElementById('banner-content');
-const veoContent      = document.getElementById('veo-content');
-const liveContent     = document.getElementById('live-content');
+const outTitle  = document.getElementById('out-title');
+const outTags   = document.getElementById('out-tags');
+const outBanner = document.getElementById('out-banner');
+const outVeo    = document.getElementById('out-veo');
+const outLive   = document.getElementById('out-live');
 
-let selectedFile = null;
+/* ── State ── */
+let imageBase64 = null;
+let imageMime   = 'image/jpeg';
 
-(function init() {
-  const saved = localStorage.getItem('backendUrl');
-  if (saved) backendUrlInput.value = saved;
-  else backendUrlInput.value = '';
-})();
-
-backendUrlInput.addEventListener('input', () => {
-  localStorage.setItem('backendUrl', backendUrlInput.value.trim());
+/* ── API Key eye toggle ── */
+btnEye.addEventListener('click', () => {
+  const show = apiKeyEl.type === 'password';
+  apiKeyEl.type = show ? 'text' : 'password';
+  eyeIcon.style.opacity = show ? '0.45' : '1';
 });
 
-dropZone.addEventListener('click', (e) => {
-  if (e.target !== fileInput) fileInput.click();
+/* ── Dropzone ── */
+dropzone.addEventListener('click', e => { if (e.target !== fileInput) fileInput.click(); });
+dropzone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') fileInput.click(); });
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('over'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
 });
-dropZone.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === ' ') fileInput.click();
-});
-dropZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  dropZone.classList.add('drag-over');
-});
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-dropZone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  dropZone.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file) setFile(file);
-});
-fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) setFile(fileInput.files[0]);
-});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
 
-function setFile(file) {
-  if (!file.type.startsWith('image/')) { showError('Bitte nur Bilddateien hochladen.'); return; }
-  if (file.size > 10 * 1024 * 1024) { showError('Datei zu groß (max. 10 MB).'); return; }
-  selectedFile = file;
-  hideError();
+function loadFile(file) {
+  if (!file.type.startsWith('image/')) return showErr('Nur Bilddateien erlaubt (JPG, PNG, WEBP).');
+  if (file.size > 10 * 1024 * 1024) return showErr('Datei zu groß – max. 10 MB.');
+  imageMime = file.type;
   const reader = new FileReader();
-  reader.onload = (ev) => {
-    previewImg.src = ev.target.result;
-    previewImg.classList.add('visible');
-    dropZoneInner.style.display = 'none';
+  reader.onload = ev => {
+    imageBase64 = ev.target.result.split(',')[1];
+    preview.src = ev.target.result;
+    preview.classList.add('show');
+    dzInner.style.display = 'none';
+    hideErr();
   };
   reader.readAsDataURL(file);
 }
 
-function showError(msg) { errorMsg.textContent = msg; errorBox.hidden = false; }
-function hideError()    { errorBox.hidden = true; errorMsg.textContent = ''; }
-function setLoading(on) { btnGenerate.disabled = on; btnLabel.hidden = on; btnSpinner.hidden = !on; }
+/* ── Error helpers ── */
+function showErr(msg) { errMsg.textContent = msg; errbox.hidden = false; }
+function hideErr()    { errbox.hidden = true; }
+function setLoading(on) {
+  btnGen.disabled = on;
+  btnLabel.hidden = on;
+  btnSpinner.hidden = !on;
+}
 
-btnGenerate.addEventListener('click', generate);
+/* ── Generate ── */
+btnGen.addEventListener('click', generate);
 
 async function generate() {
-  hideError();
-  if (!selectedFile) { showError('Bitte zuerst ein Produktbild auswählen.'); return; }
-  const backendUrl = (backendUrlInput.value.trim() || '').replace(/\/$/, '');
-  if (!backendUrl) { showError('Bitte Backend-URL eingeben.'); return; }
+  hideErr();
+  const key = apiKeyEl.value.trim();
+  if (!key)         return showErr('Bitte Anthropic API Key eingeben.');
+  if (!imageBase64) return showErr('Bitte zuerst ein Produktbild hochladen.');
 
-  const formData = new FormData();
-  formData.append('image', selectedFile);
-  formData.append('category',   document.getElementById('category').value);
-  formData.append('videoStyle', document.getElementById('videoStyle').value);
-  formData.append('audience',   document.getElementById('audience').value);
-  formData.append('tone',       document.getElementById('tone').value);
+  const category = document.getElementById('category').value;
+  const style    = document.getElementById('style').value;
+  const audience = document.getElementById('audience').value;
+  const tone     = document.getElementById('tone').value;
 
   setLoading(true);
-  resultsSection.hidden = true;
+  results.hidden = true;
+
+  const systemPrompt = `Du bist ein TikTok-Shop-Marketing-Experte für den deutschen Markt.
+REGELN: Keine Preise, keine Rabatte, keine falschen Versprechen, TikTok-safe.
+Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor oder danach, keine Markdown-Codeblöcke.
+
+Gib exakt dieses JSON zurück:
+{
+  "title": "TikTok Titel mit Emoji, max 80 Zeichen",
+  "hashtags": ["#Tag1","#Tag2","#Tag3","#Tag4","#Tag5"],
+  "banner": ["Zeile 1 (max 28 Zeichen)","Zeile 2","Zeile 3","Call-to-Action"],
+  "veo": "Ausführlicher englischer Veo 3.1 Prompt für 10-Sekunden 9:16 TikTok-Produktvideo",
+  "live": "0:00 | Hook\\n0:15 | Produktvorstellung\\n0:30 | Feature 1\\n0:45 | Feature 2\\n1:00 | Feature 3\\n1:15 | Nutzen\\n1:30 | Call-to-Action\\n1:45 | Abschluss"
+}`;
+
+  const userPrompt = `Analysiere dieses Produktbild und erstelle TikTok-Shop-Content für Deutschland.
+
+Kategorie: ${category}
+Video-Stil: ${style}
+Zielgruppe: ${audience}
+Ton: ${tone}
+
+1. title – Mitreißender Titel mit Emoji, max 80 Zeichen
+2. hashtags – Genau 5 deutsche TikTok-Hashtags
+3. banner – 4 kurze Zeilen: 3 Highlights + 1 CTA (je max 28 Zeichen)
+4. veo – Detaillierter Veo 3.1 Prompt auf Englisch: Kamera, Licht, Bewegung, Stil, Sound für 10-Sek. 9:16 Video
+5. live – 2-Minuten-Live-Skript mit Timestamps "M:SS | Text"
+
+Nur JSON zurückgeben.`;
 
   try {
-    const response = await fetch(backendUrl + '/api/generate', { method: 'POST', body: formData });
-    let data;
-    try { data = await response.json(); } catch { throw new Error('Server returned invalid response.'); }
-    if (!response.ok) throw new Error(data.error || `Server-Fehler ${response.status}`);
-    renderResults(data);
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':         'application/json',
+        'x-api-key':            key,
+        'anthropic-version':    '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true',
+      },
+      body: JSON.stringify({
+        model:      'claude-opus-4-8',
+        max_tokens: 2048,
+        system:     systemPrompt,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: imageMime, data: imageBase64 } },
+            { type: 'text',  text: userPrompt },
+          ],
+        }],
+      }),
+    });
+
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.error?.message || `API-Fehler ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const raw  = data.content?.[0]?.text?.trim() || '';
+    const json = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    const parsed = JSON.parse(json);
+    render(parsed);
+
   } catch (err) {
-    showError(err.message || 'Unbekannter Fehler. Bitte Backend-URL prüfen.');
+    showErr(err.message || 'Unbekannter Fehler. API Key prüfen.');
   } finally {
     setLoading(false);
   }
 }
 
-function renderResults(data) {
-  titleContent.textContent = data.title || '—';
+/* ── Render ── */
+function render(d) {
+  outTitle.textContent = d.title || '—';
 
-  hashtagsContent.innerHTML = '';
-  const pillsWrapper = document.createElement('div');
-  pillsWrapper.className = 'hashtag-pills';
-  (Array.isArray(data.hashtags) ? data.hashtags : []).forEach(tag => {
-    const pill = document.createElement('span');
-    pill.className = 'hashtag-pill';
-    pill.textContent = tag;
-    pillsWrapper.appendChild(pill);
+  outTags.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'tag-wrap';
+  (d.hashtags || []).forEach(t => {
+    const s = document.createElement('span');
+    s.className = 'tag'; s.textContent = t;
+    wrap.appendChild(s);
   });
-  hashtagsContent.appendChild(pillsWrapper);
+  outTags.appendChild(wrap);
 
-  bannerContent.innerHTML = '';
-  (Array.isArray(data.banner) ? data.banner : []).forEach(line => {
+  outBanner.innerHTML = '';
+  (d.banner || []).forEach(l => {
     const div = document.createElement('div');
-    div.className = 'banner-line';
-    div.textContent = line;
-    bannerContent.appendChild(div);
+    div.className = 'bline'; div.textContent = l;
+    outBanner.appendChild(div);
   });
 
-  veoContent.textContent = data.veo || '—';
+  outVeo.textContent = d.veo || '—';
 
-  liveContent.innerHTML = '';
-  (data.live || '').split('\n').forEach(line => {
+  outLive.innerHTML = '';
+  (d.live || '').split('\n').forEach(line => {
     const span = document.createElement('span');
     span.className = 'live-line';
-    const m = line.match(/^(\d+:\d+)\s*\|(.*)$/);
+    const m = line.match(/^(\d+:\d+)\s*\|(.*)/);
     if (m) {
-      const tp = document.createElement('span');
-      tp.className = 'live-time';
-      tp.textContent = m[1];
-      span.appendChild(tp);
+      const ts = document.createElement('span');
+      ts.className = 'live-ts'; ts.textContent = m[1];
+      span.appendChild(ts);
       span.appendChild(document.createTextNode(m[2].trim()));
     } else { span.textContent = line; }
-    liveContent.appendChild(span);
+    outLive.appendChild(span);
   });
 
-  resultsSection.hidden = false;
-  resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  results.hidden = false;
+  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-document.addEventListener('click', (e) => {
+/* ── Copy ── */
+document.addEventListener('click', e => {
   const btn = e.target.closest('.btn-copy');
   if (!btn) return;
-  const el = document.getElementById(btn.dataset.target);
-  if (el) copyToClipboard(getPlainText(el), btn);
+  const card = document.getElementById(btn.dataset.src);
+  if (card) clip(card.querySelector('.rcard-body')?.innerText || '', btn);
 });
 
 btnCopyAll.addEventListener('click', () => {
   const all = [
-    '=== TikTok Titel ===\n'       + getPlainText(titleContent),
-    '=== Hashtags ===\n'           + getPlainText(hashtagsContent),
-    '=== Banner Text ===\n'        + getPlainText(bannerContent),
-    '=== Veo 3.1 Prompt ===\n'     + getPlainText(veoContent),
-    '=== TikTok Live Skript ===\n' + getPlainText(liveContent),
+    '=== TikTok Titel ===\n'       + (outTitle.innerText  || ''),
+    '=== Hashtags ===\n'           + (outTags.innerText   || ''),
+    '=== Banner Text ===\n'        + (outBanner.innerText || ''),
+    '=== Veo 3.1 Prompt ===\n'     + (outVeo.innerText    || ''),
+    '=== TikTok Live Script ===\n' + (outLive.innerText   || ''),
   ].join('\n\n');
-  copyToClipboard(all, btnCopyAll);
+  clip(all, btnCopyAll);
 });
 
-function getPlainText(el) { return (el.innerText || el.textContent || '').trim(); }
-
-function copyToClipboard(text, btn) {
+function clip(text, btn) {
   const orig = btn.textContent;
-  const origClass = btn.className;
-  const ok = () => {
+  const done = () => {
     btn.textContent = '✓ Kopiert';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = orig; btn.className = origClass; }, 2000);
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('ok'); }, 2000);
   };
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).then(ok).catch(() => fallbackCopy(text, ok));
-  } else { fallbackCopy(text, ok); }
+  if (navigator.clipboard && location.protocol === 'https:') {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallback(text, done));
+  } else { fallback(text, done); }
 }
-
-function fallbackCopy(text, ok) {
+function fallback(text, done) {
   const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
-  document.body.appendChild(ta);
-  ta.focus(); ta.select();
-  try { document.execCommand('copy'); ok(); } catch {}
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch {}
   document.body.removeChild(ta);
 }
