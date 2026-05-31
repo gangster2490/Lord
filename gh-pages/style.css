@@ -260,19 +260,34 @@ select:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
 .title-out{font-size:18px;font-weight:800;line-height:1.4}
 
 /* Hook selection */
-.hook-list{display:flex;flex-direction:column;gap:10px}
+.hook-batch{display:flex;flex-direction:column;gap:8px}
+.hook-batch-divider{
+  display:flex;align-items:center;gap:10px;margin:10px 0 4px;
+  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);
+}
+.hook-batch-divider::before,.hook-batch-divider::after{
+  content:'';flex:1;height:1px;background:var(--b);
+}
 .hook-item{
   background:var(--bg3);border:1px solid var(--b);border-radius:10px;
-  padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:11px 13px;display:flex;align-items:center;justify-content:space-between;gap:12px;
   transition:border-color .18s;
 }
 .hook-item:hover{border-color:rgba(255,255,255,.15)}
+.hook-item.selected{border-color:var(--gbord);background:rgba(57,255,20,.04)}
 .hook-meta{flex:1;min-width:0}
-.hook-angle{
-  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
-  color:var(--mid);margin-bottom:3px;
+.hook-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.hook-score{
+  display:inline-block;background:rgba(57,255,20,.13);color:var(--g);
+  font-size:10px;font-weight:800;padding:1px 7px;border-radius:4px;font-family:monospace;
 }
-.hook-text{font-size:15px;font-weight:700;color:var(--txt);line-height:1.3}
+.hook-angle{
+  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--mid);
+}
+.hook-text{
+  font-size:14px;font-weight:800;color:var(--txt);letter-spacing:.04em;
+  text-transform:uppercase;line-height:1.25;
+}
 .btn-hook{
   flex-shrink:0;
   background:var(--bg4);border:1px solid var(--b);border-radius:8px;
@@ -285,6 +300,16 @@ select:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
 .hook-hint{
   font-size:11.5px;color:var(--mid);margin-top:14px;text-align:center;
 }
+
+/* Neue Hooks button */
+.btn-neue-hooks{
+  background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);border-radius:8px;
+  color:#fbbf24;font-size:10px;font-weight:800;
+  padding:4px 12px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;
+  transition:all .18s;
+}
+.btn-neue-hooks:hover{background:rgba(251,191,36,.2);border-color:rgba(251,191,36,.5)}
+.btn-neue-hooks:disabled{opacity:.4;cursor:not-allowed}
 
 /* Step 2 loading */
 .step2-spinner{
