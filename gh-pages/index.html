@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <title>TikTok Shop Creator – SparDirekt DE</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <span class="logo">⚡ TikTok Shop Creator</span>
+    <span class="badge">SparDirekt DE</span>
+  </header>
+
+  <main>
+
+    <!-- API Key -->
+    <section class="card">
+      <div class="card-label">🔑 Anthropic API Key</div>
+      <div class="key-row">
+        <input type="password" id="apiKey" placeholder="sk-ant-api03-..." spellcheck="false" autocomplete="off" />
+        <button class="btn-eye" id="btnEye" aria-label="Key anzeigen">
+          <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+      <p class="hint">Dein Key bleibt nur im Browser. Er wird nie gespeichert oder weitergegeben.</p>
+    </section>
+
+    <!-- Upload -->
+    <section class="card">
+      <div class="card-label">📸 Produktbild</div>
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Bild hochladen">
+        <div class="dz-inner" id="dzInner">
+          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 16V4m0 0L8 8m4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 16.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5" stroke-linecap="round"/>
+          </svg>
+          <p class="dz-text">Bild hierher ziehen</p>
+          <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
+        </div>
+        <img id="preview" class="preview" alt="Vorschau" />
+        <input type="file" id="fileInput" accept="image/*" />
+      </div>
+    </section>
+
+    <!-- Options -->
+    <section class="card">
+      <div class="card-label">🎨 Einstellungen</div>
+      <div class="grid2">
+        <div class="field">
+          <label for="category">Kategorie</label>
+          <select id="category">
+            <option>Elektronik &amp; Gadgets</option>
+            <option>Mode &amp; Accessoires</option>
+            <option>Beauty &amp; Kosmetik</option>
+            <option>Sport &amp; Outdoor</option>
+            <option>Haushalt &amp; Küche</option>
+            <option>Gesundheit &amp; Wellness</option>
+            <option>Kinder &amp; Familie</option>
+            <option>Heimtiere</option>
+            <option>Lebensmittel</option>
+            <option>Allgemein</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="style">Video-Stil</label>
+          <select id="style">
+            <option>Trendy &amp; viral</option>
+            <option>Aesthetic &amp; ruhig</option>
+            <option>Energetisch &amp; schnell</option>
+            <option>Storytelling</option>
+            <option>Unboxing</option>
+            <option>Tutorial / How-to</option>
+            <option>Before &amp; After</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="audience">Zielgruppe</label>
+          <select id="audience">
+            <option>Gen Z (16–24)</option>
+            <option>Millennials (25–34)</option>
+            <option>Berufstätige (30–45)</option>
+            <option>Eltern &amp; Familie</option>
+            <option>Senioren (50+)</option>
+            <option>Allgemein</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tone">Ton</label>
+          <select id="tone">
+            <option>Freundlich &amp; persönlich</option>
+            <option>Aufgeregt &amp; enthusiastisch</option>
+            <option>Professionell &amp; seriös</option>
+            <option>Humorvoll &amp; locker</option>
+            <option>Inspirierend &amp; motivierend</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Button -->
+    <button class="btn-gen" id="btnGen">
+      <span id="btnLabel">⚡ Content generieren</span>
+      <span id="btnSpinner" class="spinner" hidden></span>
+    </button>
+
+    <!-- Error -->
+    <div class="errbox" id="errbox" hidden>
+      <strong>⚠ Fehler:</strong> <span id="errMsg"></span>
+    </div>
+
+    <!-- Results -->
+    <section id="results" hidden>
+
+      <div class="res-header">
+        <h2>Ergebnisse</h2>
+        <button class="btn-copyall" id="btnCopyAll">Alles kopieren</button>
+      </div>
+
+      <div class="rcard" id="rc-title">
+        <div class="rcard-head">
+          <span>🎬 TikTok Titel</span>
+          <button class="btn-copy" data-src="rc-title">Kopieren</button>
+        </div>
+        <div class="rcard-body title-out" id="out-title"></div>
+      </div>
+
+      <div class="rcard" id="rc-tags">
+        <div class="rcard-head">
+          <span># Hashtags</span>
+          <button class="btn-copy" data-src="rc-tags">Kopieren</button>
+        </div>
+        <div class="rcard-body" id="out-tags"></div>
+      </div>
+
+      <div class="rcard" id="rc-banner">
+        <div class="rcard-head">
+          <span>📌 Banner Text</span>
+          <button class="btn-copy" data-src="rc-banner">Kopieren</button>
+        </div>
+        <div class="rcard-body" id="out-banner"></div>
+      </div>
+
+      <div class="rcard" id="rc-veo">
+        <div class="rcard-head">
+          <span>🎥 Veo 3.1 Prompt</span>
+          <button class="btn-copy" data-src="rc-veo">Kopieren</button>
+        </div>
+        <div class="rcard-body veo-out" id="out-veo"></div>
+      </div>
+
+      <div class="rcard" id="rc-live">
+        <div class="rcard-head">
+          <span>🔴 TikTok Live Script</span>
+          <button class="btn-copy" data-src="rc-live">Kopieren</button>
+        </div>
+        <div class="rcard-body" id="out-live"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <footer>TikTok Shop Creator · SparDirekt DE · Kein Preis · Keine Rabatte · TikTok-safe</footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
