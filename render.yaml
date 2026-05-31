@@ -3,9 +3,12 @@ services:
     name: tiktok-shop-creator-proxy
     runtime: node
     rootDir: proxy
-    buildCommand: "echo 'no build needed'"
+    buildCommand: "npm install --omit=dev"
     startCommand: "node server.js"
     plan: free
+    healthCheckPath: /health
     envVars:
       - key: PORT
         value: 10000
+      - key: NODE_ENV
+        value: production
