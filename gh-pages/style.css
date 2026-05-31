@@ -263,6 +263,26 @@ select:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
 }
 .sfx-ts{background:rgba(245,158,11,.15)!important;color:#fbbf24!important}
 
+/* Produktdaten facts grid */
+.facts-grid{display:flex;flex-direction:column;gap:6px}
+.fact-row{
+  display:flex;gap:10px;font-size:13px;line-height:1.5;
+  padding:5px 0;border-bottom:1px solid var(--b);
+}
+.fact-row:last-child{border-bottom:none}
+.fact-key{
+  flex-shrink:0;width:130px;
+  font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--mid);padding-top:1px;
+}
+.fact-val{color:var(--txt);flex:1;word-break:break-word}
+.fact-val.unknown{color:var(--dim);font-style:italic}
+.fact-tags{display:flex;flex-wrap:wrap;gap:5px}
+.fact-tag{
+  background:var(--bg3);border:1px solid var(--b);border-radius:6px;
+  font-size:12px;padding:2px 9px;color:var(--txt);
+}
+
 /* Copy btn */
 .btn-copy{
   background:none;border:1px solid var(--b);border-radius:6px;

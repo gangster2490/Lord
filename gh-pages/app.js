@@ -27,6 +27,7 @@ const errMsg        = document.getElementById('errMsg');
 const results       = document.getElementById('results');
 const btnCopyAll    = document.getElementById('btnCopyAll');
 
+const outFacts      = document.getElementById('out-facts');
 const outTitle      = document.getElementById('out-title');
 const outTags       = document.getElementById('out-tags');
 const outBanner     = document.getElementById('out-banner');
@@ -138,25 +139,50 @@ const SYSTEM_PROMPT = `Du bist ein TikTok-Shop-Marketing-Experte und Videoproduk
 
 BILDNUTZUNG:
 - Bild 1 (Produktbild): Nutze es zur visuellen Erkennung des Produkts – Aussehen, Farbe, Form, Verpackung.
-- Bild 2 (Beschreibungsbild, falls vorhanden): Lese daraus alle faktischen Produktinfos: Titel, Features, Spezifikationen, Material, Größe, Kapazität, Anwendungsfälle, Warnhinweise.
-- Erfinde keine Features. Wenn eine Eigenschaft nur im Beschreibungsbild steht, darfst du sie verwenden.
-- Wenn Informationen unklar sind, bleibe allgemein.
+- Bild 2 (Beschreibungsbild, falls vorhanden): Lies daraus alle sichtbaren Produktfakten heraus.
+
+PRODUKTFAKTEN EXTRAHIEREN (nur aus Bild 2, falls vorhanden):
+Extrahiere ausschließlich sichtbare, belegbare Fakten:
+- Produktname
+- Maße / Abmessungen
+- Kapazität / Volumen
+- Material
+- Gewicht
+- Farbe
+- Lieferumfang (enthaltene Teile)
+- Hauptfeatures (max. 6 Stichpunkte)
+- Warnhinweise / Einschränkungen
+- Anwendungsfälle
 
 REGELN:
-- Keine Preise, keine Rabatte, keine falschen Versprechen
-- TikTok-safe: keine irreführenden Claims
-- Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor oder danach, keine Markdown-Codeblöcke
+- Erfinde KEINE Fakten. Wenn ein Wert nicht sichtbar oder unklar ist, setze "Nicht erkennbar".
+- Nutze die extrahierten Fakten aktiv in: title, banner, veoPrompt, voiceoverText, live.
+- Keine Preise, keine Rabatte, keine falschen Versprechen.
+- TikTok-safe: keine irreführenden Claims.
+- Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor oder danach, keine Markdown-Codeblöcke.
 
 Gib exakt dieses JSON zurück:
 {
-  "title": "TikTok Titel mit Emoji, max 80 Zeichen",
+  "productFacts": {
+    "name": "Produktname oder 'Nicht erkennbar'",
+    "dimensions": "z.B. '30 x 20 x 10 cm' oder 'Nicht erkennbar'",
+    "capacity": "z.B. '500 ml' oder 'Nicht erkennbar'",
+    "material": "z.B. 'Edelstahl, BPA-frei' oder 'Nicht erkennbar'",
+    "weight": "z.B. '320 g' oder 'Nicht erkennbar'",
+    "color": "z.B. 'Schwarz / Silber' oder 'Nicht erkennbar'",
+    "includedItems": ["Teil 1", "Teil 2"],
+    "keyFeatures": ["Feature 1", "Feature 2", "Feature 3"],
+    "warnings": ["Warnung 1"],
+    "useCases": ["Anwendung 1", "Anwendung 2"]
+  },
+  "title": "TikTok Titel mit Emoji, max 80 Zeichen – nutze echte Produktfakten",
   "hashtags": ["#Tag1","#Tag2","#Tag3","#Tag4","#Tag5"],
-  "banner": ["Zeile 1 (max 28 Zeichen)","Zeile 2","Zeile 3","Call-to-Action"],
-  "veoPrompt": "Detaillierter englischer Veo 3.1 Prompt für ein 10-Sekunden 9:16 vertikales TikTok-Produktvideo. Enthält: Szenenaufbau, Kamerabewegungen (z.B. slow push-in, arc shot), Beleuchtung, Produktplatzierung, Übergänge, On-Screen-Text-Overlays mit Timing, Farbpalette und visuellen Stil.",
-  "voiceoverText": "Deutschsprachiger Voiceover-Text im natürlichen TikTok-Shop-Verkäufer-Stil. Kurze Sätze. Jede Zeile passt zu einem 1-2 Sek. Videoabschnitt. Optimiert für ElevenLabs-TTS. Format: eine Zeile pro Timing-Beat, z.B.: '0s – Satz 1\\n2s – Satz 2\\n4s – Satz 3'",
-  "musicSuggestion": "Konkrete Musikbeschreibung für das Video: Genre, Tempo (BPM), Energie, Instrumente, Stimmung, Referenz-Stil (z.B. 'Lo-fi Hip-Hop Beat, 95 BPM, entspannt aber fokussiert, Klavier + subtile Drums, ähnlich wie typische TikTok-Shop-Backgroundmusik')",
-  "soundEffects": "Liste der Sound-Effekte mit Timing, z.B.: '0s – Whoosh-Intro\\n2s – Soft Impact beim Produktclose-up\\n6s – Subtle Riser\\n9s – Ding/Chime beim CTA'",
-  "live": "0:00 | Hook\\n0:15 | Produktvorstellung\\n0:30 | Feature 1\\n0:45 | Feature 2\\n1:00 | Feature 3\\n1:15 | Nutzen für den Käufer\\n1:30 | Call-to-Action\\n1:45 | Abschluss & Verabschiedung"
+  "banner": ["Zeile 1 (max 28 Zeichen, Fakten-basiert)","Zeile 2","Zeile 3","Call-to-Action"],
+  "veoPrompt": "Detaillierter englischer Veo 3.1 Prompt für ein 10-Sekunden 9:16 vertikales TikTok-Produktvideo. Enthält: Szenenaufbau, Kamerabewegungen (z.B. slow push-in, arc shot), Beleuchtung, Produktplatzierung, Übergänge, On-Screen-Text-Overlays mit echten Produktfakten und Timing, Farbpalette und visuellen Stil.",
+  "voiceoverText": "Deutschsprachiger Voiceover-Text im natürlichen TikTok-Shop-Verkäufer-Stil. Nutze echte Fakten aus productFacts. Kurze Sätze. Format: '0s – Satz 1\\n2s – Satz 2\\n4s – Satz 3'",
+  "musicSuggestion": "Konkrete Musikbeschreibung für das Video: Genre, Tempo (BPM), Energie, Instrumente, Stimmung, Referenz-Stil",
+  "soundEffects": "Sound-Effekte mit Timing: '0s – Whoosh-Intro\\n2s – Soft Impact\\n6s – Subtle Riser\\n9s – Chime CTA'",
+  "live": "2-Minuten TikTok-Live-Skript mit echten Produktfakten: '0:00 | Hook\\n0:15 | Produktvorstellung\\n0:30 | Feature 1\\n0:45 | Feature 2\\n1:00 | Feature 3\\n1:15 | Nutzen\\n1:30 | CTA\\n1:45 | Abschluss'"
 }`;
 
 /* ── Generate ── */
@@ -280,6 +306,59 @@ Nur JSON zurückgeben – kein erklärender Text.`,
 
 /* ── Render ── */
 function render(d) {
+  /* Produktdaten */
+  const pf = d.productFacts || {};
+  outFacts.innerHTML = '';
+  const factsGrid = document.createElement('div');
+  factsGrid.className = 'facts-grid';
+
+  function addFactRow(label, val) {
+    const row = document.createElement('div');
+    row.className = 'fact-row';
+    const k = document.createElement('span');
+    k.className = 'fact-key';
+    k.textContent = label;
+    const v = document.createElement('span');
+    v.className = 'fact-val' + (!val || val === 'Nicht erkennbar' ? ' unknown' : '');
+    v.textContent = val || 'Nicht erkennbar';
+    row.appendChild(k);
+    row.appendChild(v);
+    factsGrid.appendChild(row);
+  }
+
+  function addFactTags(label, arr) {
+    if (!arr || !arr.length) { addFactRow(label, 'Nicht erkennbar'); return; }
+    const row = document.createElement('div');
+    row.className = 'fact-row';
+    const k = document.createElement('span');
+    k.className = 'fact-key';
+    k.textContent = label;
+    const v = document.createElement('div');
+    v.className = 'fact-val fact-tags';
+    arr.forEach(item => {
+      const t = document.createElement('span');
+      t.className = 'fact-tag';
+      t.textContent = item;
+      v.appendChild(t);
+    });
+    row.appendChild(k);
+    row.appendChild(v);
+    factsGrid.appendChild(row);
+  }
+
+  addFactRow('Produktname',  pf.name);
+  addFactRow('Maße',         pf.dimensions);
+  addFactRow('Kapazität',    pf.capacity);
+  addFactRow('Material',     pf.material);
+  addFactRow('Gewicht',      pf.weight);
+  addFactRow('Farbe',        pf.color);
+  addFactTags('Lieferumfang',  pf.includedItems);
+  addFactTags('Features',      pf.keyFeatures);
+  addFactTags('Warnhinweise',  pf.warnings);
+  addFactTags('Anwendung',     pf.useCases);
+
+  outFacts.appendChild(factsGrid);
+
   /* Title */
   outTitle.textContent = d.title || '—';
 
@@ -381,6 +460,7 @@ document.addEventListener('click', e => {
 
 btnCopyAll.addEventListener('click', () => {
   const all = [
+    '=== Produktdaten ===\n'        + (outFacts.innerText      || ''),
     '=== TikTok Titel ===\n'        + (outTitle.innerText     || ''),
     '=== Hashtags ===\n'            + (outTags.innerText      || ''),
     '=== Banner Text ===\n'         + (outBanner.innerText    || ''),
