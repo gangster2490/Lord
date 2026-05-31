@@ -250,10 +250,34 @@ select:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
 .voiceover-out{font-size:14px;line-height:1.85;font-style:italic}
 
 /* Card accent colours */
-#rc-facts    {border-top-color:#22d3ee}
-#rc-voiceover{border-top-color:#a855f7}
-#rc-music    {border-top-color:#3b82f6}
-#rc-sfx      {border-top-color:#f59e0b}
+#rc-facts        {border-top-color:#22d3ee}
+#rc-category     {border-top-color:#34d399}
+#rc-audience     {border-top-color:#818cf8}
+#rc-varA         {border-top-color:#f97316}
+#rc-varB         {border-top-color:#ec4899}
+#rc-varC         {border-top-color:#ef4444}
+#rc-banner-prompt{border-top-color:#a78bfa}
+#rc-voiceover    {border-top-color:#a855f7}
+#rc-music        {border-top-color:#3b82f6}
+#rc-sfx          {border-top-color:#f59e0b}
+
+/* Variant card internals */
+.variant-section{margin-bottom:14px}
+.variant-section:last-child{margin-bottom:0}
+.variant-label{
+  font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--mid);margin-bottom:6px;
+}
+.variant-title{font-size:16px;font-weight:800;margin-bottom:8px;line-height:1.3}
+.cta-box{
+  background:rgba(57,255,20,.07);border:1px solid var(--gbord);border-radius:8px;
+  padding:8px 13px;font-weight:700;font-size:13.5px;color:var(--g);margin-top:4px;
+}
+.variant-divider{border:none;border-top:1px solid var(--b);margin:12px 0}
+
+/* Auto-category / audience */
+.detect-val{font-size:15px;font-weight:700;color:var(--txt)}
+.detect-reason{font-size:12px;color:var(--mid);margin-top:4px;line-height:1.5}
 
 /* Live / timing lines */
 .live-line{display:block;margin-bottom:4px}
