@@ -1,18 +1,17 @@
 'use strict';
 
 /* ── DOM ── */
-const apiKeyEl      = document.getElementById('apiKey');
-const btnEye        = document.getElementById('btnEye');
-const eyeIcon       = document.getElementById('eyeIcon');
-const proxyUrlEl    = document.getElementById('proxyUrl');
-const btnGen        = document.getElementById('btnGen');
-const btnLabel      = document.getElementById('btnLabel');
-const btnSpinner    = document.getElementById('btnSpinner');
-const errbox        = document.getElementById('errbox');
-const errMsg        = document.getElementById('errMsg');
-const results       = document.getElementById('results');
-const btnCopyAll    = document.getElementById('btnCopyAll');
-const btnNeueHooks  = document.getElementById('btnNeueHooks');
+const apiKeyEl   = document.getElementById('apiKey');
+const btnEye     = document.getElementById('btnEye');
+const eyeIcon    = document.getElementById('eyeIcon');
+const proxyUrlEl = document.getElementById('proxyUrl');
+const btnGen     = document.getElementById('btnGen');
+const btnLabel   = document.getElementById('btnLabel');
+const btnSpinner = document.getElementById('btnSpinner');
+const errbox     = document.getElementById('errbox');
+const errMsg     = document.getElementById('errMsg');
+const results    = document.getElementById('results');
+const btnCopyAll = document.getElementById('btnCopyAll');
 
 /* ── Safe helpers ── */
 function $id(id) {
@@ -25,19 +24,12 @@ function $clear(el) { if (el) el.innerHTML = ''; }
 function $append(el, child) { if (el && child) el.appendChild(child); }
 
 const outFacts        = $id('out-facts');
-const outHooks        = $id('out-hooks');
-const outHashtags     = $id('out-hashtags');
 const outTitle        = $id('out-title');
+const outHashtags     = $id('out-hashtags');
 const outBanner       = $id('out-banner');
 const outVeo          = $id('out-veo');
 const outLive         = $id('out-live');
 const outBannerPrompt = $id('out-banner-prompt');
-
-const rcTitle        = $id('rc-title');
-const rcBanner       = $id('rc-banner');
-const rcVeo          = $id('rc-veo');
-const rcLive         = $id('rc-live');
-const rcBannerPrompt = $id('rc-banner-prompt');
 
 /* ── Image state (3 slots) ── */
 const images = [
@@ -45,11 +37,6 @@ const images = [
   { base64: null, mime: 'image/jpeg' },
   { base64: null, mime: 'image/jpeg' },
 ];
-
-/* ── Workflow state ── */
-let step1Data        = null;  // { productFacts, hashtags, hooks }
-let allHookBatches   = [];    // array of hook arrays, one per generation
-let selectedHookGlobal = null; // { batchIdx, hookIdx, hook }
 
 /* ── Persist proxy URL ── */
 (function init() {
@@ -131,87 +118,11 @@ function setLoading(on) {
   btnSpinner.hidden = !on;
 }
 
-/* ── API call helper ── */
-async function callClaude(payload) {
-  const key      = apiKeyEl.value.trim();
-  const proxyUrl = (proxyUrlEl.value.trim() || 'http://localhost:3001').replace(/\/$/, '');
+/* ── System prompt ── */
+const SYSTEM_PROMPT = `Du bist ein TikTok-Shop-Marketing-Experte und Videoproduktions-Spezialist für den deutschen Markt.
 
-  let resp;
-  try {
-    resp = await fetch(`${proxyUrl}/api/generate`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key-fwd': key },
-      body:    JSON.stringify(payload),
-    });
-  } catch {
-    throw new Error(
-      `Proxy nicht erreichbar (<code>${proxyUrl}</code>).<br>` +
-      `Starte: <code>cd proxy &amp;&amp; node server.js</code>`
-    );
-  }
-
-  const text = await resp.text();
-  console.log('[TikTok Creator] status:', resp.status, text.slice(0, 300));
-
-  let data;
-  try { data = JSON.parse(text); } catch {
-    throw new Error(`Ungültige Proxy-Antwort (${resp.status}):<br><code>${text.slice(0, 200)}</code>`);
-  }
-  if (!resp.ok) {
-    throw new Error(`API-Fehler ${resp.status}: ${data.error?.message || data.error || JSON.stringify(data)}`);
-  }
-
-  const rawText = data.content?.[0]?.text?.trim() || '';
-  if (!rawText) throw new Error('Anthropic hat eine leere Antwort zurückgegeben.');
-
-  const jsonStr = rawText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
-  try { return JSON.parse(jsonStr); } catch {
-    throw new Error(`Claude-Antwort kein gültiges JSON:<br><code>${rawText.slice(0, 400)}</code>`);
-  }
-}
-
-/* ══════════════════════════════════════
-   STEP 1 – Produktdaten + Hooks + Tags
-══════════════════════════════════════ */
-const HOOK_RULES = `HOOK-REGELN (strikt einhalten):
-- Genau 5 Hooks, einen pro psychologischem Winkel
-- Maximal 6 Wörter pro Hook
-- Sprache: Deutsch
-- Plattform: TikTok Shop Deutschland
-- Videolänge: 8 Sekunden
-- GROSSBUCHSTABEN für den Hook-Text
-- Bewerte jeden Hook von 0–100 nach Scroll-Stop-Potenzial
-- Stärksten Hook zuerst (höchste Punktzahl zuerst sortieren)
-- Psychologische Winkel: Pain, Curiosity, Convenience, Benefit, Emotional
-
-VERBOTEN:
-- Keine Emojis im Hook-Text
-- Keine Markennamen
-- Keine Rabatt- oder Preis-Sprache
-- Keine generischen Marketing-Phrasen
-- Kein Clickbait der nicht beweisbar ist
-- Keine erfundenen Produkteigenschaften
-
-HOOK-PRODUKTREGEL (KRITISCH):
-Hooks dürfen ein Kundenproblem beschreiben – aber sie dürfen das Produkt NICHT verändern.
-Das im Video gezeigte Produkt bleibt immer das hochgeladene Produkt.
-FALSCH: Hook "Rollen fallen ständig um?" → Video zeigt spezielle Halterungen die nicht existieren.
-RICHTIG: Hook "Rollen fallen ständig um?" → Video zeigt das echte Produkt mit sichtbaren Staufächern.
-
-FOKUS: Echte Kundenschmerzpunkte, konkrete Vorteile, ehrliche Neugier.`;
-
-const SYSTEM_STEP1 = `Du bist ein TikTok-Shop-Marketing-Experte für den deutschen Markt.
-
-PRODUCT ACCURACY MODE – AKTIV:
-Die hochgeladenen Bilder sind die einzige Wahrheitsquelle.
-Erfinde KEINE: Taschen, Fächer, Zubehör, Griffe, Riemen, Materialien, Farben, Maße, Funktionen.
-Füge KEINE Features hinzu, die nicht klar sichtbar oder durch OCR-Text bestätigt sind.
-Wenn Informationen fehlen: verwende generische Formulierungen. Nicht erfinden.
-
-BILDNUTZUNG (OCR auf allen hochgeladenen Bildern):
-- Bild 1: Produktbild – visuelle Erkennung (Aussehen, Farbe, Form, Verpackung).
-- Bild 2 (falls vorhanden): Produktbeschreibung / Spezifikationen – extrahiere alle lesbaren Fakten via OCR.
-- Bild 3 (falls vorhanden): Zusatzbild – weitere Fakten via OCR (Verpackung, Etikett, Lieferumfang, Zertifizierungen).
+━━━ PRODUCT ACCURACY MODE – AKTIV ━━━
+Die hochgeladenen Bilder und OCR-Texte sind die EINZIGE Wahrheitsquelle.
 
 GENAUIGKEITS-PRIORITÄT:
 1. Hochgeladene Bilder (höchste Priorität)
@@ -219,13 +130,47 @@ GENAUIGKEITS-PRIORITÄT:
 3. Extrahierte Produktfakten
 4. Marketing-Kreativität (niedrigste Priorität)
 
+VERBOTEN – erfinde NIEMALS:
+- Taschen, Fächer oder Kompartimente die nicht sichtbar sind
+- Zubehör, Griffe, Riemen oder Befestigungen die nicht sichtbar sind
+- Materialien, Farben, Maße oder Gewichte die nicht bestätigt sind
+- Produktfunktionen die nicht erkennbar oder im OCR-Text genannt sind
+- Alternative, verbesserte, futuristische oder konzeptionelle Produktversionen
+
+Bei fehlenden Informationen: generische Formulierungen verwenden. NICHT erfinden.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BILDNUTZUNG (OCR auf allen hochgeladenen Bildern):
+- Bild 1: Produktbild – visuelle Erkennung (Aussehen, Farbe, Form, Verpackung).
+- Bild 2 (falls vorhanden): Produktbeschreibung / Spezifikationen – extrahiere alle lesbaren Fakten via OCR.
+- Bild 3 (falls vorhanden): Zusatzbild – weitere Fakten via OCR (Verpackung, Etikett, Lieferumfang, Zertifizierungen).
+Fakten aus allen Bildern zusammenführen und in productFacts eintragen.
+
 PRODUKTFAKTEN: Nur aus sichtbaren Informationen. Nicht erkennbare Werte = "Nicht erkennbar". Nichts erfinden.
 
-${HOOK_RULES}
+VEO 3.1 MASTER PROMPT REGELN:
+Vor dem Schreiben des veoPrompt: erstelle intern eine Checkliste aller sichtbaren Produktfeatures.
+Verwende NUR Features die auf dieser Checkliste stehen – kein Feature hinzufügen das nicht bestätigt ist.
+Das Produkt im Video muss visuell identisch mit den hochgeladenen Bildern sein: gleiche Form, Farbe, Größe, Layout.
 
-HASHTAGS: 7 relevante deutsche TikTok-Hashtags.
+Der veoPrompt muss ALLES enthalten – er ist der vollständige Produktionsplan:
+[PRODUKT] Beschreibe das Produkt exakt so wie es in den Bildern erscheint.
+[SZENEN-TIMING] 0s-2s Intro/Hook, 2s-4s Produktreveal, 4s-6s Feature-Highlight, 6s-8s CTA.
+[KAMERA] Spezifische Kamerabewegungen pro Szene (Schwenk, Zoom, Nahaufnahme etc.).
+[BELEUCHTUNG] Lichtsetup und Stimmung.
+[ON-SCREEN TEXT] Exakte deutsche Overlays mit bestätigten Produktfakten und Zeitangaben.
+[VOICEOVER MÄNNLICH DEUTSCH] Vollständiges Skript mit Timing-Beats (0s – Satz, 2s – Satz, usw.).
+[HINTERGRUNDMUSIK] Genre, BPM, Energie, Stimmung.
+[SOUND EFFECTS] Timing-Beats mit Beschreibung.
+Schreibe veoPrompt auf Englisch, detailliert und produktionsfähig. Videolänge: 8 Sekunden, 9:16 vertikal.
+
+BANNER PROMPT REGEL:
+bannerPrompt ist NUR für KI-Bildgeneratoren (kein Video).
+Beschreibe NUR sichtbare Produktfeatures – kein Feature das nicht in den Bildern sichtbar ist.
+Englisch, 9:16, schwarzer Hintergrund, Neongrün (#39FF14), kein Preis, keine Rabatte.
 
 REGELN: Keine Preise, Rabatte, falschen Versprechen. TikTok-safe.
+Marketing-Text auf Deutsch. veoPrompt und bannerPrompt auf Englisch.
 Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor/danach, keine Markdown-Blöcke.
 
 Gib exakt dieses JSON zurück:
@@ -242,37 +187,31 @@ Gib exakt dieses JSON zurück:
     "warnings": [],
     "useCases": []
   },
+  "title": "TikTok-Titel mit Emoji, max 80 Zeichen, Scroll-Stop-Hook",
   "hashtags": ["#Tag1","#Tag2","#Tag3","#Tag4","#Tag5","#Tag6","#Tag7"],
-  "hooks": [
-    {"score": 95, "angle": "Pain",        "text": "HOOK TEXT MAX 6 WÖRTER"},
-    {"score": 92, "angle": "Curiosity",   "text": "HOOK TEXT MAX 6 WÖRTER"},
-    {"score": 89, "angle": "Convenience", "text": "HOOK TEXT MAX 6 WÖRTER"},
-    {"score": 86, "angle": "Benefit",     "text": "HOOK TEXT MAX 6 WÖRTER"},
-    {"score": 82, "angle": "Emotional",   "text": "HOOK TEXT MAX 6 WÖRTER"}
-  ]
+  "bannerText": ["Zeile 1 max 28 Zeichen","Zeile 2","Zeile 3","CTA-Zeile"],
+  "veoPrompt": "Complete English Veo 3.1 production prompt for an 8-second 9:16 vertical TikTok product video. [PRODUCT ACCURACY] show only the exact product from uploaded images – same shape, color, size, layout, no redesign. [PRODUCT CHECKLIST] list confirmed visible features used. [SCENE TIMING] 0s-2s hook/intro, 2s-4s product reveal, 4s-6s feature highlight, 6s-8s CTA. [CAMERA] movements per scene. [LIGHTING] setup and mood. [ON-SCREEN TEXT] exact German overlays at specific seconds using confirmed facts only. [GERMAN MALE VOICEOVER] full script: 0s – line, 2s – line, 4s – line, 6s – line, 8s – CTA. [BACKGROUND MUSIC] genre, BPM, mood, energy. [SOUND EFFECTS] 0s – effect, 2s – effect, 6s – effect, 8s – effect.",
+  "live": "0:00 | Hook-Eröffnung\n0:15 | Produktvorstellung\n0:30 | Feature 1\n0:45 | Feature 2\n1:00 | Feature 3\n1:15 | Nutzen & Mehrwert\n1:30 | Community-Frage\n1:45 | CTA & Abschluss",
+  "bannerPrompt": "English AI image generation prompt for 9:16 vertical TikTok Shop product banner. ACCURACY: only features visible in uploaded images. Pure black background, neon green #39FF14 accent, large bold German product headline, product dramatically centered and lit exactly as it appears in images – no modifications, SparDirekt DE minimal style, no prices, no discount stickers, photorealistic."
 }`;
 
-btnGen.addEventListener('click', runStep1);
+/* ── Generate ── */
+btnGen.addEventListener('click', generate);
 
-async function runStep1() {
+async function generate() {
   hideErr();
 
-  const key = apiKeyEl.value.trim();
+  const key      = apiKeyEl.value.trim();
+  const proxyUrl = (proxyUrlEl.value.trim() || 'http://localhost:3001').replace(/\/$/, '');
+
   if (!key)               return showErr('Bitte Anthropic API Key eingeben.');
   if (!images[0].base64) return showErr('Bitte zuerst ein Produktbild hochladen (Bild 1).');
 
   const style = document.getElementById('style').value;
   const tone  = document.getElementById('tone').value;
 
-  // Reset workflow
-  step1Data           = null;
-  allHookBatches      = [];
-  selectedHookGlobal  = null;
-  if (results) results.hidden = true;
-  if (btnNeueHooks) btnNeueHooks.hidden = true;
-  [rcTitle, rcBanner, rcVeo, rcLive, rcBannerPrompt].forEach(el => { if (el) el.hidden = true; });
-
   setLoading(true);
+  if (results) results.hidden = true;
 
   const activeImages = images.filter(img => img.base64);
   const imgCount     = activeImages.length;
@@ -290,42 +229,76 @@ async function runStep1() {
 
   userContent.push({
     type: 'text',
-    text: `Analysiere ${imgCount === 1 ? 'dieses Produktbild' : `diese ${imgCount} Bilder`} und erstelle Produktdaten, Hashtags und 5 Hooks.
+    text: `Analysiere ${imgCount === 1 ? 'dieses Produktbild' : `diese ${imgCount} Bilder`} und erstelle vollständigen TikTok-Shop-Content für Deutschland.
 
 ${imgDesc}
+
+PRODUCT ACCURACY: Das Produkt im veoPrompt muss exakt den hochgeladenen Bildern entsprechen.
+Erstelle intern eine Checkliste sichtbarer Features und verwende nur diese.
 
 Video-Stil: ${style}
 Ton: ${tone}
 
-Nur JSON zurückgeben – kein erklärender Text.`,
+Erstelle ALLE Felder vollständig. Nur JSON zurückgeben – kein erklärender Text.`,
   });
 
+  const payload = {
+    model:      'claude-opus-4-5',
+    max_tokens: 4000,
+    system:     SYSTEM_PROMPT,
+    messages:   [{ role: 'user', content: userContent }],
+  };
+
   try {
-    const parsed = await callClaude({
-      model: 'claude-opus-4-5', max_tokens: 2000,
-      system: SYSTEM_STEP1,
-      messages: [{ role: 'user', content: userContent }],
-    });
+    console.log('[TikTok Creator] → proxy:', proxyUrl);
 
-    step1Data = parsed;
-    allHookBatches = [parsed.hooks || []];
-    renderStep1(parsed);
-
-    if (results) {
-      results.hidden = false;
-      results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    let resp;
+    try {
+      resp = await fetch(`${proxyUrl}/api/generate`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key-fwd': key },
+        body:    JSON.stringify(payload),
+      });
+    } catch {
+      throw new Error(
+        `Proxy nicht erreichbar (<code>${proxyUrl}</code>).<br>` +
+        `Starte: <code>cd proxy &amp;&amp; node server.js</code>`
+      );
     }
+
+    const text = await resp.text();
+    console.log('[TikTok Creator] status:', resp.status, text.slice(0, 400));
+
+    let data;
+    try { data = JSON.parse(text); } catch {
+      throw new Error(`Ungültige Proxy-Antwort (${resp.status}):<br><code>${text.slice(0, 200)}</code>`);
+    }
+    if (!resp.ok) {
+      throw new Error(`API-Fehler ${resp.status}: ${data.error?.message || data.error || JSON.stringify(data)}`);
+    }
+
+    const rawText = data.content?.[0]?.text?.trim() || '';
+    if (!rawText) throw new Error('Anthropic hat eine leere Antwort zurückgegeben.');
+
+    const jsonStr = rawText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+    let parsed;
+    try { parsed = JSON.parse(jsonStr); } catch {
+      throw new Error(`Claude-Antwort kein gültiges JSON:<br><code>${rawText.slice(0, 400)}</code>`);
+    }
+
+    render(parsed);
+
   } catch (err) {
-    console.error('[TikTok Creator] Step 1 error:', err);
+    console.error('[TikTok Creator] Error:', err);
     showErr(err.message || 'Unbekannter Fehler.');
   } finally {
     setLoading(false);
   }
 }
 
-/* ── Render Step 1 ── */
-function renderStep1(d) {
-  /* Produktdaten */
+/* ── Render ── */
+function render(d) {
+  /* 1. Produktdaten */
   const pf = d.productFacts || {};
   $clear(outFacts);
   const factsGrid = document.createElement('div');
@@ -351,26 +324,22 @@ function renderStep1(d) {
     row.appendChild(k); row.appendChild(v); factsGrid.appendChild(row);
   }
 
-  addFactRow('Produktname', pf.name);
-  addFactRow('Maße',        pf.dimensions);
-  addFactRow('Kapazität',   pf.capacity);
-  addFactRow('Material',    pf.material);
-  addFactRow('Gewicht',     pf.weight);
-  addFactRow('Farbe',       pf.color);
+  addFactRow('Produktname',  pf.name);
+  addFactRow('Maße',         pf.dimensions);
+  addFactRow('Kapazität',    pf.capacity);
+  addFactRow('Material',     pf.material);
+  addFactRow('Gewicht',      pf.weight);
+  addFactRow('Farbe',        pf.color);
   addFactTags('Lieferumfang', pf.includedItems);
   addFactTags('Features',     pf.keyFeatures);
   addFactTags('Warnhinweise', pf.warnings);
   addFactTags('Anwendung',    pf.useCases);
   $append(outFacts, factsGrid);
 
-  /* Hooks */
-  $clear(outHooks);
-  renderHookBatch(d.hooks || [], 0, true);
+  /* 2. TikTok Titel */
+  $set(outTitle, 'textContent', d.title || '—');
 
-  /* Show Neue Hooks button */
-  if (btnNeueHooks) btnNeueHooks.hidden = false;
-
-  /* Hashtags */
+  /* 3. Hashtags */
   $clear(outHashtags);
   const tagWrap = document.createElement('div');
   tagWrap.className = 'tag-wrap';
@@ -380,307 +349,18 @@ function renderStep1(d) {
   });
   $append(outHashtags, tagWrap);
 
-  /* Hide step-2 cards */
-  [rcTitle, rcBanner, rcVeo, rcLive, rcBannerPrompt].forEach(el => { if (el) el.hidden = true; });
-}
-
-/* ── Render a hook batch ── */
-function renderHookBatch(hooks, batchIdx, isFirst) {
-  if (!isFirst) {
-    /* Divider between batches */
-    const div = document.createElement('div');
-    div.className = 'hook-batch-divider';
-    div.textContent = `Batch ${batchIdx + 1}`;
-    $append(outHooks, div);
-  }
-
-  const list = document.createElement('div');
-  list.className = 'hook-batch';
-  list.dataset.batchIdx = batchIdx;
-
-  hooks.forEach((hook, hookIdx) => {
-    const item = document.createElement('div');
-    item.className = 'hook-item';
-    item.dataset.batchIdx = batchIdx;
-    item.dataset.hookIdx  = hookIdx;
-
-    const meta = document.createElement('div');
-    meta.className = 'hook-meta';
-
-    const top = document.createElement('div');
-    top.className = 'hook-top';
-
-    const score = document.createElement('span');
-    score.className = 'hook-score';
-    score.textContent = `${hook.score}/100`;
-
-    const angle = document.createElement('span');
-    angle.className = 'hook-angle';
-    angle.textContent = hook.angle || '';
-
-    top.appendChild(score);
-    top.appendChild(angle);
-
-    const text = document.createElement('div');
-    text.className = 'hook-text';
-    text.textContent = hook.text || '';
-
-    meta.appendChild(top);
-    meta.appendChild(text);
-
-    const btn = document.createElement('button');
-    btn.className = 'btn-hook';
-    btn.textContent = `Hook ${hookIdx + 1}`;
-    btn.addEventListener('click', () => onHookSelect(batchIdx, hookIdx, btn));
-
-    item.appendChild(meta);
-    item.appendChild(btn);
-    list.appendChild(item);
-  });
-
-  $append(outHooks, list);
-
-  /* Hint line (only after last batch) */
-  const existing = outHooks?.querySelector('.hook-hint');
-  if (existing) existing.remove();
-  const hint = document.createElement('p');
-  hint.className = 'hook-hint';
-  hint.textContent = '👆 Wähle einen Hook – der Content wird automatisch generiert';
-  $append(outHooks, hint);
-}
-
-/* ── Hook selection ── */
-function onHookSelect(batchIdx, hookIdx, clickedBtn) {
-  const hook = allHookBatches[batchIdx]?.[hookIdx];
-  if (!hook || !step1Data) return;
-
-  /* Update visual selection state */
-  document.querySelectorAll('.hook-item').forEach(el => el.classList.remove('selected'));
-  document.querySelectorAll('.btn-hook').forEach(el => el.classList.remove('selected'));
-  clickedBtn.closest('.hook-item')?.classList.add('selected');
-  clickedBtn.classList.add('selected');
-
-  selectedHookGlobal = { batchIdx, hookIdx, hook };
-
-  runStep2(hook);
-}
-
-/* ══════════════════════════════
-   NEUE HOOKS – no image re-scan
-══════════════════════════════ */
-const SYSTEM_NEUE_HOOKS = `Du bist ein TikTok-Shop-Marketing-Experte für den deutschen Markt.
-
-${HOOK_RULES}
-
-Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor/danach, keine Markdown-Blöcke.
-
-Gib exakt dieses JSON zurück:
-{
-  "hooks": [
-    {"score": 95, "angle": "Pain",        "text": "HOOK TEXT MAX 6 WÖRTER"},
-    {"score": 92, "angle": "Curiosity",   "text": "HOOK TEXT MAX 6 WÖRTER"},
-    {"score": 89, "angle": "Convenience", "text": "HOOK TEXT MAX 6 WÖRTER"},
-    {"score": 86, "angle": "Benefit",     "text": "HOOK TEXT MAX 6 WÖRTER"},
-    {"score": 82, "angle": "Emotional",   "text": "HOOK TEXT MAX 6 WÖRTER"}
-  ]
-}`;
-
-btnNeueHooks?.addEventListener('click', async () => {
-  if (!step1Data) return;
-
-  btnNeueHooks.disabled = true;
-  btnNeueHooks.textContent = '…';
-
-  const pf = step1Data.productFacts || {};
-  const prev = allHookBatches.flat().map(h => h.text).join(', ');
-
-  const factsText = [
-    `Produktname: ${pf.name || 'Nicht erkennbar'}`,
-    `Features: ${(pf.keyFeatures || []).join(', ') || 'Nicht erkennbar'}`,
-    `Anwendung: ${(pf.useCases || []).join(', ') || 'Nicht erkennbar'}`,
-    `Material: ${pf.material || 'Nicht erkennbar'}`,
-  ].join('\n');
-
-  try {
-    const parsed = await callClaude({
-      model: 'claude-opus-4-5', max_tokens: 800,
-      system: SYSTEM_NEUE_HOOKS,
-      messages: [{
-        role: 'user',
-        content: [{
-          type: 'text',
-          text: `Generiere 5 NEUE, völlig andere Hooks für dieses Produkt.
-
-Produktfakten:
-${factsText}
-
-Bereits verwendete Hooks (NICHT wiederholen):
-${prev}
-
-Erstelle komplett andere Hooks mit anderen Formulierungen und Perspektiven.
-Nur JSON zurückgeben.`,
-        }],
-      }],
-    });
-
-    const newHooks = parsed.hooks || [];
-    const newBatchIdx = allHookBatches.length;
-    allHookBatches.push(newHooks);
-    renderHookBatch(newHooks, newBatchIdx, false);
-
-    /* Scroll to new batch */
-    outHooks?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-  } catch (err) {
-    console.error('[TikTok Creator] Neue Hooks error:', err);
-    showErr(err.message || 'Fehler beim Generieren neuer Hooks.');
-  } finally {
-    btnNeueHooks.disabled = false;
-    btnNeueHooks.textContent = '🎣 Neue Hooks';
-  }
-});
-
-/* ══════════════════════════════
-   STEP 2 – Hook → Full Content
-══════════════════════════════ */
-const SYSTEM_STEP2 = `Du bist ein TikTok-Shop-Marketing-Experte und Videoproduktions-Spezialist für den deutschen Markt.
-
-PRODUCT ACCURACY MODE – AKTIV (KRITISCH):
-Die hochgeladenen Bilder und der OCR-Text sind die EINZIGE Wahrheitsquelle.
-
-GENAUIGKEITS-PRIORITÄT:
-1. Hochgeladene Bilder (höchste Priorität)
-2. OCR-Text aus den Bildern
-3. Extrahierte Produktfakten
-4. Marketing-Kreativität (niedrigste Priorität)
-
-VERBOTEN – erfinde NIEMALS:
-- Taschen, Fächer, Kompartimente die nicht sichtbar sind
-- Zubehör, Griffe, Riemen, Befestigungen die nicht sichtbar sind
-- Materialien, Farben, Maße, Gewichte die nicht bestätigt sind
-- Produktfunktionen die nicht klar erkennbar oder im OCR-Text genannt sind
-- Alternative, verbesserte, futuristische oder konzeptionelle Produktversionen
-
-HOOK-PRODUKTREGEL:
-Der Hook beschreibt ein Kundenproblem – er verändert das Produkt NICHT.
-Das Video zeigt immer das echte hochgeladene Produkt: gleiche Form, Farbe, Größe, Layout.
-
-VEO PRODUCT CHECKLIST (intern, vor dem Schreiben des veoPrompt):
-Bevor du den veoPrompt schreibst, erstelle intern eine Checkliste aller sichtbaren Produktfeatures.
-Verwende NUR Features die auf dieser Checkliste stehen.
-Wenn ein Feature nicht auf der Checkliste steht: nicht erwähnen.
-Das Produkt im Video muss visuell identisch mit dem hochgeladenen Produkt sein.
-
-VEO 3.1 MASTER PROMPT REGELN:
-Der veoPrompt muss ALLES enthalten – vollständiger Produktionsplan:
-- Szenenaufbau: Kamerabewegungen, Beleuchtung, Bildkomposition (9:16 vertikal)
-- Timing: Exakte Sekunden-Beats (0s, 2s, 4s, 6s, 8s)
-- On-Screen Text: Hook als erstes Overlay, dann nur bestätigte Produktfakten
-- Voiceover: Männliche deutsche Stimme, Skript mit Timing-Beats, Hook als Eröffnungszeile
-- Hintergrundmusik: Genre, BPM, Energie, Stimmung
-- Sound Effects: Timing-Beats mit Beschreibung
-Schreibe veoPrompt auf Englisch, detailliert und produktionsfähig.
-Beschreibe das Produkt exakt so wie es in den Bildern erscheint – keine Abweichungen.
-
-BANNER PROMPT REGEL:
-bannerPrompt beschreibt NUR sichtbare Produktfeatures.
-Erwähne KEIN Feature das nicht in den Bildern sichtbar oder im OCR-Text bestätigt ist.
-Englisch, 9:16, schwarzer Hintergrund, Neongrün (#39FF14), kein Preis, keine Rabatte.
-
-REGELN:
-- Hook als kreative Richtlinie. Keine erfundenen Fakten. TikTok-safe.
-- title und bannerText auf Deutsch. veoPrompt und bannerPrompt auf Englisch.
-- Antworte NUR mit einem gültigen JSON-Objekt – kein Text davor/danach, keine Markdown-Blöcke.
-
-Gib exakt dieses JSON zurück:
-{
-  "title": "TikTok-Titel ohne Emoji, max 80 Zeichen, Hook als Grundlage",
-  "bannerText": ["Hook-Text oder Variante (max 28 Zeichen)","Zeile 2","Zeile 3","CTA-Zeile"],
-  "veoPrompt": "Complete English Veo 3.1 production prompt for 8-second 9:16 TikTok video. PRODUCT ACCURACY: show only the exact product from the uploaded images – same shape, color, size, layout. No redesign. Opens with hook as first on-screen overlay and voiceover. [PRODUCT CHECKLIST] list only confirmed visible features used in this prompt. [SCENE TIMING] 0s-2s hook, 2s-4s product, 4s-6s feature, 6s-8s CTA. [CAMERA] movements per scene. [LIGHTING] setup. [ON-SCREEN TEXT] German overlays using only confirmed facts. [GERMAN MALE VOICEOVER] full script. [BACKGROUND MUSIC] genre, BPM, mood. [SOUND EFFECTS] timed.",
-  "live": "0:00 | Hook-Eröffnung\n0:15 | Produktvorstellung\n0:30 | Feature 1\n0:45 | Feature 2\n1:00 | Feature 3\n1:15 | Nutzen & Mehrwert\n1:30 | Community-Frage\n1:45 | CTA & Abschluss",
-  "bannerPrompt": "English AI image generation prompt for 9:16 TikTok Shop product banner. ACCURACY: describe only features visible in uploaded images. Hook text as headline. Pure black background, neon green #39FF14 accent, product shown exactly as it appears in images – no modifications, no added features, photorealistic. SparDirekt DE style, no prices, no discounts."
-}`;
-
-async function runStep2(hook) {
-  /* Loading state inside hooks card */
-  const hint = outHooks?.querySelector('.hook-hint');
-  if (hint) {
-    hint.innerHTML = `<div class="step2-spinner"><span class="spinner"></span><span>Content wird generiert…</span></div>`;
-  }
-
-  [rcTitle, rcBanner, rcVeo, rcLive, rcBannerPrompt].forEach(el => { if (el) el.hidden = true; });
-
-  const pf = step1Data?.productFacts || {};
-  const factsText = [
-    `Produktname: ${pf.name || 'Nicht erkennbar'}`,
-    `Maße: ${pf.dimensions || 'Nicht erkennbar'}`,
-    `Kapazität: ${pf.capacity || 'Nicht erkennbar'}`,
-    `Material: ${pf.material || 'Nicht erkennbar'}`,
-    `Gewicht: ${pf.weight || 'Nicht erkennbar'}`,
-    `Farbe: ${pf.color || 'Nicht erkennbar'}`,
-    `Features: ${(pf.keyFeatures || []).join(', ') || 'Nicht erkennbar'}`,
-    `Anwendung: ${(pf.useCases || []).join(', ') || 'Nicht erkennbar'}`,
-  ].join('\n');
-
-  const style = document.getElementById('style').value;
-  const tone  = document.getElementById('tone').value;
-
-  try {
-    const parsed = await callClaude({
-      model: 'claude-opus-4-5', max_tokens: 3000,
-      system: SYSTEM_STEP2,
-      messages: [{
-        role: 'user',
-        content: [{
-          type: 'text',
-          text: `Ausgewählter Hook: "${hook.text}" (Winkel: ${hook.angle}, Score: ${hook.score}/100)
-
-BESTÄTIGTE PRODUKTFAKTEN (aus Bildern und OCR extrahiert – das sind die einzigen erlaubten Features):
-${factsText}
-
-Video-Stil: ${style}
-Ton: ${tone}
-
-PRODUCT ACCURACY REMINDER:
-- Das Produkt im Video muss exakt den hochgeladenen Bildern entsprechen.
-- Erfinde KEINE zusätzlichen Features, Fächer, Materialien oder Funktionen.
-- Erstelle intern eine Checkliste sichtbarer Features und verwende nur diese.
-- Der Hook beschreibt ein Kundenproblem – das Produkt selbst bleibt unverändert.
-
-Generiere TikTok Titel, Banner Text, Veo 3.1 Master Prompt, TikTok Live Script und Banner Prompt.
-Nur JSON zurückgeben.`,
-        }],
-      }],
-    });
-
-    renderStep2(parsed, hook);
-
-  } catch (err) {
-    console.error('[TikTok Creator] Step 2 error:', err);
-    showErr(err.message || 'Fehler bei der Content-Generierung.');
-    if (hint) hint.textContent = '👆 Wähle einen Hook – der Content wird automatisch generiert';
-  }
-}
-
-/* ── Render Step 2 ── */
-function renderStep2(d, hook) {
-  const hint = outHooks?.querySelector('.hook-hint');
-  if (hint) hint.textContent = `✓ Hook "${hook.text}" aktiv`;
-
-  $set(outTitle, 'textContent', d.title || '—');
-  if (rcTitle) rcTitle.hidden = false;
-
+  /* 4. Banner Text */
   $clear(outBanner);
   (d.bannerText || []).forEach(line => {
     const bline = document.createElement('div');
     bline.className = 'bline'; bline.textContent = line;
     $append(outBanner, bline);
   });
-  if (rcBanner) rcBanner.hidden = false;
 
+  /* 5. Veo 3.1 Master Prompt */
   $set(outVeo, 'textContent', d.veoPrompt || '—');
-  if (rcVeo) rcVeo.hidden = false;
 
+  /* 6. TikTok Live Script */
   $clear(outLive);
   (d.live || '').split('\n').forEach(line => {
     const span = document.createElement('span');
@@ -694,12 +374,11 @@ function renderStep2(d, hook) {
     } else { span.textContent = line; }
     $append(outLive, span);
   });
-  if (rcLive) rcLive.hidden = false;
 
+  /* 7. Banner Prompt */
   $set(outBannerPrompt, 'textContent', d.bannerPrompt || '—');
-  if (rcBannerPrompt) rcBannerPrompt.hidden = false;
 
-  rcTitle?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (results) { results.hidden = false; results.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 }
 
 /* ── Copy ── */
@@ -711,19 +390,15 @@ document.addEventListener('click', e => {
 });
 
 btnCopyAll?.addEventListener('click', () => {
-  const sections = [
-    ['Produktdaten',          outFacts],
-    ['TikTok Titel',          outTitle],
-    ['Hashtags',              outHashtags],
-    ['Banner Text',           outBanner],
-    ['Veo 3.1 Master Prompt', outVeo],
-    ['TikTok Live Script',    outLive],
-    ['Banner Prompt',         outBannerPrompt],
-  ];
-  const all = sections
-    .filter(([, el]) => el && !el.closest('.rcard')?.hidden)
-    .map(([label, el]) => `=== ${label} ===\n${el?.innerText || ''}`)
-    .join('\n\n');
+  const all = [
+    '=== Produktdaten ===\n'          + (outFacts?.innerText        || ''),
+    '=== TikTok Titel ===\n'          + (outTitle?.innerText        || ''),
+    '=== Hashtags ===\n'              + (outHashtags?.innerText     || ''),
+    '=== Banner Text ===\n'           + (outBanner?.innerText       || ''),
+    '=== Veo 3.1 Master Prompt ===\n' + (outVeo?.innerText          || ''),
+    '=== TikTok Live Script ===\n'    + (outLive?.innerText         || ''),
+    '=== Banner Prompt ===\n'         + (outBannerPrompt?.innerText || ''),
+  ].join('\n\n');
   clip(all, btnCopyAll);
 });
 
