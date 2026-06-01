@@ -233,6 +233,8 @@ select:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
 }
 .btn-copy:hover{color:var(--txt);border-color:rgba(255,255,255,.18);background:var(--bg3)}
 .btn-copy.ok{color:var(--g);border-color:var(--gbord)}
+.btn-veo-komplett{color:var(--mid);border-color:var(--b)}
+.btn-veo-komplett:hover{color:#818cf8;border-color:rgba(129,140,248,.4);background:rgba(129,140,248,.07)}
 
 /* ── Footer ── */
 footer{text-align:center;padding:22px 14px;font-size:11px;color:var(--dim);border-top:1px solid var(--b)}
