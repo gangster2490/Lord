@@ -149,28 +149,28 @@ HASHTAGS: 7 relevante deutsche TikTok-Hashtags.
 
 BANNER TEXT: 4 kurze Zeilen für ein visuelles Banner (Deutsch). Zeile 1-3 max. 28 Zeichen. Zeile 4 = CTA.
 
-VEO 3.1 PROMPT: English. 8-second vertical 9:16 TikTok Shop Germany product video.
+VEO 3.1 PROMPT: English. Realistic vertical 9:16 professional advertising video for TikTok Shop Germany.
 
-CRITICAL RULE: DO NOT describe the product shape, pockets, straps, compartments, accessories, materials or construction. The uploaded product image is the visual source of truth. Veo must use it exactly as-is.
+PRODUCT LOCK RULE: The uploaded product image is a locked asset. The product must appear identically in every frame. Do NOT describe the product at all — Veo reads the image directly.
 
-Always begin the veoPrompt with this exact sentence:
-"Use the uploaded product image as the exact product reference. Keep the same shape, color, proportions, details and layout. Do not redesign, replace or add product features."
+Always begin the veoPrompt with this exact block (copy word for word):
+"PRODUCT LOCK: Use the uploaded product image as a locked visual asset. The product must remain completely identical in every frame — same shape, proportions, size, color, material, texture, seams, pockets, and all visible details. The product may move naturally with the person wearing or using it, but its design must never change. Do not distort, deform, stretch, shrink, morph, redesign, improve, simplify, replace or reinterpret the product. Do not add or remove anything from the product."
 
-Then describe ONLY:
-- Scene timing (0–1s, 1–3s, 3–6s, 6–8s)
-- Camera movement (push-in, orbit, static, etc.)
-- Lighting and background (studio, clean, soft light, etc.)
-- German on-screen text overlays with timing (reference the bannerText lines)
-- CTA overlay at 6–8s
+After the product lock block, describe ONLY the scene around the product:
+- Real people using or wearing the exact product naturally
+- Dynamic camera movement (handheld, push-in, orbit, slow-mo burst)
+- Background, environment, weather, lighting, water, action
+- German on-screen text overlays with timing (use the generated bannerText lines)
+- CTA text overlay at the end
 
-Structure:
-0–1s: Product visible immediately. Strong hook text overlay.
-1–3s: Slow camera push-in / orbit around the exact product.
-3–6s: Show product in clean studio/product-ad style. Do not add new features.
-6–8s: Product centered, CTA overlay.
+Scene timing structure:
+0–2s: Strong opening. Product immediately visible on person. Hook text overlay.
+2–5s: Dynamic action scene. Realistic water splashes / natural light / human motion. Camera moves freely around the person and product.
+5–7s: Close detail shot — natural light on product surface. Do not alter product.
+7–8s: Wide shot. Product centered. CTA overlay.
 
-End the veoPrompt with this negative prompt block:
-"Negative prompt: Do not change product shape. Do not add pockets. Do not add straps. Do not change color. Do not invent accessories. Do not replace the product. Do not create a different model."
+End the veoPrompt with this exact negative prompt (copy word for word):
+"Negative prompt: Do not change product shape. Do not add or remove pockets, straps, zippers or any detail. Do not change product color or material. Do not replace or reinterpret the product. Do not create a different version or model. Product accuracy is more important than cinematic effects."
 
 German voiceover and music go in their own separate fields (voiceoverText, musicSuggestion, soundEffects). Do NOT include them inside veoPrompt.
 
