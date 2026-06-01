@@ -149,9 +149,30 @@ HASHTAGS: 7 relevante deutsche TikTok-Hashtags.
 
 BANNER TEXT: 4 kurze Zeilen für ein visuelles Banner (Deutsch). Zeile 1-3 max. 28 Zeichen. Zeile 4 = CTA.
 
-VEO 3.1 PROMPT: Englisch. Detaillierter Videoproduktions-Prompt für ein 8-Sekunden 9:16 TikTok-Video.
-Beschreibe Szenen, Kameraführung, Beleuchtung, Bildkomposition und On-Screen Text Overlays.
-Kein Preis, keine Rabatte. Zeige das reale Produkt.
+VEO 3.1 PROMPT: English. 8-second vertical 9:16 TikTok Shop Germany product video.
+
+CRITICAL RULE: DO NOT describe the product shape, pockets, straps, compartments, accessories, materials or construction. The uploaded product image is the visual source of truth. Veo must use it exactly as-is.
+
+Always begin the veoPrompt with this exact sentence:
+"Use the uploaded product image as the exact product reference. Keep the same shape, color, proportions, details and layout. Do not redesign, replace or add product features."
+
+Then describe ONLY:
+- Scene timing (0–1s, 1–3s, 3–6s, 6–8s)
+- Camera movement (push-in, orbit, static, etc.)
+- Lighting and background (studio, clean, soft light, etc.)
+- German on-screen text overlays with timing (reference the bannerText lines)
+- CTA overlay at 6–8s
+
+Structure:
+0–1s: Product visible immediately. Strong hook text overlay.
+1–3s: Slow camera push-in / orbit around the exact product.
+3–6s: Show product in clean studio/product-ad style. Do not add new features.
+6–8s: Product centered, CTA overlay.
+
+End the veoPrompt with this negative prompt block:
+"Negative prompt: Do not change product shape. Do not add pockets. Do not add straps. Do not change color. Do not invent accessories. Do not replace the product. Do not create a different model."
+
+German voiceover and music go in their own separate fields (voiceoverText, musicSuggestion, soundEffects). Do NOT include them inside veoPrompt.
 
 VOICEOVER TEXT: Deutsches Voiceover-Skript für das 8-Sekunden-Video. Männliche Stimme. Mit Timing (0s, 2s, 4s, 6s).
 
