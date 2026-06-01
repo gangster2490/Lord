@@ -149,28 +149,29 @@ HASHTAGS: 7 relevante deutsche TikTok-Hashtags.
 
 BANNER TEXT: 4 kurze Zeilen für ein visuelles Banner (Deutsch). Zeile 1-3 max. 28 Zeichen. Zeile 4 = CTA.
 
-VEO 3.1 PROMPT: English. Realistic vertical 9:16 professional advertising video for TikTok Shop Germany.
+VEO 3.1 PROMPT: English. Realistic high-quality vertical 9:16 TikTok Shop Germany advertisement. Photorealistic commercial quality.
 
 PRODUCT LOCK RULE: The uploaded product image is a locked asset. The product must appear identically in every frame. Do NOT describe the product at all — Veo reads the image directly.
 
 Always begin the veoPrompt with this exact block (copy word for word):
-"PRODUCT LOCK: Use the uploaded product image as a locked visual asset. The product must remain completely identical in every frame — same shape, proportions, size, color, material, texture, seams, pockets, and all visible details. The product may move naturally with the person wearing or using it, but its design must never change. Do not distort, deform, stretch, shrink, morph, redesign, improve, simplify, replace or reinterpret the product. Do not add or remove anything from the product."
+"Use the uploaded image as the exact locked product reference. CRITICAL RULE: The uploaded product image is the visual source of truth. The product from the uploaded image is a protected asset. The product may move, rotate, swing, wrinkle naturally and be handled by people, but its design must never change. Keep 100% identical: shape, proportions, dimensions, color, material, texture, pockets, seams, and all visible details. Do not add, remove, redesign, improve, modify or reinterpret any part of the product. IMPORTANT: Treat the product as locked. Animate the scene around the product, not the product design. If there is a conflict between creativity and product accuracy, product accuracy always wins."
 
-After the product lock block, describe ONLY the scene around the product:
-- Real people using or wearing the exact product naturally
-- Dynamic camera movement (handheld, push-in, orbit, slow-mo burst)
-- Background, environment, weather, lighting, water, action
-- German on-screen text overlays with timing (use the generated bannerText lines)
-- CTA text overlay at the end
+After the product lock block, describe ONLY the scene around the product.
+Use the extracted productFacts (useCases, keyFeatures) to determine the most realistic and natural usage scenario for this specific product.
+Show real people interacting with the product in a way that fits its actual purpose — for example: wearing it, using it in its intended environment, demonstrating it in action, close-up shots of real usage.
+Everything around the product may be generated or modified: people, nature, environment, lighting, weather, camera movement, cinematic effects.
 
 Scene timing structure:
-0–2s: Strong opening. Product immediately visible on person. Hook text overlay.
-2–5s: Dynamic action scene. Realistic water splashes / natural light / human motion. Camera moves freely around the person and product.
-5–7s: Close detail shot — natural light on product surface. Do not alter product.
-7–8s: Wide shot. Product centered. CTA overlay.
+0–2s: Strong opening. Product immediately visible on person in action. Hook text overlay.
+2–5s: Dynamic realistic usage scene. Natural environment, natural light, human motion. Camera moves freely around the person and product.
+5–7s: Close-up shot showing product in use. Natural light. Do not alter product.
+7–8s: Wide or medium shot. Product centered. Final CTA overlay.
+
+German on-screen text overlays (use the generated bannerText lines with timing).
+Final screen CTA: "Jetzt unten im Warenkorb" — do NOT use "Link in Bio".
 
 End the veoPrompt with this exact negative prompt (copy word for word):
-"Negative prompt: Do not change product shape. Do not add or remove pockets, straps, zippers or any detail. Do not change product color or material. Do not replace or reinterpret the product. Do not create a different version or model. Product accuracy is more important than cinematic effects."
+"Negative prompt: Do not change product shape. Do not add or remove pockets, straps, zippers or any detail. Do not change product color or material. Do not replace or reinterpret the product. Do not create a different version or model. No product redesign. No product hallucination. Product accuracy is more important than cinematic effects."
 
 German voiceover and music go in their own separate fields (voiceoverText, musicSuggestion, soundEffects). Do NOT include them inside veoPrompt.
 
