@@ -156,19 +156,19 @@ PRODUCT LOCK RULE: The uploaded product image is a locked asset. The product mus
 Always begin the veoPrompt with this exact block (copy word for word):
 "Use the uploaded image as the exact locked product reference. CRITICAL RULE: The uploaded product image is the visual source of truth. The product from the uploaded image is a protected asset. The product may move, rotate, swing, wrinkle naturally and be handled by people, but its design must never change. Keep 100% identical: shape, proportions, dimensions, color, material, texture, pockets, seams, and all visible details. Do not add, remove, redesign, improve, modify or reinterpret any part of the product. IMPORTANT: Treat the product as locked. Animate the scene around the product, not the product design. If there is a conflict between creativity and product accuracy, product accuracy always wins."
 
-After the product lock block, describe ONLY the scene around the product.
-Use the extracted productFacts (useCases, keyFeatures) to determine the most realistic and natural usage scenario for this specific product.
-Show real people interacting with the product in a way that fits its actual purpose — for example: wearing it, using it in its intended environment, demonstrating it in action, close-up shots of real usage.
-Everything around the product may be generated or modified: people, nature, environment, lighting, weather, camera movement, cinematic effects.
+After the product lock block, add this exact HUMAN INTERACTION block (copy word for word):
+"HUMAN INTERACTION RULES: The video must focus on human interaction with the product. At least 80% of the video must contain real people using, wearing, touching or demonstrating the product. Every scene must include at least one person interacting with the product. Do not create a product-only showcase. Do not create a rotating product presentation. Do not keep the product isolated on screen. The main subject of the video is people actively using the product in real-life conditions."
+
+After the human interaction block, describe the scene using the extracted productFacts (useCases, keyFeatures) to determine the most realistic and natural usage scenario for this specific product. Show natural real-life usage: a person wearing or handling the product in its intended environment, in action, with close-up shots of real use. Everything around the product may be generated or modified: people, nature, environment, lighting, weather, camera movement, cinematic effects.
 
 Scene timing structure:
-0–2s: Strong opening. Product immediately visible on person in action. Hook text overlay.
+0–2s: Strong opening. Product immediately visible on person actively using it. Hook text overlay.
 2–5s: Dynamic realistic usage scene. Natural environment, natural light, human motion. Camera moves freely around the person and product.
-5–7s: Close-up shot showing product in use. Natural light. Do not alter product.
-7–8s: Wide or medium shot. Product centered. Final CTA overlay.
+5–7s: Close-up shot of person interacting with product in use. Natural light. Do not alter product.
+7–8s: Medium shot of person with product. Final CTA overlay.
 
 German on-screen text overlays (use the generated bannerText lines with timing).
-Final screen CTA: "Jetzt unten im Warenkorb" — do NOT use "Link in Bio".
+Final screen CTA: "Jetzt unten im Warenkorb" or "Produkt unten im Warenkorb" — do NOT use "Link in Bio".
 
 End the veoPrompt with this exact negative prompt (copy word for word):
 "Negative prompt: Do not change product shape. Do not add or remove pockets, straps, zippers or any detail. Do not change product color or material. Do not replace or reinterpret the product. Do not create a different version or model. No product redesign. No product hallucination. Product accuracy is more important than cinematic effects."
@@ -205,10 +205,10 @@ Antworte NUR mit einem gültigen JSON-Objekt ohne Markdown-Blöcke:
   "hashtags": ["#Tag1","#Tag2","#Tag3","#Tag4","#Tag5","#Tag6","#Tag7"],
   "bannerText": ["Zeile 1","Zeile 2","Zeile 3","CTA"],
   "veoPrompt": "Complete English Veo 3.1 production prompt describing scenes, camera, lighting, text overlays...",
-  "voiceoverText": "0s – Erster Satz\n2s – Zweiter Satz\n4s – Dritter Satz\n6s – CTA",
+  "voiceoverText": "0s – Erster Satz\\n2s – Zweiter Satz\\n4s – Dritter Satz\\n6s – CTA",
   "musicSuggestion": "Genre, BPM, Stimmung und Stil",
-  "soundEffects": "0s – Effekt 1\n2s – Effekt 2\n4s – Effekt 3",
-  "liveScript": "0:00 | Hook-Eröffnung\n0:15 | Produktvorstellung\n0:30 | Feature 1\n0:45 | Feature 2\n1:00 | Feature 3\n1:15 | Nutzen\n1:30 | Community-Frage\n1:45 | CTA",
+  "soundEffects": "0s – Effekt 1\\n2s – Effekt 2\\n4s – Effekt 3",
+  "liveScript": "0:00 | Hook-Eröffnung\\n0:15 | Produktvorstellung\\n0:30 | Feature 1\\n0:45 | Feature 2\\n1:00 | Feature 3\\n1:15 | Nutzen\\n1:30 | Community-Frage\\n1:45 | CTA",
   "bannerPrompt": "English AI image generation prompt for 9:16 banner..."
 }`;
 
