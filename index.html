@@ -30,7 +30,7 @@
       <p class="hint">Dein Key bleibt nur im Browser – er wird nie gespeichert oder weitergegeben.</p>
     </section>
 
-    <!-- Image 1 -->
+    <!-- Image 1 (Produktbild – Pflicht) -->
     <section class="card">
       <div class="card-label">📸 Bild 1 – Produktbild <span class="required-badge">Pflichtfeld</span></div>
       <div class="dropzone" id="dropzone" tabindex="0" role="button">
@@ -51,16 +51,16 @@
       </div>
     </section>
 
-    <!-- Image 2 -->
+    <!-- Image 2 (Produktbild – Optional) -->
     <section class="card">
-      <div class="card-label">📋 Bild 2 – Beschreibung / Spezifikationen <span class="optional-badge">Optional</span></div>
-      <p class="hint" style="margin-bottom:10px">Screenshot der Produktbeschreibung mit Features, Spezifikationen, Material, Maße etc.</p>
+      <div class="card-label">📷 Bild 2 – Produktbild <span class="optional-badge">Optional</span></div>
+      <p class="hint" style="margin-bottom:10px">Weitere Produktansicht (andere Perspektive, Detail, Anwendung).</p>
       <div class="dropzone" id="dropzone2" tabindex="0" role="button">
         <div class="dz-inner" id="dzInner2">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M9 12h6m-6 4h6m-6-8h6M5 20h14a2 2 0 0 0 2-2V8l-5-5H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <p class="dz-text">Beschreibungsfoto hierher ziehen</p>
+          <p class="dz-text">Produktbild hierher ziehen</p>
           <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
         </div>
         <img id="preview2" class="preview" alt="" />
@@ -72,16 +72,16 @@
       </div>
     </section>
 
-    <!-- Image 3 -->
+    <!-- Image 3 (Produktbild – Optional) -->
     <section class="card">
-      <div class="card-label">🖼️ Bild 3 – Verpackung / Etikett / Zusatz <span class="optional-badge">Optional</span></div>
-      <p class="hint" style="margin-bottom:10px">Verpackungsrückseite, Etikett, Zertifizierungen, Lieferumfang etc.</p>
+      <div class="card-label">🖼️ Bild 3 – Produktbild <span class="optional-badge">Optional</span></div>
+      <p class="hint" style="margin-bottom:10px">Weitere Produktansicht (Verpackung, Lieferumfang, Detail).</p>
       <div class="dropzone" id="dropzone3" tabindex="0" role="button">
         <div class="dz-inner" id="dzInner3">
           <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <p class="dz-text">Zusatzbild hierher ziehen</p>
+          <p class="dz-text">Produktbild hierher ziehen</p>
           <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
         </div>
         <img id="preview3" class="preview" alt="" />
@@ -90,6 +90,27 @@
       <div class="img-meta" id="imgMeta3" hidden>
         <span class="img-name" id="imgName3"></span>
         <button class="btn-remove" id="btnRemove3">✕ Entfernen</button>
+      </div>
+    </section>
+
+    <!-- Image 4 (Beschreibung / Spezifikationen – Optional, OCR) -->
+    <section class="card">
+      <div class="card-label">📋 Bild 4 – Beschreibung / Spezifikationen <span class="optional-badge">Optional</span></div>
+      <p class="hint" style="margin-bottom:10px">Screenshot der Produktbeschreibung mit Features, Spezifikationen, Material, Maße etc. (OCR).</p>
+      <div class="dropzone" id="dropzone4" tabindex="0" role="button">
+        <div class="dz-inner" id="dzInner4">
+          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 12h6m-6 4h6m-6-8h6M5 20h14a2 2 0 0 0 2-2V8l-5-5H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="dz-text">Beschreibungsfoto hierher ziehen</p>
+          <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
+        </div>
+        <img id="preview4" class="preview" alt="" />
+        <input type="file" id="fileInput4" accept="image/*" />
+      </div>
+      <div class="img-meta" id="imgMeta4" hidden>
+        <span class="img-name" id="imgName4"></span>
+        <button class="btn-remove" id="btnRemove4">✕ Entfernen</button>
       </div>
     </section>
 
@@ -158,13 +179,22 @@
         <div class="rcard-body" id="out-facts"></div>
       </div>
 
-      <!-- 2. TikTok Titel -->
+      <!-- TikTok Titel -->
       <div class="rcard" id="rc-title">
         <div class="rcard-head">
           <span>✏️ TikTok Titel</span>
           <button class="btn-copy" data-src="rc-title">Kopieren</button>
         </div>
         <div class="rcard-body title-out" id="out-title"></div>
+      </div>
+
+      <!-- 2. 5 Hook Ideas -->
+      <div class="rcard" id="rc-hooks">
+        <div class="rcard-head">
+          <span>🪝 5 Hook Ideas</span>
+          <button class="btn-copy" data-src="rc-hooks">Kopieren</button>
+        </div>
+        <div class="rcard-body" id="out-hooks"></div>
       </div>
 
       <!-- 3. Hashtags -->
@@ -185,22 +215,19 @@
         <div class="rcard-body" id="out-banner"></div>
       </div>
 
-      <!-- 5. Veo 3.1 Prompt -->
-      <div class="rcard" id="rc-veo">
+      <!-- 5. Banner Prompt -->
+      <div class="rcard" id="rc-banner-prompt">
         <div class="rcard-head">
-          <span>🎥 Veo 3.1 Prompt</span>
-          <div style="display:flex;gap:6px">
-            <button class="btn-copy" data-src="rc-veo">Kopieren</button>
-            <button class="btn-copy btn-veo-komplett" id="btnVeoKomplett">📋 Veo Komplett</button>
-          </div>
+          <span>🎨 Banner Prompt</span>
+          <button class="btn-copy" data-src="rc-banner-prompt">Kopieren</button>
         </div>
-        <div class="rcard-body veo-out" id="out-veo"></div>
+        <div class="rcard-body veo-out" id="out-banner-prompt"></div>
       </div>
 
-      <!-- 6. Voiceover Text -->
+      <!-- 6. Voice Script -->
       <div class="rcard" id="rc-voiceover">
         <div class="rcard-head">
-          <span>🎙️ Voiceover Text</span>
+          <span>🎙️ Voice Script</span>
           <button class="btn-copy" data-src="rc-voiceover">Kopieren</button>
         </div>
         <div class="rcard-body" id="out-voiceover"></div>
@@ -224,7 +251,19 @@
         <div class="rcard-body" id="out-sfx"></div>
       </div>
 
-      <!-- 9. TikTok Live Script -->
+      <!-- 9. Veo 3.1 Prompt -->
+      <div class="rcard" id="rc-veo">
+        <div class="rcard-head">
+          <span>🎥 Veo 3.1 Prompt</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn-copy" data-src="rc-veo">Kopieren</button>
+            <button class="btn-copy btn-veo-komplett" id="btnVeoKomplett">📋 Veo Komplett</button>
+          </div>
+        </div>
+        <div class="rcard-body veo-out" id="out-veo"></div>
+      </div>
+
+      <!-- 10. TikTok Live Script -->
       <div class="rcard" id="rc-live">
         <div class="rcard-head">
           <span>🔴 TikTok Live Script</span>
@@ -233,13 +272,13 @@
         <div class="rcard-body" id="out-live"></div>
       </div>
 
-      <!-- 10. Banner Prompt -->
-      <div class="rcard" id="rc-banner-prompt">
+      <!-- 11. Master Copy Block -->
+      <div class="rcard" id="rc-master">
         <div class="rcard-head">
-          <span>🎨 Banner Prompt</span>
-          <button class="btn-copy" data-src="rc-banner-prompt">Kopieren</button>
+          <span>📦 Master Copy Block</span>
+          <button class="btn-copy btn-master" id="btnMasterCopy">Alles für Veo kopieren</button>
         </div>
-        <div class="rcard-body veo-out" id="out-banner-prompt"></div>
+        <div class="rcard-body veo-out" id="out-master"></div>
       </div>
 
     </section>

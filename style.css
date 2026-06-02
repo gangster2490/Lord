@@ -3,20 +3,20 @@
 
 /* ── Tokens ── */
 :root{
-  --bg:    #000;
-  --bg2:   #0a0a0a;
-  --bg3:   #111;
-  --bg4:   #161616;
-  --b:     rgba(255,255,255,0.08);
-  --g:     #39ff14;
-  --gdim:  rgba(57,255,20,0.11);
+  --bg: #000;
+  --bg2: #0a0a0a;
+  --bg3: #111;
+  --bg4: #161616;
+  --b: rgba(255,255,255,0.08);
+  --g: #39ff14;
+  --gdim: rgba(57,255,20,0.11);
   --gbord: rgba(57,255,20,0.28);
-  --ora:   #f97316;
-  --txt:   #e8eaed;
-  --mid:   #8a8f98;
-  --dim:   #3f4350;
-  --r:     14px;
-  --rs:    9px;
+  --ora: #f97316;
+  --txt: #e8eaed;
+  --mid: #8a8f98;
+  --dim: #3f4350;
+  --r: 14px;
+  --rs: 9px;
 }
 
 /* ── Base ── */
@@ -155,36 +155,40 @@ select:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
   border-top:2px solid var(--g);border-radius:var(--r);
   overflow:hidden;animation:fadeUp .32s ease both;
 }
-.rcard:nth-child(2){animation-delay:.04s}
-.rcard:nth-child(3){animation-delay:.08s}
-.rcard:nth-child(4){animation-delay:.12s}
-.rcard:nth-child(5){animation-delay:.16s}
-.rcard:nth-child(6){animation-delay:.20s}
-.rcard:nth-child(7){animation-delay:.24s}
-.rcard:nth-child(8){animation-delay:.28s}
-.rcard:nth-child(9){animation-delay:.32s}
-.rcard:nth-child(10){animation-delay:.36s}
-.rcard:nth-child(11){animation-delay:.40s}
+.rcard:nth-child(2){animation-delay:.03s}
+.rcard:nth-child(3){animation-delay:.06s}
+.rcard:nth-child(4){animation-delay:.09s}
+.rcard:nth-child(5){animation-delay:.12s}
+.rcard:nth-child(6){animation-delay:.15s}
+.rcard:nth-child(7){animation-delay:.18s}
+.rcard:nth-child(8){animation-delay:.21s}
+.rcard:nth-child(9){animation-delay:.24s}
+.rcard:nth-child(10){animation-delay:.27s}
+.rcard:nth-child(11){animation-delay:.30s}
+.rcard:nth-child(12){animation-delay:.33s}
+.rcard:nth-child(13){animation-delay:.36s}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
 .rcard-head{
   display:flex;align-items:center;justify-content:space-between;
   padding:11px 15px;border-bottom:1px solid var(--b);
-  font-size:12.5px;font-weight:800;letter-spacing:.03em;
+  font-size:12.5px;font-weight:800;letter-spacing:.03em;gap:10px;
 }
 .rcard-body{padding:15px;font-size:14px;line-height:1.75;min-height:48px}
 
 /* Card accent colours */
-#rc-facts        {border-top-color:#22d3ee}
-#rc-title        {border-top-color:#39ff14}
-#rc-hashtags     {border-top-color:#34d399}
-#rc-banner       {border-top-color:#f97316}
-#rc-veo          {border-top-color:#818cf8}
-#rc-voiceover    {border-top-color:#fb923c}
-#rc-music        {border-top-color:#f472b6}
-#rc-sfx          {border-top-color:#a3e635}
-#rc-live         {border-top-color:#ef4444}
+#rc-facts {border-top-color:#22d3ee}
+#rc-title {border-top-color:#39ff14}
+#rc-hooks {border-top-color:#fbbf24}
+#rc-hashtags {border-top-color:#34d399}
+#rc-banner {border-top-color:#f97316}
 #rc-banner-prompt{border-top-color:#a78bfa}
+#rc-voiceover {border-top-color:#fb923c}
+#rc-music {border-top-color:#f472b6}
+#rc-sfx {border-top-color:#a3e635}
+#rc-veo {border-top-color:#818cf8}
+#rc-live {border-top-color:#ef4444}
+#rc-master {border-top-color:#39ff14;box-shadow:0 0 22px rgba(57,255,20,.12)}
 
 /* Title card */
 .title-out{font-size:18px;font-weight:800;line-height:1.4}
@@ -192,6 +196,17 @@ select:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
 /* Hashtags */
 .tag-wrap{display:flex;flex-wrap:wrap;gap:7px}
 .tag{border:1px solid var(--gbord);color:var(--g);background:var(--gdim);font-size:12.5px;font-weight:700;padding:3px 11px;border-radius:20px}
+
+/* Hooks */
+.hook-list{display:flex;flex-direction:column;gap:8px}
+.hook-row{display:flex;align-items:flex-start;gap:10px}
+.hook-num{
+  flex-shrink:0;width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.4);
+  color:#fbbf24;font-size:11px;font-weight:800;
+}
+.hook-text{font-size:14px;font-weight:600;color:var(--txt);padding-top:1px}
 
 /* Banner lines */
 .bline{
@@ -201,7 +216,7 @@ select:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
 }
 .bline:last-child{margin-bottom:0}
 
-/* Veo / Banner prompt monospace blocks */
+/* Veo / Banner / Master monospace blocks */
 .veo-out{
   font-family:'Courier New',monospace;font-size:12.5px;color:var(--g);
   background:rgba(0,0,0,.3);border-radius:8px;white-space:pre-wrap;word-break:break-word;
@@ -236,6 +251,14 @@ select:focus{border-color:var(--g);box-shadow:0 0 0 3px var(--gdim)}
 .btn-veo-komplett{color:var(--mid);border-color:var(--b)}
 .btn-veo-komplett:hover{color:#818cf8;border-color:rgba(129,140,248,.4);background:rgba(129,140,248,.07)}
 
+/* Master copy button – prominent */
+.btn-master{
+  color:#000;background:var(--g);border-color:var(--g);font-size:10.5px;
+  box-shadow:0 0 16px rgba(57,255,20,.3);
+}
+.btn-master:hover{color:#000;background:#4dff2b;border-color:#4dff2b}
+.btn-master.ok{color:#000;background:#4dff2b}
+
 /* ── Footer ── */
 footer{text-align:center;padding:22px 14px;font-size:11px;color:var(--dim);border-top:1px solid var(--b)}
 
@@ -244,4 +267,5 @@ footer{text-align:center;padding:22px 14px;font-size:11px;color:var(--dim);borde
   .grid2{grid-template-columns:1fr}
   .btn-gen{font-size:15px;padding:14px 16px}
   .logo{font-size:14px}
+  .rcard-head{flex-wrap:wrap}
 }

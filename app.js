@@ -1,16 +1,16 @@
 'use strict';
 
 /* ── DOM ── */
-const apiKeyEl   = document.getElementById('apiKey');
-const btnEye     = document.getElementById('btnEye');
-const eyeIcon    = document.getElementById('eyeIcon');
+const apiKeyEl = document.getElementById('apiKey');
+const btnEye = document.getElementById('btnEye');
+const eyeIcon = document.getElementById('eyeIcon');
 const proxyUrlEl = document.getElementById('proxyUrl');
-const btnGen     = document.getElementById('btnGen');
-const btnLabel   = document.getElementById('btnLabel');
+const btnGen = document.getElementById('btnGen');
+const btnLabel = document.getElementById('btnLabel');
 const btnSpinner = document.getElementById('btnSpinner');
-const errbox     = document.getElementById('errbox');
-const errMsg     = document.getElementById('errMsg');
-const results    = document.getElementById('results');
+const errbox = document.getElementById('errbox');
+const errMsg = document.getElementById('errMsg');
+const results = document.getElementById('results');
 const btnCopyAll = document.getElementById('btnCopyAll');
 
 function $id(id) { return document.getElementById(id); }
@@ -18,22 +18,31 @@ function $set(el, prop, val) { if (el) el[prop] = val; }
 function $clear(el) { if (el) el.innerHTML = ''; }
 function $append(el, child) { if (el && child) el.appendChild(child); }
 
-const outFacts        = $id('out-facts');
-const outTitle        = $id('out-title');
-const outHashtags     = $id('out-hashtags');
-const outBanner       = $id('out-banner');
-const outVeo          = $id('out-veo');
-const outVoiceover    = $id('out-voiceover');
-const outMusic        = $id('out-music');
-const outSfx          = $id('out-sfx');
-const outLive         = $id('out-live');
+const outFacts = $id('out-facts');
+const outTitle = $id('out-title');
+const outHooks = $id('out-hooks');
+const outTitle = $id('out-title');
+const outHashtags = $id('out-hashtags');
+const outBanner = $id('out-banner');
 const outBannerPrompt = $id('out-banner-prompt');
+const outVoiceover = $id('out-voiceover');
+const outMusic = $id('out-music');
+const outSfx = $id('out-sfx');
+const outVeo = $id('out-veo');
+const outLive = $id('out-live');
+const outMaster = $id('out-master');
 
-/* ── Image slots ── */
+/* ── Image slots ──
+   0 = Produktbild (Pflicht)
+   1 = Produktbild (Optional)
+   2 = Produktbild (Optional)
+   3 = Beschreibung / Spezifikationen (Optional, OCR)
+*/
 const images = [
-  { base64: null, mime: 'image/jpeg' },
-  { base64: null, mime: 'image/jpeg' },
-  { base64: null, mime: 'image/jpeg' },
+  { base64: null, mime: 'image/jpeg', kind: 'product' },
+  { base64: null, mime: 'image/jpeg', kind: 'product' },
+  { base64: null, mime: 'image/jpeg', kind: 'product' },
+  { base64: null, mime: 'image/jpeg', kind: 'description' },
 ];
 
 /* ── Proxy URL persistence ── */
@@ -64,47 +73,48 @@ function wireDropzone(dz, input, onFile) {
 
 function readImageFile(file, onDone) {
   if (!file.type.startsWith('image/')) { showErr('Nur Bilddateien erlaubt (JPG, PNG, WEBP).'); return; }
-  if (file.size > 10 * 1024 * 1024)   { showErr('Datei zu groß – max. 10 MB.'); return; }
+  if (file.size > 10 * 1024 * 1024) { showErr('Datei zu groß – max. 10 MB.'); return; }
   const reader = new FileReader();
   reader.onload = ev => { onDone(ev.target.result, file.type, file.name); hideErr(); };
   reader.readAsDataURL(file);
 }
 
 function wireSlot(idx, dzId, inputId, previewId, dzInnerId, metaId, nameId, removeId) {
-  const dz      = $id(dzId),   input   = $id(inputId);
+  const dz = $id(dzId), input = $id(inputId);
   const preview = $id(previewId), dzInner = $id(dzInnerId);
-  const meta    = $id(metaId), name    = $id(nameId), btnRem = $id(removeId);
+  const meta = $id(metaId), name = $id(nameId), btnRem = $id(removeId);
   if (!dz || !input) return;
   wireDropzone(dz, input, file => {
     readImageFile(file, (dataUrl, mime, fname) => {
       images[idx].base64 = dataUrl.split(',')[1];
-      images[idx].mime   = mime;
-      if (preview)  { preview.src = dataUrl; preview.classList.add('show'); }
-      if (dzInner)  dzInner.style.display = 'none';
-      if (name)     name.textContent = fname;
-      if (meta)     meta.hidden = false;
+      images[idx].mime = mime;
+      if (preview) { preview.src = dataUrl; preview.classList.add('show'); }
+      if (dzInner) dzInner.style.display = 'none';
+      if (name) name.textContent = fname;
+      if (meta) meta.hidden = false;
     });
   });
   btnRem?.addEventListener('click', () => {
     images[idx].base64 = null;
-    if (preview)  { preview.src = ''; preview.classList.remove('show'); }
-    if (dzInner)  dzInner.style.display = '';
-    if (meta)     meta.hidden = true;
+    if (preview) { preview.src = ''; preview.classList.remove('show'); }
+    if (dzInner) dzInner.style.display = '';
+    if (meta) meta.hidden = true;
     input.value = '';
   });
 }
 
-wireSlot(0, 'dropzone',  'fileInput',  'preview',  'dzInner',  'imgMeta',  'imgName',  'btnRemove');
+wireSlot(0, 'dropzone', 'fileInput', 'preview', 'dzInner', 'imgMeta', 'imgName', 'btnRemove');
 wireSlot(1, 'dropzone2', 'fileInput2', 'preview2', 'dzInner2', 'imgMeta2', 'imgName2', 'btnRemove2');
 wireSlot(2, 'dropzone3', 'fileInput3', 'preview3', 'dzInner3', 'imgMeta3', 'imgName3', 'btnRemove3');
+wireSlot(3, 'dropzone4', 'fileInput4', 'preview4', 'dzInner4', 'imgMeta4', 'imgName4', 'btnRemove4');
 
 /* ── Helpers ── */
 function showErr(msg) { if (errMsg) errMsg.innerHTML = msg; if (errbox) errbox.hidden = false; }
-function hideErr()    { if (errbox) errbox.hidden = true; }
+function hideErr() { if (errbox) errbox.hidden = true; }
 function setLoading(on) { btnGen.disabled = on; btnLabel.hidden = on; btnSpinner.hidden = !on; }
 
 async function callClaude(payload) {
-  const key      = apiKeyEl.value.trim();
+  const key = apiKeyEl.value.trim();
   const proxyUrl = (proxyUrlEl.value.trim() || 'http://localhost:3001').replace(/\/$/, '');
   let resp;
   try {
@@ -114,19 +124,19 @@ async function callClaude(payload) {
       body: JSON.stringify(payload),
     });
   } catch {
-    throw new Error(`Proxy nicht erreichbar (<code>${proxyUrl}</code>).<br>Starte: <code>cd proxy &amp;&amp; node server.js</code>`);
+    throw new Error(`Proxy nicht erreichbar ( ${proxyUrl}). Starte: cd proxy && node server.js `);
   }
   const text = await resp.text();
   let data;
   try { data = JSON.parse(text); } catch {
-    throw new Error(`Ungültige Proxy-Antwort (${resp.status}):<br><code>${text.slice(0, 200)}</code>`);
+    throw new Error(`Ungültige Proxy-Antwort (${resp.status}): ${text.slice(0, 200)} `);
   }
   if (!resp.ok) throw new Error(`API-Fehler ${resp.status}: ${data.error?.message || JSON.stringify(data)}`);
   const raw = data.content?.[0]?.text?.trim() || '';
   if (!raw) throw new Error('Leere Antwort von Anthropic.');
   const json = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
   try { return JSON.parse(json); } catch {
-    throw new Error(`Kein gültiges JSON:<br><code>${raw.slice(0, 400)}</code>`);
+    throw new Error(`Kein gültiges JSON: ${raw.slice(0, 400)} `);
   }
 }
 
@@ -136,18 +146,27 @@ async function callClaude(payload) {
 const SYSTEM_PROMPT = `Du bist ein TikTok-Shop-Marketing-Experte und Videoproduktions-Spezialist für den deutschen Markt.
 
 BILDNUTZUNG (OCR auf allen hochgeladenen Bildern):
-- Bild 1: Produktbild – erkenne Aussehen, Farbe, Form, Verpackung.
-- Bild 2 (falls vorhanden): Produktbeschreibung – extrahiere alle lesbaren Texte und Fakten via OCR.
-- Bild 3 (falls vorhanden): Zusatzbild – extrahiere weitere Fakten via OCR.
-Fakten aus allen Bildern zusammenführen und konsolidieren.
+- Bild 1-3: Produktbilder – erkenne Aussehen, Farbe, Form, Verpackung, Details.
+- Beschreibungsbild (falls vorhanden): Produktbeschreibung/Spezifikationen – extrahiere alle lesbaren Texte und Fakten via OCR.
+Fakten aus allen Bildern zusammenführen und konsolidieren. Keine Spezifikationen erfinden.
 
 PRODUKTFAKTEN: Nur aus sichtbaren oder lesbaren Informationen. Unbekannte Werte = "Nicht erkennbar".
+
+5 HOOK IDEAS: 5 verschiedene deutsche Hook-Texte für den Videostart. Jeweils max. 6 Wörter, scroll-stopping, kein Preis, keine falschen Versprechen. Starke, neugierig machende Aufhänger.
 
 TIKTOK TITEL: Auf Deutsch, mit Emoji, maximal 80 Zeichen, scroll-stopping, kein Preis.
 
 HASHTAGS: 7 relevante deutsche TikTok-Hashtags.
 
 BANNER TEXT: 4 kurze Zeilen für ein visuelles Banner (Deutsch). Zeile 1-3 max. 28 Zeichen. Zeile 4 = CTA.
+
+BANNER PROMPT: Englisch. Prompt für einen KI-Bildgenerator. 9:16, schwarzer Hintergrund, Neon-Grün (#39FF14), kein Preis.
+
+VOICE SCRIPT (voiceoverText): Deutsches Voiceover-Skript für das 8-Sekunden-Video. Männliche Stimme. Mit Timing (0s, 2s, 4s, 6s).
+
+MUSIC SUGGESTION: Genre, BPM, Stimmung, Stil. Auf Deutsch.
+
+SOUND EFFECTS: Liste relevanter Sound-Effekte mit Timing. Auf Deutsch.
 
 VEO 3.1 PROMPT: English. Realistic high-quality vertical 9:16 TikTok Shop Germany advertisement. Photorealistic commercial quality.
 
@@ -177,15 +196,7 @@ End the veoPrompt with this exact negative prompt (copy word for word):
 
 German voiceover and music go in their own separate fields (voiceoverText, musicSuggestion, soundEffects). Do NOT include them inside veoPrompt.
 
-VOICEOVER TEXT: Deutsches Voiceover-Skript für das 8-Sekunden-Video. Männliche Stimme. Mit Timing (0s, 2s, 4s, 6s).
-
-MUSIC SUGGESTION: Genre, BPM, Stimmung, Stil. Auf Deutsch.
-
-SOUND EFFECTS: Liste relevanter Sound-Effekte mit Timing. Auf Deutsch.
-
 TIKTOK LIVE SCRIPT: Moderationsplan für eine Live-Session. Zeitplan im Format "0:00 | Beschreibung". Auf Deutsch.
-
-BANNER PROMPT: Englisch. Prompt für einen KI-Bildgenerator. 9:16, schwarzer Hintergrund, Neon-Grün (#39FF14), kein Preis.
 
 REGELN: Keine Preise, keine Rabatte, keine falschen Versprechen. TikTok-safe.
 
@@ -203,15 +214,16 @@ Antworte NUR mit einem gültigen JSON-Objekt ohne Markdown-Blöcke:
     "warnings": [],
     "useCases": []
   },
+  "hooks": ["Hook 1","Hook 2","Hook 3","Hook 4","Hook 5"],
   "title": "TikTok-Titel mit Emoji",
   "hashtags": ["#Tag1","#Tag2","#Tag3","#Tag4","#Tag5","#Tag6","#Tag7"],
   "bannerText": ["Zeile 1","Zeile 2","Zeile 3","CTA"],
-  "veoPrompt": "Complete English Veo 3.1 production prompt describing scenes, camera, lighting, text overlays...",
+  "bannerPrompt": "English AI image generation prompt for 9:16 banner...",
   "voiceoverText": "0s – Erster Satz\\n2s – Zweiter Satz\\n4s – Dritter Satz\\n6s – CTA",
   "musicSuggestion": "Genre, BPM, Stimmung und Stil",
   "soundEffects": "0s – Effekt 1\\n2s – Effekt 2\\n4s – Effekt 3",
-  "liveScript": "0:00 | Hook-Eröffnung\\n0:15 | Produktvorstellung\\n0:30 | Feature 1\\n0:45 | Feature 2\\n1:00 | Feature 3\\n1:15 | Nutzen\\n1:30 | Community-Frage\\n1:45 | CTA",
-  "bannerPrompt": "English AI image generation prompt for 9:16 banner..."
+  "veoPrompt": "Complete English Veo 3.1 production prompt describing scenes, camera, lighting, text overlays...",
+  "liveScript": "0:00 | Hook-Eröffnung\\n0:15 | Produktvorstellung\\n0:30 | Feature 1\\n0:45 | Feature 2\\n1:00 | Feature 3\\n1:15 | Nutzen\\n1:30 | Community-Frage\\n1:45 | CTA"
 }`;
 
 /* ── Generate ── */
@@ -220,24 +232,23 @@ btnGen.addEventListener('click', generate);
 async function generate() {
   hideErr();
   if (!apiKeyEl.value.trim()) return showErr('Bitte Anthropic API Key eingeben.');
-  if (!images[0].base64)      return showErr('Bitte zuerst ein Produktbild hochladen (Bild 1).');
+  if (!images[0].base64) return showErr('Bitte zuerst ein Produktbild hochladen (Bild 1).');
 
   if (results) results.hidden = true;
   setLoading(true);
 
-  const active   = images.filter(img => img.base64);
-  const imgCount = active.length;
+  const activeProducts = images.filter(img => img.base64 && img.kind === 'product');
+  const descImg = images.find(img => img.base64 && img.kind === 'description');
 
   const userContent = [];
-  active.forEach(img => userContent.push({ type: 'image', source: { type: 'base64', media_type: img.mime, data: img.base64 } }));
+  activeProducts.forEach(img => userContent.push({ type: 'image', source: { type: 'base64', media_type: img.mime, data: img.base64 } }));
+  if (descImg) userContent.push({ type: 'image', source: { type: 'base64', media_type: descImg.mime, data: descImg.base64 } });
 
-  const imgDesc = imgCount === 1
-    ? 'Nur Bild 1 vorhanden (Produktbild). Setze alle productFacts auf "Nicht erkennbar" sofern nicht sichtbar.'
-    : imgCount === 2
-      ? 'Bild 1 = Produktbild. Bild 2 = Beschreibung/Spezifikationen – OCR anwenden und Fakten extrahieren.'
-      : 'Bild 1 = Produktbild. Bild 2 = Beschreibung/Spezifikationen. Bild 3 = Zusatzbild. OCR auf Bild 2 und 3 anwenden und alle Fakten zusammenführen.';
+  const parts = [`${activeProducts.length} Produktbild(er) hochgeladen.`];
+  if (descImg) parts.push('Zusätzlich ein Beschreibungs-/Spezifikationsbild – OCR anwenden und alle Fakten extrahieren und zusammenführen.');
+  else parts.push('Kein Beschreibungsbild vorhanden. Setze unbekannte productFacts auf "Nicht erkennbar".');
 
-  userContent.push({ type: 'text', text: `${imgDesc}\n\nVideo-Stil: ${$id('style').value}\nTon: ${$id('tone').value}\n\nNur JSON zurückgeben.` });
+  userContent.push({ type: 'text', text: `${parts.join(' ')}\n\nVideo-Stil: ${$id('style').value}\nTon: ${$id('tone').value}\n\nAlle Videos sind exakt 8 Sekunden lang.\n\nNur JSON zurückgeben.` });
 
   try {
     const parsed = await callClaude({
@@ -259,14 +270,16 @@ async function generate() {
 function renderResults(d) {
   renderFacts(d.productFacts || {});
   $set(outTitle, 'textContent', d.title || '—');
+  renderHooks(d.hooks || []);
   renderHashtags(d.hashtags || []);
   renderBanner(d.bannerText || []);
-  $set(outVeo, 'textContent', d.veoPrompt || '—');
+  $set(outBannerPrompt, 'textContent', d.bannerPrompt || '—');
   renderVoiceover(d.voiceoverText || '');
   $set(outMusic, 'textContent', d.musicSuggestion || '—');
   renderSfx(d.soundEffects || '');
+  $set(outVeo, 'textContent', d.veoPrompt || '—');
   renderLive(d.liveScript || '');
-  $set(outBannerPrompt, 'textContent', d.bannerPrompt || '—');
+  renderMaster(d);
 }
 
 function renderFacts(pf) {
@@ -295,6 +308,19 @@ function renderFacts(pf) {
   $append(outFacts, grid);
 }
 
+function renderHooks(hooks) {
+  $clear(outHooks);
+  if (!hooks.length) { $set(outHooks, 'textContent', '—'); return; }
+  const list = document.createElement('div'); list.className = 'hook-list';
+  hooks.forEach((h, i) => {
+    const row = document.createElement('div'); row.className = 'hook-row';
+    const n = document.createElement('span'); n.className = 'hook-num'; n.textContent = (i + 1);
+    const t = document.createElement('span'); t.className = 'hook-text'; t.textContent = h;
+    row.appendChild(n); row.appendChild(t); list.appendChild(row);
+  });
+  $append(outHooks, list);
+}
+
 function renderHashtags(tags) {
   $clear(outHashtags);
   const wrap = document.createElement('div'); wrap.className = 'tag-wrap';
@@ -310,53 +336,51 @@ function renderBanner(lines) {
   });
 }
 
-function renderVoiceover(text) {
-  $clear(outVoiceover);
+function renderTimedLines(target, text, re) {
+  $clear(target);
   (text || '').split('\n').forEach(line => {
     const span = document.createElement('span'); span.className = 'live-line';
-    const m = line.match(/^(\d+s)\s*[–-]\s*(.*)/);
+    const m = line.match(re);
     if (m) {
       const ts = document.createElement('span'); ts.className = 'live-ts'; ts.textContent = m[1];
       span.appendChild(ts); span.appendChild(document.createTextNode(m[2].trim()));
     } else { span.textContent = line; }
-    $append(outVoiceover, span);
+    $append(target, span);
   });
 }
 
-function renderSfx(text) {
-  $clear(outSfx);
-  (text || '').split('\n').forEach(line => {
-    const span = document.createElement('span'); span.className = 'live-line';
-    const m = line.match(/^(\d+s)\s*[–-]\s*(.*)/);
-    if (m) {
-      const ts = document.createElement('span'); ts.className = 'live-ts'; ts.textContent = m[1];
-      span.appendChild(ts); span.appendChild(document.createTextNode(m[2].trim()));
-    } else { span.textContent = line; }
-    $append(outSfx, span);
-  });
+function renderVoiceover(text) { renderTimedLines(outVoiceover, text, /^(\d+s)\s*[–-]\s*(.*)/); }
+function renderSfx(text) { renderTimedLines(outSfx, text, /^(\d+s)\s*[–-]\s*(.*)/); }
+function renderLive(text) { renderTimedLines(outLive, text, /^(\d+:\d+)\s*\|(.*)/); }
+
+/* ── Master Copy Block ──
+   Combines: Banner Text + Voice Script + Music Suggestion + Sound Effects + Veo 3.1 Prompt
+*/
+function buildMasterText(d) {
+  const bannerText = Array.isArray(d.bannerText) ? d.bannerText.join('\n') : (d.bannerText || '');
+  return [
+    '=== VIDEO LENGTH ===\n8 Seconds',
+    `=== BANNER TEXT ===\n${bannerText}`,
+    `=== VOICE SCRIPT ===\n${d.voiceoverText || ''}`,
+    `=== MUSIC ===\n${d.musicSuggestion || ''}`,
+    `=== SOUND EFFECTS ===\n${d.soundEffects || ''}`,
+    `=== VEO 3.1 PROMPT ===\n${d.veoPrompt || ''}`,
+  ].join('\n\n');
 }
 
-function renderLive(text) {
-  $clear(outLive);
-  (text || '').split('\n').forEach(line => {
-    const span = document.createElement('span'); span.className = 'live-line';
-    const m = line.match(/^(\d+:\d+)\s*\|(.*)/);
-    if (m) {
-      const ts = document.createElement('span'); ts.className = 'live-ts'; ts.textContent = m[1];
-      span.appendChild(ts); span.appendChild(document.createTextNode(m[2].trim()));
-    } else { span.textContent = line; }
-    $append(outLive, span);
-  });
+function renderMaster(d) {
+  $set(outMaster, 'textContent', buildMasterText(d));
 }
 
 /* ── Copy ── */
 document.addEventListener('click', e => {
   const btn = e.target.closest('.btn-copy');
-  if (!btn) return;
+  if (!btn || btn.id === 'btnVeoKomplett' || btn.id === 'btnMasterCopy') return;
   const card = $id(btn.dataset.src);
   if (card) clip(card.querySelector('.rcard-body')?.innerText || '', btn);
 });
 
+/* Existing: copy Veo bundle (length + veo + voice + music + sfx) */
 $id('btnVeoKomplett')?.addEventListener('click', () => {
   const text = [
     '=== VIDEO LENGTH ===\n8 Seconds',
@@ -365,21 +389,27 @@ $id('btnVeoKomplett')?.addEventListener('click', () => {
     `=== MUSIC ===\n${outMusic?.innerText || ''}`,
     `=== SOUND EFFECTS ===\n${outSfx?.innerText || ''}`,
   ].join('\n\n');
-  clip(text, $id('btnVeoKomplett'));
+  clip(text, $id('btnVeoKomplett'), '✓ Komplett kopiert');
+});
+
+/* New: copy full Master Copy Block */
+$id('btnMasterCopy')?.addEventListener('click', () => {
+  clip(outMaster?.innerText || '', $id('btnMasterCopy'), '✓ Alles kopiert');
 });
 
 btnCopyAll?.addEventListener('click', () => {
   const sections = [
-    ['Produktdaten',     outFacts],
-    ['TikTok Titel',     outTitle],
-    ['Hashtags',         outHashtags],
-    ['Banner Text',      outBanner],
-    ['Veo 3.1 Prompt',   outVeo],
-    ['Voiceover Text',   outVoiceover],
+    ['Produktdaten', outFacts],
+    ['TikTok Titel', outTitle],
+    ['5 Hook Ideas', outHooks],
+    ['Hashtags', outHashtags],
+    ['Banner Text', outBanner],
+    ['Banner Prompt', outBannerPrompt],
+    ['Voice Script', outVoiceover],
     ['Music Suggestion', outMusic],
-    ['Sound Effects',    outSfx],
-    ['Live Script',      outLive],
-    ['Banner Prompt',    outBannerPrompt],
+    ['Sound Effects', outSfx],
+    ['Veo 3.1 Prompt', outVeo],
+    ['Live Script', outLive],
   ];
   const all = sections
     .map(([label, el]) => `=== ${label} ===\n${el?.innerText || ''}`)
@@ -387,9 +417,9 @@ btnCopyAll?.addEventListener('click', () => {
   clip(all, btnCopyAll);
 });
 
-function clip(text, btn) {
+function clip(text, btn, okLabel) {
   const orig = btn.textContent;
-  const done = () => { btn.textContent = '✓ Kopiert'; btn.classList.add('ok'); setTimeout(() => { btn.textContent = orig; btn.classList.remove('ok'); }, 2000); };
+  const done = () => { btn.textContent = okLabel || '✓ Kopiert'; btn.classList.add('ok'); setTimeout(() => { btn.textContent = orig; btn.classList.remove('ok'); }, 2000); };
   if (navigator.clipboard && location.protocol === 'https:') navigator.clipboard.writeText(text).then(done).catch(() => fallback(text, done));
   else fallback(text, done);
 }
