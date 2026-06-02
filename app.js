@@ -368,8 +368,25 @@ function buildMasterText(d) {
   ].join('\n\n');
 }
 
+let masterText = '';
+
 function renderMaster(d) {
-  $set(outMaster, 'textContent', buildMasterText(d));
+  masterText = buildMasterText(d);
+  $clear(outMaster);
+  const sections = [
+    ['VIDEO LENGTH', '8 Seconds'],
+    ['BANNER TEXT', Array.isArray(d.bannerText) ? d.bannerText.join('\n') : (d.bannerText || '')],
+    ['VOICE SCRIPT', d.voiceoverText || ''],
+    ['MUSIC', d.musicSuggestion || ''],
+    ['SOUND EFFECTS', d.soundEffects || ''],
+    ['VEO 3.1 PROMPT', d.veoPrompt || ''],
+  ];
+  sections.forEach(([label, body]) => {
+    const sec = document.createElement('div'); sec.className = 'master-section';
+    const l = document.createElement('div'); l.className = 'master-section-label'; l.textContent = label;
+    const b = document.createElement('pre'); b.className = 'master-section-body'; b.textContent = (body || '—');
+    sec.appendChild(l); sec.appendChild(b); $append(outMaster, sec);
+  });
 }
 
 /* ── Copy ── */
@@ -394,7 +411,7 @@ $id('btnVeoKomplett')?.addEventListener('click', () => {
 
 /* New: copy full Master Copy Block */
 $id('btnMasterCopy')?.addEventListener('click', () => {
-  clip(outMaster?.innerText || '', $id('btnMasterCopy'), '✓ Alles kopiert');
+  clip(masterText || outMaster?.innerText || '', $id('btnMasterCopy'), '✓ Alles kopiert');
 });
 
 btnCopyAll?.addEventListener('click', () => {

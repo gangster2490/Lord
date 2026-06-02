@@ -10,111 +10,136 @@
 <body>
 
   <header>
-    <span class="logo">⚡ TikTok Shop Creator</span>
-    <span class="badge">SparDirekt DE</span>
+    <div class="header-inner">
+      <span class="logo"><span class="logo-mark">⚡</span> TikTok Shop Creator</span>
+      <span class="badge">SparDirekt DE</span>
+    </div>
   </header>
 
   <main>
 
-    <!-- API Key -->
-    <section class="card">
-      <div class="card-label">🔑 Anthropic API Key</div>
-      <div class="key-row">
-        <input type="password" id="apiKey" placeholder="sk-ant-api03-..." spellcheck="false" autocomplete="off" />
-        <button class="btn-eye" id="btnEye" aria-label="Key anzeigen">
-          <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>
-          </svg>
-        </button>
-      </div>
-      <p class="hint">Dein Key bleibt nur im Browser – er wird nie gespeichert oder weitergegeben.</p>
+    <!-- Intro -->
+    <section class="hero-intro">
+      <h1>Dein TikTok Shop Studio</h1>
+      <p>Lade dein Produkt hoch und generiere komplette TikTok-Shop-Inhalte – Hooks, Hashtags, Banner, Voiceover und einen fertigen Veo&nbsp;3.1 Prompt.</p>
     </section>
 
-    <!-- Image 1 (Produktbild – Pflicht) -->
+    <!-- Konfiguration -->
     <section class="card">
-      <div class="card-label">📸 Bild 1 – Produktbild <span class="required-badge">Pflichtfeld</span></div>
-      <div class="dropzone" id="dropzone" tabindex="0" role="button">
-        <div class="dz-inner" id="dzInner">
-          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 16V4m0 0L8 8m4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M20 16.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5" stroke-linecap="round"/>
-          </svg>
-          <p class="dz-text">Produktbild hierher ziehen</p>
-          <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
+      <div class="card-label">🔑 Konfiguration</div>
+
+      <div class="field-block">
+        <label class="field-cap" for="apiKey">Anthropic API Key</label>
+        <div class="key-row">
+          <input type="password" id="apiKey" placeholder="sk-ant-api03-..." spellcheck="false" autocomplete="off" />
+          <button class="btn-eye" id="btnEye" aria-label="Key anzeigen">
+            <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
         </div>
-        <img id="preview" class="preview" alt="" />
-        <input type="file" id="fileInput" accept="image/*" />
+        <p class="hint">Dein Key bleibt nur im Browser – er wird nie gespeichert oder weitergegeben.</p>
       </div>
-      <div class="img-meta" id="imgMeta" hidden>
-        <span class="img-name" id="imgName"></span>
-        <button class="btn-remove" id="btnRemove">✕ Entfernen</button>
+
+      <div class="divider"></div>
+
+      <div class="field-block">
+        <label class="field-cap" for="proxyUrl">Proxy URL</label>
+        <input type="url" id="proxyUrl" placeholder="https://your-proxy.onrender.com" autocomplete="off" spellcheck="false" />
+        <p class="hint">CORS-Proxy erforderlich. Lokal: <code>cd proxy &amp;&amp; node server.js</code></p>
       </div>
     </section>
 
-    <!-- Image 2 (Produktbild – Optional) -->
+    <!-- Produktbilder -->
     <section class="card">
-      <div class="card-label">📷 Bild 2 – Produktbild <span class="optional-badge">Optional</span></div>
-      <p class="hint" style="margin-bottom:10px">Weitere Produktansicht (andere Perspektive, Detail, Anwendung).</p>
-      <div class="dropzone" id="dropzone2" tabindex="0" role="button">
-        <div class="dz-inner" id="dzInner2">
-          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <p class="dz-text">Produktbild hierher ziehen</p>
-          <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
+      <div class="card-label">📸 Produktbilder</div>
+      <div class="upload-grid">
+
+        <!-- Image 1 (Produktbild – Pflicht) -->
+        <div class="upload-slot">
+          <div class="slot-cap">Bild 1 – Produktbild <span class="required-badge">Pflicht</span></div>
+          <div class="dropzone" id="dropzone" tabindex="0" role="button">
+            <div class="dz-inner" id="dzInner">
+              <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 16V4m0 0L8 8m4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M20 16.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5" stroke-linecap="round"/>
+              </svg>
+              <p class="dz-text">Produktbild ablegen</p>
+              <p class="dz-sub">JPG · PNG · WEBP · max 10 MB</p>
+            </div>
+            <img id="preview" class="preview" alt="" />
+            <input type="file" id="fileInput" accept="image/*" />
+          </div>
+          <div class="img-meta" id="imgMeta" hidden>
+            <span class="img-name" id="imgName"></span>
+            <button class="btn-remove" id="btnRemove">✕ Entfernen</button>
+          </div>
         </div>
-        <img id="preview2" class="preview" alt="" />
-        <input type="file" id="fileInput2" accept="image/*" />
-      </div>
-      <div class="img-meta" id="imgMeta2" hidden>
-        <span class="img-name" id="imgName2"></span>
-        <button class="btn-remove" id="btnRemove2">✕ Entfernen</button>
+
+        <!-- Image 2 (Produktbild – Optional) -->
+        <div class="upload-slot">
+          <div class="slot-cap">Bild 2 – Produktbild <span class="optional-badge">Optional</span></div>
+          <div class="dropzone" id="dropzone2" tabindex="0" role="button">
+            <div class="dz-inner" id="dzInner2">
+              <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <p class="dz-text">Weitere Ansicht</p>
+              <p class="dz-sub">JPG · PNG · WEBP · max 10 MB</p>
+            </div>
+            <img id="preview2" class="preview" alt="" />
+            <input type="file" id="fileInput2" accept="image/*" />
+          </div>
+          <div class="img-meta" id="imgMeta2" hidden>
+            <span class="img-name" id="imgName2"></span>
+            <button class="btn-remove" id="btnRemove2">✕ Entfernen</button>
+          </div>
+        </div>
+
+        <!-- Image 3 (Produktbild – Optional) -->
+        <div class="upload-slot">
+          <div class="slot-cap">Bild 3 – Produktbild <span class="optional-badge">Optional</span></div>
+          <div class="dropzone" id="dropzone3" tabindex="0" role="button">
+            <div class="dz-inner" id="dzInner3">
+              <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <p class="dz-text">Weitere Ansicht</p>
+              <p class="dz-sub">JPG · PNG · WEBP · max 10 MB</p>
+            </div>
+            <img id="preview3" class="preview" alt="" />
+            <input type="file" id="fileInput3" accept="image/*" />
+          </div>
+          <div class="img-meta" id="imgMeta3" hidden>
+            <span class="img-name" id="imgName3"></span>
+            <button class="btn-remove" id="btnRemove3">✕ Entfernen</button>
+          </div>
+        </div>
+
+        <!-- Image 4 (Beschreibung / Spezifikationen – Optional, OCR) -->
+        <div class="upload-slot">
+          <div class="slot-cap">Bild 4 – Beschreibung <span class="optional-badge">OCR</span></div>
+          <div class="dropzone" id="dropzone4" tabindex="0" role="button">
+            <div class="dz-inner" id="dzInner4">
+              <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M9 12h6m-6 4h6m-6-8h6M5 20h14a2 2 0 0 0 2-2V8l-5-5H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <p class="dz-text">Beschreibung / Specs</p>
+              <p class="dz-sub">JPG · PNG · WEBP · max 10 MB</p>
+            </div>
+            <img id="preview4" class="preview" alt="" />
+            <input type="file" id="fileInput4" accept="image/*" />
+          </div>
+          <div class="img-meta" id="imgMeta4" hidden>
+            <span class="img-name" id="imgName4"></span>
+            <button class="btn-remove" id="btnRemove4">✕ Entfernen</button>
+          </div>
+        </div>
+
       </div>
     </section>
 
-    <!-- Image 3 (Produktbild – Optional) -->
-    <section class="card">
-      <div class="card-label">🖼️ Bild 3 – Produktbild <span class="optional-badge">Optional</span></div>
-      <p class="hint" style="margin-bottom:10px">Weitere Produktansicht (Verpackung, Lieferumfang, Detail).</p>
-      <div class="dropzone" id="dropzone3" tabindex="0" role="button">
-        <div class="dz-inner" id="dzInner3">
-          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M4 16l4.586-4.586a2 2 0 0 1 2.828 0L16 16m-2-2 1.586-1.586a2 2 0 0 1 2.828 0L20 14M6 20h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <p class="dz-text">Produktbild hierher ziehen</p>
-          <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
-        </div>
-        <img id="preview3" class="preview" alt="" />
-        <input type="file" id="fileInput3" accept="image/*" />
-      </div>
-      <div class="img-meta" id="imgMeta3" hidden>
-        <span class="img-name" id="imgName3"></span>
-        <button class="btn-remove" id="btnRemove3">✕ Entfernen</button>
-      </div>
-    </section>
-
-    <!-- Image 4 (Beschreibung / Spezifikationen – Optional, OCR) -->
-    <section class="card">
-      <div class="card-label">📋 Bild 4 – Beschreibung / Spezifikationen <span class="optional-badge">Optional</span></div>
-      <p class="hint" style="margin-bottom:10px">Screenshot der Produktbeschreibung mit Features, Spezifikationen, Material, Maße etc. (OCR).</p>
-      <div class="dropzone" id="dropzone4" tabindex="0" role="button">
-        <div class="dz-inner" id="dzInner4">
-          <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M9 12h6m-6 4h6m-6-8h6M5 20h14a2 2 0 0 0 2-2V8l-5-5H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <p class="dz-text">Beschreibungsfoto hierher ziehen</p>
-          <p class="dz-sub">oder tippen zum Auswählen · JPG PNG WEBP · max 10 MB</p>
-        </div>
-        <img id="preview4" class="preview" alt="" />
-        <input type="file" id="fileInput4" accept="image/*" />
-      </div>
-      <div class="img-meta" id="imgMeta4" hidden>
-        <span class="img-name" id="imgName4"></span>
-        <button class="btn-remove" id="btnRemove4">✕ Entfernen</button>
-      </div>
-    </section>
-
-    <!-- Options -->
+    <!-- Einstellungen -->
     <section class="card">
       <div class="card-label">🎨 Einstellungen</div>
       <div class="grid2">
@@ -143,15 +168,7 @@
       </div>
     </section>
 
-    <!-- Proxy URL -->
-    <section class="card">
-      <div class="card-label">🔗 Proxy URL</div>
-      <input type="url" id="proxyUrl" placeholder="https://your-proxy.onrender.com" autocomplete="off" spellcheck="false" />
-      <p class="hint">CORS-Proxy erforderlich.<br>
-      Lokal: <code style="background:#111;padding:1px 6px;border-radius:4px;color:#39ff14">cd proxy &amp;&amp; node server.js</code></p>
-    </section>
-
-    <!-- Button -->
+    <!-- Generate -->
     <button class="btn-gen" id="btnGen">
       <span id="btnLabel">⚡ Content generieren</span>
       <span id="btnSpinner" class="spinner" hidden></span>
@@ -165,120 +182,190 @@
     <!-- Results -->
     <section id="results" hidden>
 
-      <div class="res-header">
+      <div class="res-toolbar">
         <h2>Ergebnisse</h2>
-        <button class="btn-copyall" id="btnCopyAll">Alles kopieren</button>
+        <button class="btn-copyall" id="btnCopyAll">⧉ Alles kopieren</button>
       </div>
 
-      <!-- 1. Produktdaten -->
-      <div class="rcard" id="rc-facts">
-        <div class="rcard-head">
-          <span>📋 Produktdaten</span>
-          <button class="btn-copy" data-src="rc-facts">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-facts"></div>
-      </div>
+      <!-- ★ MAIN OUTPUT — Master Copy Block -->
+      <div class="result-group">
+        <div class="group-label"><span class="group-dot main"></span>Main Output</div>
 
-      <!-- TikTok Titel -->
-      <div class="rcard" id="rc-title">
-        <div class="rcard-head">
-          <span>✏️ TikTok Titel</span>
-          <button class="btn-copy" data-src="rc-title">Kopieren</button>
-        </div>
-        <div class="rcard-body title-out" id="out-title"></div>
-      </div>
-
-      <!-- 2. 5 Hook Ideas -->
-      <div class="rcard" id="rc-hooks">
-        <div class="rcard-head">
-          <span>🪝 5 Hook Ideas</span>
-          <button class="btn-copy" data-src="rc-hooks">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-hooks"></div>
-      </div>
-
-      <!-- 3. Hashtags -->
-      <div class="rcard" id="rc-hashtags">
-        <div class="rcard-head">
-          <span>#️⃣ Hashtags</span>
-          <button class="btn-copy" data-src="rc-hashtags">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-hashtags"></div>
-      </div>
-
-      <!-- 4. Banner Text -->
-      <div class="rcard" id="rc-banner">
-        <div class="rcard-head">
-          <span>🖼️ Banner Text</span>
-          <button class="btn-copy" data-src="rc-banner">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-banner"></div>
-      </div>
-
-      <!-- 5. Banner Prompt -->
-      <div class="rcard" id="rc-banner-prompt">
-        <div class="rcard-head">
-          <span>🎨 Banner Prompt</span>
-          <button class="btn-copy" data-src="rc-banner-prompt">Kopieren</button>
-        </div>
-        <div class="rcard-body veo-out" id="out-banner-prompt"></div>
-      </div>
-
-      <!-- 6. Voice Script -->
-      <div class="rcard" id="rc-voiceover">
-        <div class="rcard-head">
-          <span>🎙️ Voice Script</span>
-          <button class="btn-copy" data-src="rc-voiceover">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-voiceover"></div>
-      </div>
-
-      <!-- 7. Music Suggestion -->
-      <div class="rcard" id="rc-music">
-        <div class="rcard-head">
-          <span>🎵 Music Suggestion</span>
-          <button class="btn-copy" data-src="rc-music">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-music"></div>
-      </div>
-
-      <!-- 8. Sound Effects -->
-      <div class="rcard" id="rc-sfx">
-        <div class="rcard-head">
-          <span>🔊 Sound Effects</span>
-          <button class="btn-copy" data-src="rc-sfx">Kopieren</button>
-        </div>
-        <div class="rcard-body" id="out-sfx"></div>
-      </div>
-
-      <!-- 9. Veo 3.1 Prompt -->
-      <div class="rcard" id="rc-veo">
-        <div class="rcard-head">
-          <span>🎥 Veo 3.1 Prompt</span>
-          <div style="display:flex;gap:6px">
-            <button class="btn-copy" data-src="rc-veo">Kopieren</button>
-            <button class="btn-copy btn-veo-komplett" id="btnVeoKomplett">📋 Veo Komplett</button>
+        <div class="rcard hero" id="rc-master">
+          <input type="checkbox" id="exp-master" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-master">
+            <span class="rc-name">📦 Master Copy Block <span class="master-badge">READY FOR VEO</span></span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel">
+            <div class="rcard-panel-inner">
+              <div class="rcard-body veo-out" id="out-master"></div>
+              <div class="rcard-foot foot-full">
+                <button class="btn-copy btn-master" id="btnMasterCopy">📋 Alles für Veo kopieren</button>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="rcard-body veo-out" id="out-veo"></div>
       </div>
 
-      <!-- 10. TikTok Live Script -->
-      <div class="rcard" id="rc-live">
-        <div class="rcard-head">
-          <span>🔴 TikTok Live Script</span>
-          <button class="btn-copy" data-src="rc-live">Kopieren</button>
+      <!-- Product Data -->
+      <div class="result-group">
+        <div class="group-label"><span class="group-dot"></span>Product Data</div>
+
+        <div class="rcard" id="rc-facts">
+          <input type="checkbox" id="exp-facts" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-facts">
+            <span class="rc-name">📋 Produktdaten</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body" id="out-facts"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-facts">Kopieren</button></div>
+          </div></div>
         </div>
-        <div class="rcard-body" id="out-live"></div>
       </div>
 
-      <!-- 11. Master Copy Block -->
-      <div class="rcard" id="rc-master">
-        <div class="rcard-head">
-          <span>📦 Master Copy Block</span>
-          <button class="btn-copy btn-master" id="btnMasterCopy">Alles für Veo kopieren</button>
+      <!-- TikTok Content -->
+      <div class="result-group">
+        <div class="group-label"><span class="group-dot"></span>TikTok Content</div>
+
+        <div class="rcard" id="rc-title">
+          <input type="checkbox" id="exp-title" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-title">
+            <span class="rc-name">✏️ TikTok Titel</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body title-out" id="out-title"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-title">Kopieren</button></div>
+          </div></div>
         </div>
-        <div class="rcard-body veo-out" id="out-master"></div>
+
+        <div class="rcard" id="rc-hooks">
+          <input type="checkbox" id="exp-hooks" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-hooks">
+            <span class="rc-name">🪝 5 Hook Ideas</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body" id="out-hooks"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-hooks">Kopieren</button></div>
+          </div></div>
+        </div>
+
+        <div class="rcard" id="rc-hashtags">
+          <input type="checkbox" id="exp-hashtags" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-hashtags">
+            <span class="rc-name">#️⃣ Hashtags</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body" id="out-hashtags"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-hashtags">Kopieren</button></div>
+          </div></div>
+        </div>
+
+        <div class="rcard" id="rc-live">
+          <input type="checkbox" id="exp-live" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-live">
+            <span class="rc-name">🔴 TikTok Live Script</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body" id="out-live"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-live">Kopieren</button></div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- Banner Content -->
+      <div class="result-group">
+        <div class="group-label"><span class="group-dot"></span>Banner Content</div>
+
+        <div class="rcard" id="rc-banner">
+          <input type="checkbox" id="exp-banner" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-banner">
+            <span class="rc-name">🖼️ Banner Text</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body" id="out-banner"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-banner">Kopieren</button></div>
+          </div></div>
+        </div>
+
+        <div class="rcard" id="rc-banner-prompt">
+          <input type="checkbox" id="exp-banner-prompt" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-banner-prompt">
+            <span class="rc-name">🎨 Banner Prompt</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body veo-out" id="out-banner-prompt"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-banner-prompt">Kopieren</button></div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- Voice Content -->
+      <div class="result-group">
+        <div class="group-label"><span class="group-dot"></span>Voice Content</div>
+
+        <div class="rcard" id="rc-voiceover">
+          <input type="checkbox" id="exp-voiceover" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-voiceover">
+            <span class="rc-name">🎙️ Voice Script</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body" id="out-voiceover"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-voiceover">Kopieren</button></div>
+          </div></div>
+        </div>
+
+        <div class="rcard" id="rc-music">
+          <input type="checkbox" id="exp-music" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-music">
+            <span class="rc-name">🎵 Music Suggestion</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body" id="out-music"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-music">Kopieren</button></div>
+          </div></div>
+        </div>
+
+        <div class="rcard" id="rc-sfx">
+          <input type="checkbox" id="exp-sfx" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-sfx">
+            <span class="rc-name">🔊 Sound Effects</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body" id="out-sfx"></div>
+            <div class="rcard-foot"><button class="btn-copy" data-src="rc-sfx">Kopieren</button></div>
+          </div></div>
+        </div>
+      </div>
+
+      <!-- Veo Content -->
+      <div class="result-group">
+        <div class="group-label"><span class="group-dot"></span>Veo Content</div>
+
+        <div class="rcard" id="rc-veo">
+          <input type="checkbox" id="exp-veo" class="exp" checked hidden />
+          <label class="rcard-head" for="exp-veo">
+            <span class="rc-name">🎥 Veo 3.1 Prompt</span>
+            <span class="chev" aria-hidden="true"></span>
+          </label>
+          <div class="rcard-panel"><div class="rcard-panel-inner">
+            <div class="rcard-body veo-out" id="out-veo"></div>
+            <div class="rcard-foot">
+              <button class="btn-copy" data-src="rc-veo">Kopieren</button>
+              <button class="btn-copy btn-veo-komplett" id="btnVeoKomplett">📋 Veo Komplett</button>
+            </div>
+          </div></div>
+        </div>
       </div>
 
     </section>
