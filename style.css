@@ -158,7 +158,32 @@ input:focus{border-color:var(--g);background:var(--bg4);box-shadow:0 0 0 3px var
 }
 .dropzone:hover{border-color:rgba(57,255,20,.5);background:rgba(57,255,20,.045);transform:translateY(-1px)}
 .dropzone.over{border-color:var(--g);background:var(--gdim);box-shadow:inset 0 0 34px rgba(57,255,20,.16),0 0 22px rgba(57,255,20,.2)}
-.dropzone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+/* Off-screen – NOT display:none – so Android Chrome fires change events correctly */
+.file-input-hidden{
+  position:absolute;width:1px;height:1px;opacity:.01;
+  pointer-events:none;left:-9999px;top:-9999px;overflow:hidden;
+}
+
+/* Visible "Foto auswählen" tap button inside every dropzone */
+.btn-file-select{
+  pointer-events:auto; /* override dz-inner's pointer-events:none */
+  background:rgba(57,255,20,.14);
+  border:1px solid rgba(57,255,20,.45);
+  border-radius:10px;color:var(--g);
+  font-size:12px;font-weight:800;letter-spacing:.04em;
+  padding:9px 18px;cursor:pointer;margin-top:6px;
+  transition:background .18s,border-color .18s,box-shadow .18s,transform .1s;
+  -webkit-tap-highlight-color:transparent;
+}
+.btn-file-select:hover{background:rgba(57,255,20,.26);border-color:var(--g);box-shadow:0 0 14px rgba(57,255,20,.28)}
+.btn-file-select:active{transform:translateY(1px);background:rgba(57,255,20,.36)}
+
+/* Debug confirmation strip */
+.upload-debug{
+  font-size:11px;font-family:var(--mono);color:var(--g);
+  background:rgba(57,255,20,.08);border:1px solid rgba(57,255,20,.22);
+  border-radius:8px;padding:6px 12px;word-break:break-all;
+}
 .dz-inner{display:flex;flex-direction:column;align-items:center;gap:10px;padding:30px 16px;text-align:center;pointer-events:none}
 .dz-icon{width:42px;height:42px;color:var(--dim);transition:color .2s,transform .2s}
 .dropzone:hover .dz-icon{color:var(--g);transform:translateY(-2px)}

@@ -21,7 +21,6 @@ function $append(el, child) { if (el && child) el.appendChild(child); }
 const outFacts = $id('out-facts');
 const outTitle = $id('out-title');
 const outHooks = $id('out-hooks');
-const outTitle = $id('out-title');
 const outHashtags = $id('out-hashtags');
 const outBanner = $id('out-banner');
 const outBannerPrompt = $id('out-banner-prompt');
@@ -32,18 +31,18 @@ const outVeo = $id('out-veo');
 const outLive = $id('out-live');
 const outMaster = $id('out-master');
 
-/* ── Image slots ──
-   0 = Produktbild (Pflicht)
-   1 = Produktbild (Optional)
-   2 = Produktbild (Optional)
-   3 = Beschreibung / Spezifikationen (Optional, OCR)
-*/
+/* ── Image data (keeps generate() working unchanged) ── */
 const images = [
   { base64: null, mime: 'image/jpeg', kind: 'product' },
   { base64: null, mime: 'image/jpeg', kind: 'product' },
   { base64: null, mime: 'image/jpeg', kind: 'product' },
   { base64: null, mime: 'image/jpeg', kind: 'description' },
 ];
+/* Per-slot convenience refs (also updated by setupImageSlot) */
+let productImage1Base64 = null;
+let productImage2Base64 = null;
+let productImage3Base64 = null;
+let descriptionImageBase64 = null;
 
 /* ── Proxy URL persistence ── */
 (function () {
@@ -58,55 +57,163 @@ btnEye.addEventListener('click', () => {
   eyeIcon.style.opacity = show ? '0.45' : '1';
 });
 
-/* ── Dropzone ── */
-function wireDropzone(dz, input, onFile) {
-  dz.addEventListener('click', e => { if (e.target !== input) input.click(); });
-  dz.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') input.click(); });
-  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
-  dz.addEventListener('drop', e => {
-    e.preventDefault(); dz.classList.remove('over');
-    if (e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
-  });
-  input.addEventListener('change', () => { if (input.files[0]) onFile(input.files[0]); });
-}
+/* ── Reusable image upload slot ── */
+function setupImageSlot(slot) {
+  const dropzone = document.getElementById(slot.dropzone);
+  const input    = document.getElementById(slot.input);
+  const preview  = document.getElementById(slot.preview);
+  const dzInner  = document.getElementById(slot.inner);
+  const meta     = document.getElementById(slot.meta);
+  const nameEl   = document.getElementById(slot.name);
+  const removeBtn= document.getElementById(slot.remove);
+  const debugEl  = slot.debug ? document.getElementById(slot.debug) : null;
 
-function readImageFile(file, onDone) {
-  if (!file.type.startsWith('image/')) { showErr('Nur Bilddateien erlaubt (JPG, PNG, WEBP).'); return; }
-  if (file.size > 10 * 1024 * 1024) { showErr('Datei zu groß – max. 10 MB.'); return; }
-  const reader = new FileReader();
-  reader.onload = ev => { onDone(ev.target.result, file.type, file.name); hideErr(); };
-  reader.readAsDataURL(file);
-}
+  if (!dropzone || !input) {
+    console.warn('[upload] elements not found for slot:', slot.label, slot.dropzone, slot.input);
+    return;
+  }
 
-function wireSlot(idx, dzId, inputId, previewId, dzInnerId, metaId, nameId, removeId) {
-  const dz = $id(dzId), input = $id(inputId);
-  const preview = $id(previewId), dzInner = $id(dzInnerId);
-  const meta = $id(metaId), name = $id(nameId), btnRem = $id(removeId);
-  if (!dz || !input) return;
-  wireDropzone(dz, input, file => {
-    readImageFile(file, (dataUrl, mime, fname) => {
-      images[idx].base64 = dataUrl.split(',')[1];
-      images[idx].mime = mime;
+  /* ── Process a File object via FileReader ── */
+  function processFile(file) {
+    if (!file.type.startsWith('image/')) {
+      showErr('Bitte eine Bilddatei auswählen (JPG, PNG, WEBP).');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showErr('Datei zu groß – max. 10 MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
       if (preview) { preview.src = dataUrl; preview.classList.add('show'); }
       if (dzInner) dzInner.style.display = 'none';
-      if (name) name.textContent = fname;
-      if (meta) meta.hidden = false;
+      if (meta)    meta.hidden = false;
+      if (nameEl)  nameEl.textContent = file.name;
+      slot.setValue(dataUrl, file.type);
+      hideErr();
+      if (debugEl) { debugEl.textContent = 'Bild geladen: ' + file.name; debugEl.hidden = false; }
+      console.log('Mobile image loaded:', file.name, file.type, '|', slot.label);
+    };
+    reader.onerror = () => {
+      console.error('[upload] FileReader error for', slot.label, reader.error);
+      showErr('Bild konnte nicht gelesen werden. Bitte erneut versuchen.');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /* ── Block all default drag behaviour (prevents browser navigation) ── */
+  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    dropzone.addEventListener(eventName, e => {
+      e.preventDefault();
+      e.stopPropagation();
     });
   });
-  btnRem?.addEventListener('click', () => {
-    images[idx].base64 = null;
-    if (preview) { preview.src = ''; preview.classList.remove('show'); }
-    if (dzInner) dzInner.style.display = '';
-    if (meta) meta.hidden = true;
-    input.value = '';
+  dropzone.addEventListener('dragover',  () => dropzone.classList.add('over'));
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('over'));
+  dropzone.addEventListener('drop', e => {
+    dropzone.classList.remove('over');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) processFile(file);
   });
+
+  /* ── Click / tap on dropzone → open file picker
+       Skip if click originated from btn-file-select (it handles itself) ── */
+  dropzone.addEventListener('click', e => {
+    if (e.target.closest('.btn-file-select')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    input.click();
+  });
+  dropzone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+
+  /* Prevent input click from bubbling back to dropzone (avoids double open) */
+  input.addEventListener('click', e => { e.stopPropagation(); });
+
+  /* ── File chosen via picker ── */
+  input.addEventListener('change', e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    processFile(file);
+    /* Reset value so the same file can be re-selected after removal */
+    try { input.value = ''; } catch (_) {}
+  });
+
+  /* ── Remove button (must never re-open picker) ── */
+  if (removeBtn) {
+    removeBtn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      input.value = '';
+      if (preview) { preview.src = ''; preview.classList.remove('show'); }
+      if (dzInner) dzInner.style.display = '';
+      if (meta)    meta.hidden = true;
+      if (nameEl)  nameEl.textContent = '';
+      if (debugEl) { debugEl.textContent = ''; debugEl.hidden = true; }
+      slot.setValue(null, null);
+    });
+  }
 }
 
-wireSlot(0, 'dropzone', 'fileInput', 'preview', 'dzInner', 'imgMeta', 'imgName', 'btnRemove');
-wireSlot(1, 'dropzone2', 'fileInput2', 'preview2', 'dzInner2', 'imgMeta2', 'imgName2', 'btnRemove2');
-wireSlot(2, 'dropzone3', 'fileInput3', 'preview3', 'dzInner3', 'imgMeta3', 'imgName3', 'btnRemove3');
-wireSlot(3, 'dropzone4', 'fileInput4', 'preview4', 'dzInner4', 'imgMeta4', 'imgName4', 'btnRemove4');
+setupImageSlot({
+  dropzone: 'dropzone',  input: 'fileInput',  preview: 'preview',
+  inner: 'dzInner',  meta: 'imgMeta',  name: 'imgName',  remove: 'btnRemove',
+  debug: 'uploadDebug1',
+  label: 'Image slot 1',
+  setValue: (v, mime) => {
+    productImage1Base64  = v;
+    images[0].base64 = v ? v.split(',')[1] : null;
+    images[0].mime   = mime || 'image/jpeg';
+  },
+});
+setupImageSlot({
+  dropzone: 'dropzone2', input: 'fileInput2', preview: 'preview2',
+  inner: 'dzInner2', meta: 'imgMeta2', name: 'imgName2', remove: 'btnRemove2',
+  debug: 'uploadDebug2',
+  label: 'Image slot 2',
+  setValue: (v, mime) => {
+    productImage2Base64  = v;
+    images[1].base64 = v ? v.split(',')[1] : null;
+    images[1].mime   = mime || 'image/jpeg';
+  },
+});
+setupImageSlot({
+  dropzone: 'dropzone3', input: 'fileInput3', preview: 'preview3',
+  inner: 'dzInner3', meta: 'imgMeta3', name: 'imgName3', remove: 'btnRemove3',
+  debug: 'uploadDebug3',
+  label: 'Image slot 3',
+  setValue: (v, mime) => {
+    productImage3Base64  = v;
+    images[2].base64 = v ? v.split(',')[1] : null;
+    images[2].mime   = mime || 'image/jpeg';
+  },
+});
+setupImageSlot({
+  dropzone: 'dropzone4', input: 'fileInput4', preview: 'preview4',
+  inner: 'dzInner4', meta: 'imgMeta4', name: 'imgName4', remove: 'btnRemove4',
+  debug: 'uploadDebug4',
+  label: 'Description image',
+  setValue: (v, mime) => {
+    descriptionImageBase64 = v;
+    images[3].base64 = v ? v.split(',')[1] : null;
+    images[3].mime   = mime || 'image/jpeg';
+  },
+});
+
+/* ── Mobile safety net: explicit "Foto auswählen" button handler ──
+   btn-file-select lives inside dz-inner (pointer-events:none) so we
+   use pointer-events:auto on the button, and stopPropagation so the
+   dropzone click handler is NOT also triggered.                      ── */
+document.querySelectorAll('.btn-file-select').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const input = document.getElementById(btn.dataset.target);
+    if (input) input.click();
+  });
+});
 
 /* ── Helpers ── */
 function showErr(msg) { if (errMsg) errMsg.innerHTML = msg; if (errbox) errbox.hidden = false; }
