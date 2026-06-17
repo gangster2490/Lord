@@ -160,6 +160,8 @@
     transition: all 0.2s;
     background: var(--surface);
     margin-bottom: 16px;
+    display: block;
+    position: relative;
   }
   .upload-zone:hover, .upload-zone.drag-over {
     border-color: var(--green);
@@ -428,12 +430,12 @@
   <div class="content">
 
     <!-- Upload Zone -->
-    <div class="upload-zone" id="upload-zone" onclick="triggerFileInput()">
+    <label for="file-input" class="upload-zone" id="upload-zone">
       <div class="upload-zone-icon">📁</div>
       <div class="upload-zone-text">Fotos hochladen</div>
       <div class="upload-zone-sub">Bis zu 9 Fotos · JPG, PNG, WebP</div>
-    </div>
-    <input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="handleFileSelect(event)">
+      <input type="file" id="file-input" accept="image/*" multiple style="position:absolute;opacity:0;width:100%;height:100%;top:0;left:0;cursor:pointer;" onchange="handleFileSelect(event)">
+    </label>
 
     <!-- Photo Grid -->
     <div id="photo-grid" class="photo-grid"></div>
