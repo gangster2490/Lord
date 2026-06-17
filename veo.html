@@ -917,7 +917,6 @@ async function generateImage() {
     };
     if (imageModel === 'dall-e-3') {
       body.quality = 'hd';
-      body.style = 'natural';
     }
 
     const response = await fetch('https://api.openai.com/v1/images/generations', {
