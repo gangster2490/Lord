@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>VEO Product Photo Cleaner</title>
+<style>
+  :root {
+    --green: #36ff5c;
+    --green-dim: #1a8c30;
+    --green-glow: rgba(54,255,92,0.18);
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #222222;
+    --text: #f0f0f0;
+    --muted: #666;
+    --danger: #ff3636;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── SCREENS ── */
+  .screen { display: none; flex-direction: column; min-height: 100vh; }
+  .screen.active { display: flex; }
+
+  /* ── HEADER ── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-back {
+    background: none; border: none; color: var(--green);
+    font-size: 22px; cursor: pointer; padding: 4px 8px 4px 0;
+  }
+  .header-title { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; }
+  .header-title span { color: var(--green); }
+
+  /* ── HOME ── */
+  #screen-home {
+    justify-content: space-between;
+    padding: 0;
+  }
+  .home-hero {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px 20px;
+    text-align: center;
+  }
+  .logo-icon {
+    width: 80px; height: 80px;
+    background: var(--green-glow);
+    border: 2px solid var(--green);
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 38px;
+    margin-bottom: 24px;
+    box-shadow: 0 0 30px var(--green-glow);
+  }
+  .home-title {
+    font-size: 26px; font-weight: 800;
+    line-height: 1.2; margin-bottom: 8px;
+  }
+  .home-title span { color: var(--green); }
+  .home-sub { color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 280px; }
+
+  .home-actions {
+    padding: 20px 20px 40px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    width: 100%; padding: 16px;
+    border: none; border-radius: 14px;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s ease;
+    letter-spacing: 0.3px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary {
+    background: var(--green);
+    color: #000;
+    box-shadow: 0 4px 20px rgba(54,255,92,0.3);
+  }
+  .btn-primary:hover { box-shadow: 0 4px 30px rgba(54,255,92,0.5); }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--green);
+    border: 1.5px solid var(--green);
+  }
+  .btn-danger {
+    background: var(--danger);
+    color: #fff;
+  }
+  .btn:disabled {
+    opacity: 0.4; cursor: not-allowed;
+    transform: none !important;
+  }
+  .btn-sm {
+    padding: 10px 16px;
+    font-size: 13px;
+    border-radius: 10px;
+    width: auto;
+  }
+
+  /* ── SETTINGS BADGE ── */
+  .settings-btn {
+    position: absolute; top: 14px; right: 16px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); border-radius: 10px;
+    padding: 8px 12px; font-size: 13px;
+    cursor: pointer;
+  }
+  .settings-btn:active { color: var(--green); border-color: var(--green); }
+
+  /* ── API KEY WARNING ── */
+  .api-warning {
+    margin: 0 20px 12px;
+    background: rgba(255,54,54,0.1);
+    border: 1px solid rgba(255,54,54,0.3);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #ff6b6b;
+    text-align: center;
+    cursor: pointer;
+  }
+  .api-warning.hidden { display: none; }
+
+  /* ── UPLOAD SCREEN ── */
+  #screen-upload { padding-bottom: 30px; }
+  .content { padding: 16px; flex: 1; }
+
+  .upload-zone {
+    border: 2px dashed var(--green-dim);
+    border-radius: 16px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+    margin-bottom: 16px;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--green);
+    background: var(--green-glow);
+  }
+  .upload-zone-icon { font-size: 36px; margin-bottom: 10px; }
+  .upload-zone-text { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .upload-zone-sub { font-size: 12px; color: var(--muted); }
+
+  /* ── PHOTO GRID ── */
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .photo-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface2);
+  }
+  .photo-item img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .photo-remove {
+    position: absolute; top: 4px; right: 4px;
+    width: 22px; height: 22px;
+    background: rgba(255,54,54,0.9);
+    border: none; border-radius: 50%;
+    color: white; font-size: 13px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+  }
+  .photo-count {
+    font-size: 12px; color: var(--muted);
+    text-align: center; margin-bottom: 16px;
+  }
+
+  /* ── PRODUCT DNA ── */
+  .dna-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .dna-card.hidden { display: none; }
+  .dna-title {
+    font-size: 11px; font-weight: 700;
+    color: var(--green); letter-spacing: 1.5px;
+    text-transform: uppercase; margin-bottom: 12px;
+  }
+  .dna-row {
+    display: flex; gap: 8px;
+    margin-bottom: 8px; align-items: flex-start;
+  }
+  .dna-label {
+    font-size: 11px; color: var(--muted);
+    min-width: 80px; padding-top: 2px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .dna-value { font-size: 13px; line-height: 1.5; flex: 1; }
+
+  /* ── STATUS / LOADER ── */
+  .status-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .status-bar.hidden { display: none; }
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-text { font-size: 13px; color: var(--muted); }
+  .status-text strong { color: var(--text); }
+
+  /* ── RESULT SCREEN ── */
+  #screen-result { padding-bottom: 30px; }
+  .result-image-wrap {
+    margin: 16px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    position: relative;
+  }
+  .result-image-wrap img {
+    width: 100%; display: block;
+    max-height: 65vh; object-fit: contain;
+    background: #fff;
+  }
+  .result-badge {
+    position: absolute; top: 10px; left: 10px;
+    background: var(--green);
+    color: #000; font-size: 10px; font-weight: 800;
+    padding: 4px 8px; border-radius: 6px;
+    letter-spacing: 1px;
+  }
+  .result-actions {
+    padding: 0 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  /* ── PROMPT BOX ── */
+  .prompt-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin: 0 16px 16px;
+  }
+  .prompt-box.hidden { display: none; }
+  .prompt-label {
+    font-size: 11px; color: var(--green);
+    font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .prompt-text {
+    font-size: 11px; color: var(--muted);
+    line-height: 1.6;
+    max-height: 120px; overflow-y: auto;
+    white-space: pre-wrap;
+  }
+
+  /* ── HISTORY SCREEN ── */
+  #screen-history { padding-bottom: 30px; }
+  .history-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .history-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .history-item:active { border-color: var(--green); }
+  .history-meta {
+    display: flex; justify-content: space-between;
+    margin-bottom: 10px; align-items: center;
+  }
+  .history-name { font-size: 14px; font-weight: 700; }
+  .history-date { font-size: 11px; color: var(--muted); }
+  .history-thumbs {
+    display: flex; gap: 6px; margin-bottom: 10px;
+  }
+  .history-thumb {
+    width: 44px; height: 44px;
+    border-radius: 8px; object-fit: cover;
+    background: var(--surface2);
+  }
+  .history-result-thumb {
+    width: 44px; height: 66px; /* 9:16 approx */
+    border-radius: 8px; object-fit: cover;
+    background: var(--surface2);
+    border: 1.5px solid var(--green);
+  }
+  .history-actions { display: flex; gap: 8px; }
+  .history-empty {
+    text-align: center; padding: 60px 20px;
+    color: var(--muted); font-size: 14px;
+  }
+  .history-empty span { font-size: 40px; display: block; margin-bottom: 12px; }
+
+  /* ── SETTINGS SCREEN ── */
+  #screen-settings { padding-bottom: 30px; }
+  .settings-section { padding: 16px; }
+  .settings-label {
+    font-size: 11px; color: var(--green);
+    font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; margin-bottom: 8px;
+    display: block;
+  }
+  .settings-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 13px 14px;
+    color: var(--text); font-size: 14px;
+    margin-bottom: 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .settings-input:focus { border-color: var(--green); }
+  .settings-hint { font-size: 11px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  .test-result {
+    font-size: 13px; padding: 10px 14px;
+    border-radius: 10px; margin-bottom: 12px;
+    display: none;
+  }
+  .test-result.ok { background: rgba(54,255,92,0.1); color: var(--green); display: block; }
+  .test-result.err { background: rgba(255,54,54,0.1); color: #ff6b6b; display: block; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 12px 20px;
+    border-radius: 12px; font-size: 13px; font-weight: 600;
+    z-index: 9999; transition: opacity 0.3s;
+    white-space: nowrap; max-width: 90vw;
+  }
+  .toast.green { border-color: var(--green); color: var(--green); }
+  .toast.hidden { opacity: 0; pointer-events: none; }
+
+  /* ── UTIL ── */
+  .hidden { display: none !important; }
+  .gap-row { display: flex; gap: 10px; }
+  .gap-row .btn { flex: 1; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     SCREEN: HOME
+════════════════════════════════════════════ -->
+<div id="screen-home" class="screen active">
+  <button class="settings-btn" onclick="showScreen('settings')">⚙️ API Key</button>
+
+  <div class="home-hero">
+    <div class="logo-icon">🧹</div>
+    <h1 class="home-title">VEO Product<br><span>Photo Cleaner</span></h1>
+    <p class="home-sub">Lade Produktfotos hoch → erhalte ein sauberes 9:16 VEO-Referenzbild</p>
+  </div>
+
+  <div class="home-actions">
+    <div id="home-api-warning" class="api-warning" onclick="showScreen('settings')">
+      ⚠️ Kein OpenAI API Key gesetzt — hier tippen
+    </div>
+    <button class="btn btn-primary" onclick="startNewProduct()">📸 Neues Produkt</button>
+    <button class="btn btn-secondary" onclick="showScreen('history')">🕒 Verlauf</button>
+    <button class="btn btn-secondary" onclick="showScreen('settings')">⚙️ Einstellungen</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SCREEN: UPLOAD
+════════════════════════════════════════════ -->
+<div id="screen-upload" class="screen">
+  <div class="header">
+    <button class="header-back" onclick="showScreen('home')">←</button>
+    <div class="header-title">Neues <span>Produkt</span></div>
+  </div>
+
+  <div class="content">
+
+    <!-- Upload Zone -->
+    <div class="upload-zone" id="upload-zone" onclick="triggerFileInput()">
+      <div class="upload-zone-icon">📁</div>
+      <div class="upload-zone-text">Fotos hochladen</div>
+      <div class="upload-zone-sub">Bis zu 9 Fotos · JPG, PNG, WebP</div>
+    </div>
+    <input type="file" id="file-input" accept="image/*" multiple style="display:none" onchange="handleFileSelect(event)">
+
+    <!-- Photo Grid -->
+    <div id="photo-grid" class="photo-grid"></div>
+    <div id="photo-count" class="photo-count hidden"></div>
+
+    <!-- Status -->
+    <div id="upload-status" class="status-bar hidden">
+      <div class="spinner"></div>
+      <div class="status-text" id="upload-status-text">Verarbeite...</div>
+    </div>
+
+    <!-- Product DNA -->
+    <div id="dna-card" class="dna-card hidden">
+      <div class="dna-title">⚡ Product DNA</div>
+      <div id="dna-content"></div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+      <button id="btn-analyze" class="btn btn-secondary" onclick="analyzeProduct()" disabled>
+        🔍 Produkt analysieren
+      </button>
+      <button id="btn-generate" class="btn btn-primary" onclick="generateImage()" disabled>
+        ✨ 9:16 VEO Foto erstellen
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SCREEN: RESULT
+════════════════════════════════════════════ -->
+<div id="screen-result" class="screen">
+  <div class="header">
+    <button class="header-back" onclick="showScreen('upload')">←</button>
+    <div class="header-title">VEO <span>Ergebnis</span></div>
+  </div>
+
+  <div class="result-image-wrap">
+    <img id="result-image" src="" alt="Generated product image">
+    <div class="result-badge">9:16 · VEO READY</div>
+  </div>
+
+  <!-- Status in result -->
+  <div id="result-status" class="status-bar hidden" style="margin:0 16px 16px;">
+    <div class="spinner"></div>
+    <div class="status-text" id="result-status-text">Qualität wird geprüft...</div>
+  </div>
+
+  <!-- Prompt Box -->
+  <div id="prompt-box" class="prompt-box">
+    <div class="prompt-label">
+      VEO PROMPT
+      <button class="btn btn-sm btn-outline" onclick="copyPrompt()">Kopieren</button>
+    </div>
+    <div id="prompt-text" class="prompt-text"></div>
+  </div>
+
+  <div class="result-actions">
+    <div class="gap-row">
+      <button class="btn btn-outline" onclick="downloadImage()">⬇️ Download</button>
+      <button class="btn btn-outline" onclick="copyPrompt()">📋 Prompt</button>
+    </div>
+    <button class="btn btn-primary" onclick="newGeneration()">🔄 Neue Generation</button>
+    <button class="btn btn-secondary" onclick="showScreen('home')">🏠 Home</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SCREEN: HISTORY
+════════════════════════════════════════════ -->
+<div id="screen-history" class="screen">
+  <div class="header">
+    <button class="header-back" onclick="showScreen('home')">←</button>
+    <div class="header-title"><span>Verlauf</span></div>
+  </div>
+  <div id="history-list" class="history-list"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SCREEN: SETTINGS
+════════════════════════════════════════════ -->
+<div id="screen-settings" class="screen">
+  <div class="header">
+    <button class="header-back" onclick="showScreen('home')">←</button>
+    <div class="header-title">⚙️ <span>Einstellungen</span></div>
+  </div>
+
+  <div class="settings-section">
+    <label class="settings-label">OpenAI API Key</label>
+    <input type="password" id="api-key-input" class="settings-input" placeholder="sk-..." autocomplete="off">
+    <div class="settings-hint">Dein Key wird nur lokal gespeichert und nie übertragen.</div>
+
+    <div id="test-result" class="test-result"></div>
+
+    <div class="gap-row" style="margin-bottom:16px;">
+      <button class="btn btn-outline" onclick="testApiKey()">🔌 Key testen</button>
+      <button class="btn btn-primary" onclick="saveApiKey()">💾 Speichern</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <label class="settings-label">Analyse-Modell</label>
+    <select id="model-select" class="settings-input">
+      <option value="gpt-4o">GPT-4o (empfohlen)</option>
+      <option value="gpt-4o-mini">GPT-4o Mini (schneller)</option>
+    </select>
+
+    <label class="settings-label" style="margin-top:8px;">Bildgenerierung</label>
+    <select id="image-model-select" class="settings-input">
+      <option value="dall-e-3">DALL-E 3 (beste Qualität)</option>
+      <option value="dall-e-2">DALL-E 2 (günstiger)</option>
+    </select>
+
+    <div class="divider"></div>
+
+    <button class="btn btn-danger" onclick="clearHistory()">🗑️ Verlauf löschen</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast hidden"></div>
+
+<script>
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+let uploadedPhotos = []; // [{dataUrl, file}]
+let productDNA = null;
+let currentPrompt = '';
+let currentResultUrl = '';
+
+// ═══════════════════════════════════════════
+//  SCREEN NAVIGATION
+// ═══════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  window.scrollTo(0, 0);
+
+  if (id === 'home') updateHomeWarning();
+  if (id === 'history') renderHistory();
+  if (id === 'settings') loadSettingsUI();
+}
+
+function startNewProduct() {
+  uploadedPhotos = [];
+  productDNA = null;
+  currentPrompt = '';
+  currentResultUrl = '';
+  renderPhotoGrid();
+  document.getElementById('dna-card').classList.add('hidden');
+  document.getElementById('upload-status').classList.add('hidden');
+  document.getElementById('btn-analyze').disabled = true;
+  document.getElementById('btn-generate').disabled = true;
+  showScreen('upload');
+}
+
+function newGeneration() {
+  showScreen('upload');
+  // keep photos loaded
+  renderPhotoGrid();
+}
+
+// ═══════════════════════════════════════════
+//  API KEY
+// ═══════════════════════════════════════════
+function getApiKey() { return localStorage.getItem('openai_api_key') || ''; }
+function getModel() { return localStorage.getItem('analysis_model') || 'gpt-4o'; }
+function getImageModel() { return localStorage.getItem('image_model') || 'dall-e-3'; }
+
+function updateHomeWarning() {
+  const el = document.getElementById('home-api-warning');
+  el.classList.toggle('hidden', !!getApiKey());
+}
+
+function loadSettingsUI() {
+  document.getElementById('api-key-input').value = getApiKey();
+  document.getElementById('model-select').value = getModel();
+  document.getElementById('image-model-select').value = getImageModel();
+  document.getElementById('test-result').className = 'test-result';
+}
+
+function saveApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) { showToast('API Key darf nicht leer sein', false); return; }
+  localStorage.setItem('openai_api_key', key);
+  localStorage.setItem('analysis_model', document.getElementById('model-select').value);
+  localStorage.setItem('image_model', document.getElementById('image-model-select').value);
+  showToast('✅ Gespeichert!', true);
+  updateHomeWarning();
+}
+
+async function testApiKey() {
+  const key = document.getElementById('api-key-input').value.trim();
+  const el = document.getElementById('test-result');
+  if (!key) { el.className = 'test-result err'; el.textContent = '❌ Kein Key eingegeben'; return; }
+  el.className = 'test-result'; el.textContent = 'Teste...'; el.style.display = 'block';
+
+  try {
+    const r = await fetch('https://api.openai.com/v1/models', {
+      headers: { 'Authorization': 'Bearer ' + key }
+    });
+    if (r.ok) {
+      el.className = 'test-result ok'; el.textContent = '✅ Key funktioniert!';
+    } else {
+      const d = await r.json();
+      el.className = 'test-result err'; el.textContent = '❌ ' + (d.error?.message || 'Ungültiger Key');
+    }
+  } catch(e) {
+    el.className = 'test-result err'; el.textContent = '❌ Netzwerkfehler';
+  }
+}
+
+function clearHistory() {
+  if (!confirm('Verlauf wirklich löschen?')) return;
+  localStorage.removeItem('veo_history');
+  showToast('🗑️ Verlauf gelöscht', true);
+}
+
+// ═══════════════════════════════════════════
+//  FILE UPLOAD
+// ═══════════════════════════════════════════
+function triggerFileInput() {
+  if (uploadedPhotos.length >= 9) { showToast('Maximal 9 Fotos', false); return; }
+  document.getElementById('file-input').click();
+}
+
+function handleFileSelect(event) {
+  const files = Array.from(event.target.files);
+  const remaining = 9 - uploadedPhotos.length;
+  const toAdd = files.slice(0, remaining);
+
+  const promises = toAdd.map(file => new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => resolve({ dataUrl: e.target.result, file, name: file.name });
+    reader.readAsDataURL(file);
+  }));
+
+  Promise.all(promises).then(results => {
+    uploadedPhotos = [...uploadedPhotos, ...results];
+    renderPhotoGrid();
+    updateUploadButtons();
+  });
+
+  event.target.value = '';
+}
+
+// drag & drop
+const uploadZone = document.getElementById('upload-zone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('drag-over');
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+  const fakeEvent = { target: { files, value: '' } };
+  fakeEvent.target.value = '';
+  handleFilesArray(files);
+});
+
+function handleFilesArray(files) {
+  const remaining = 9 - uploadedPhotos.length;
+  const toAdd = files.slice(0, remaining);
+  const promises = toAdd.map(file => new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => resolve({ dataUrl: e.target.result, file, name: file.name });
+    reader.readAsDataURL(file);
+  }));
+  Promise.all(promises).then(results => {
+    uploadedPhotos = [...uploadedPhotos, ...results];
+    renderPhotoGrid();
+    updateUploadButtons();
+  });
+}
+
+function removePhoto(idx) {
+  uploadedPhotos.splice(idx, 1);
+  renderPhotoGrid();
+  updateUploadButtons();
+  if (uploadedPhotos.length === 0) productDNA = null;
+}
+
+function renderPhotoGrid() {
+  const grid = document.getElementById('photo-grid');
+  const countEl = document.getElementById('photo-count');
+  grid.innerHTML = '';
+
+  uploadedPhotos.forEach((photo, idx) => {
+    const item = document.createElement('div');
+    item.className = 'photo-item';
+    item.innerHTML = `
+      <img src="${photo.dataUrl}" alt="foto ${idx+1}" loading="lazy">
+      <button class="photo-remove" onclick="removePhoto(${idx})">✕</button>
+    `;
+    grid.appendChild(item);
+  });
+
+  if (uploadedPhotos.length > 0) {
+    countEl.classList.remove('hidden');
+    countEl.textContent = `${uploadedPhotos.length}/9 Fotos geladen`;
+  } else {
+    countEl.classList.add('hidden');
+  }
+}
+
+function updateUploadButtons() {
+  const has = uploadedPhotos.length > 0;
+  document.getElementById('btn-analyze').disabled = !has;
+  document.getElementById('btn-generate').disabled = !has;
+}
+
+// ═══════════════════════════════════════════
+//  PRODUCT ANALYSIS (GPT-4o Vision)
+// ═══════════════════════════════════════════
+async function analyzeProduct() {
+  if (!checkApiKey()) return;
+  if (uploadedPhotos.length === 0) { showToast('Bitte erst Fotos hochladen', false); return; }
+
+  setStatus('upload', true, '🔍 Analysiere Produkt mit GPT-4o...');
+
+  try {
+    const imageContents = uploadedPhotos.slice(0, 4).map(p => ({
+      type: 'image_url',
+      image_url: { url: p.dataUrl, detail: 'high' }
+    }));
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + getApiKey()
+      },
+      body: JSON.stringify({
+        model: getModel(),
+        max_tokens: 600,
+        messages: [{
+          role: 'user',
+          content: [
+            ...imageContents,
+            {
+              type: 'text',
+              text: `Analysiere dieses Produkt für VEO 3.1 Videogenerierung. Antworte NUR in diesem JSON-Format ohne Markdown:
+{
+  "name": "Produktname auf Deutsch",
+  "category": "Kategorie",
+  "shape": "Form beschreiben",
+  "material": "Material",
+  "color": "Farbe(n)",
+  "details": "Wichtigste Details (Verschlüsse, Fächer, Griffe etc.)",
+  "do_not_change": "Was NIE verändert werden darf",
+  "anti_distortion": "Anti-Verzerrungsregeln"
+}`
+            }
+          ]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'API Fehler');
+    }
+
+    const data = await response.json();
+    let text = data.choices[0].message.content.trim();
+    text = text.replace(/```json|```/g, '').trim();
+    productDNA = JSON.parse(text);
+
+    renderDNA();
+    setStatus('upload', false);
+    showToast('✅ Analyse abgeschlossen!', true);
+    document.getElementById('btn-generate').disabled = false;
+
+  } catch(e) {
+    setStatus('upload', false);
+    showToast('❌ Fehler: ' + e.message, false);
+  }
+}
+
+function renderDNA() {
+  if (!productDNA) return;
+  const card = document.getElementById('dna-card');
+  const content = document.getElementById('dna-content');
+
+  const rows = [
+    ['Produkt', productDNA.name],
+    ['Kategorie', productDNA.category],
+    ['Form', productDNA.shape],
+    ['Material', productDNA.material],
+    ['Farbe', productDNA.color],
+    ['Details', productDNA.details],
+    ['Nicht ändern', productDNA.do_not_change],
+  ];
+
+  content.innerHTML = rows.map(([l, v]) => `
+    <div class="dna-row">
+      <span class="dna-label">${l}</span>
+      <span class="dna-value">${v || '–'}</span>
+    </div>
+  `).join('');
+
+  card.classList.remove('hidden');
+}
+
+// ═══════════════════════════════════════════
+//  PROMPT BUILDER
+// ═══════════════════════════════════════════
+function buildPrompt(dna) {
+  const name = dna?.name || 'product';
+  const shape = dna?.shape || 'compact form';
+  const material = dna?.material || '';
+  const color = dna?.color || '';
+  const details = dna?.details || '';
+  const doNotChange = dna?.do_not_change || 'original proportions and form';
+  const antiDistortion = dna?.anti_distortion || 'do not distort edges or proportions';
+
+  return `PRODUCT REFERENCE MODE — VEO 3.1
+
+Create one ultra-clean vertical 9:16 studio product reference image.
+
+MAIN SUBJECT:
+One single ${name}.
+
+PRODUCT DNA:
+- Shape: ${shape}
+- Material: ${material}
+- Color: ${color}
+- Key details: ${details}
+
+COMPOSITION:
+- Vertical 9:16, 1080x1920px
+- Product centered, 3/4 front angle
+- Top 15% and bottom 15% empty space
+- Clean white or very light gray background (#FAFAFA)
+- Soft professional studio lighting
+- Subtle drop shadow under product
+- No text, no logo, no price, no hands, no people
+
+ACCURACY RULES:
+- ${doNotChange}
+- ${antiDistortion}
+- Do not add extra elements
+- Do not change proportions
+- Do not invent new features
+- Keep original materials and colors
+
+STYLE:
+Ultra photorealistic premium product photo.
+Amazon/Otto.de style. Sharp, clean, commercial photography.
+High detail, 8K quality.`.trim();
+}
+
+// ═══════════════════════════════════════════
+//  IMAGE GENERATION (DALL-E 3)
+// ═══════════════════════════════════════════
+async function generateImage() {
+  if (!checkApiKey()) return;
+  if (uploadedPhotos.length === 0) { showToast('Bitte erst Fotos hochladen', false); return; }
+
+  // Auto-analyze if no DNA yet
+  if (!productDNA) {
+    await analyzeProduct();
+    if (!productDNA) return; // analyze failed
+  }
+
+  setStatus('upload', true, '🎨 Generiere 9:16 VEO Bild...');
+
+  currentPrompt = buildPrompt(productDNA);
+
+  try {
+    const imageModel = getImageModel();
+    const body = {
+      model: imageModel,
+      prompt: currentPrompt,
+      n: 1,
+      size: imageModel === 'dall-e-3' ? '1024x1792' : '512x512',
+      response_format: 'url'
+    };
+    if (imageModel === 'dall-e-3') {
+      body.quality = 'hd';
+      body.style = 'natural';
+    }
+
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + getApiKey()
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'Bildgenerierung fehlgeschlagen');
+    }
+
+    const data = await response.json();
+    currentResultUrl = data.data[0].url;
+
+    setStatus('upload', false);
+    showResult();
+    saveToHistory();
+
+  } catch(e) {
+    setStatus('upload', false);
+    showToast('❌ ' + e.message, false);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  RESULT
+// ═══════════════════════════════════════════
+function showResult() {
+  const img = document.getElementById('result-image');
+  img.src = currentResultUrl;
+  document.getElementById('prompt-text').textContent = currentPrompt;
+  document.getElementById('prompt-box').classList.remove('hidden');
+  document.getElementById('result-status').classList.add('hidden');
+  showScreen('result');
+}
+
+function copyPrompt() {
+  if (!currentPrompt) { showToast('Kein Prompt vorhanden', false); return; }
+  navigator.clipboard.writeText(currentPrompt)
+    .then(() => showToast('📋 Prompt kopiert!', true))
+    .catch(() => {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = currentPrompt;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('📋 Kopiert!', true);
+    });
+}
+
+function downloadImage() {
+  if (!currentResultUrl) return;
+  const a = document.createElement('a');
+  a.href = currentResultUrl;
+  a.download = `veo-product-${Date.now()}.jpg`;
+  a.target = '_blank';
+  a.click();
+  showToast('⬇️ Download gestartet', true);
+}
+
+// ═══════════════════════════════════════════
+//  HISTORY
+// ═══════════════════════════════════════════
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem('veo_history') || '[]'); } catch { return []; }
+}
+
+function saveToHistory() {
+  const history = getHistory();
+  const entry = {
+    id: Date.now(),
+    date: new Date().toLocaleString('de-DE'),
+    productName: productDNA?.name || 'Unbekannt',
+    thumbnails: uploadedPhotos.slice(0, 3).map(p => p.dataUrl),
+    prompt: currentPrompt,
+    resultUrl: currentResultUrl,
+    dna: productDNA
+  };
+  history.unshift(entry);
+  if (history.length > 20) history.pop();
+  localStorage.setItem('veo_history', JSON.stringify(history));
+}
+
+function renderHistory() {
+  const history = getHistory();
+  const list = document.getElementById('history-list');
+
+  if (history.length === 0) {
+    list.innerHTML = `
+      <div class="history-empty">
+        <span>🕒</span>
+        Noch keine Generierungen gespeichert.
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = history.map((entry, idx) => `
+    <div class="history-item">
+      <div class="history-meta">
+        <span class="history-name">${entry.productName}</span>
+        <span class="history-date">${entry.date}</span>
+      </div>
+      <div class="history-thumbs">
+        ${entry.thumbnails.map(t => `<img class="history-thumb" src="${t}" alt="">`).join('')}
+        ${entry.resultUrl ? `<img class="history-result-thumb" src="${entry.resultUrl}" alt="Ergebnis">` : ''}
+      </div>
+      <div class="history-actions">
+        ${entry.resultUrl ? `<button class="btn btn-sm btn-outline" onclick="loadHistoryResult(${idx})">🖼️ Anzeigen</button>` : ''}
+        <button class="btn btn-sm btn-secondary" onclick="copyHistoryPrompt(${idx})">📋 Prompt</button>
+        <button class="btn btn-sm btn-secondary" onclick="loadHistoryProduct(${idx})">🔄 Neu generieren</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function loadHistoryResult(idx) {
+  const history = getHistory();
+  const entry = history[idx];
+  if (!entry) return;
+  currentResultUrl = entry.resultUrl;
+  currentPrompt = entry.prompt;
+  productDNA = entry.dna;
+  showResult();
+}
+
+function copyHistoryPrompt(idx) {
+  const history = getHistory();
+  const entry = history[idx];
+  if (!entry) return;
+  navigator.clipboard.writeText(entry.prompt)
+    .then(() => showToast('📋 Prompt kopiert!', true))
+    .catch(() => showToast('❌ Kopieren fehlgeschlagen', false));
+}
+
+function loadHistoryProduct(idx) {
+  const history = getHistory();
+  const entry = history[idx];
+  if (!entry) return;
+  productDNA = entry.dna;
+  uploadedPhotos = entry.thumbnails.map((t, i) => ({ dataUrl: t, name: `foto_${i+1}.jpg` }));
+  renderPhotoGrid();
+  renderDNA();
+  updateUploadButtons();
+  showScreen('upload');
+  showToast('📦 Produkt geladen — bereit für neue Generation', true);
+}
+
+// ═══════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════
+function checkApiKey() {
+  if (!getApiKey()) {
+    showToast('⚠️ Bitte zuerst API Key eingeben', false);
+    showScreen('settings');
+    return false;
+  }
+  return true;
+}
+
+function setStatus(screen, visible, text) {
+  const bar = document.getElementById(screen + '-status');
+  const textEl = document.getElementById(screen + '-status-text');
+  if (visible) {
+    bar.classList.remove('hidden');
+    if (textEl) textEl.innerHTML = text || 'Verarbeite...';
+    document.getElementById('btn-analyze').disabled = true;
+    document.getElementById('btn-generate').disabled = true;
+  } else {
+    bar.classList.add('hidden');
+    if (uploadedPhotos.length > 0) {
+      document.getElementById('btn-analyze').disabled = false;
+      document.getElementById('btn-generate').disabled = false;
+    }
+  }
+}
+
+let toastTimer;
+function showToast(msg, success) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (success ? ' green' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+updateHomeWarning();
+</script>
+</body>
+</html>
