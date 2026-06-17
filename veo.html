@@ -913,8 +913,7 @@ async function generateImage() {
       model: imageModel,
       prompt: currentPrompt,
       n: 1,
-      size: imageModel === 'dall-e-3' ? '1024x1792' : '512x512',
-      response_format: 'url'
+      size: imageModel === 'dall-e-3' ? '1024x1792' : '1024x1024',
     };
     if (imageModel === 'dall-e-3') {
       body.quality = 'hd';
