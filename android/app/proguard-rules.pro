@@ -1,0 +1,5 @@
+-keepattributes *Annotation*, InnerClasses, Signature
+-keep class de.spardirekt.tiktokshop.data.** { *; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn kotlinx.serialization.**
