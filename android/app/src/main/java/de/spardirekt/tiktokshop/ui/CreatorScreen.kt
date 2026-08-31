@@ -474,7 +474,7 @@ private fun ProxyCard(state: CreatorUiState, onEvent: (CreatorEvent) -> Unit) {
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
         )
         Text(
-            "CORS-Proxy erforderlich. Emulator: http://10.0.2.2:3001 — Gerät: LAN-IP des Rechners.",
+            "CORS-Proxy erforderlich. Emulator: http://10.0.2.2:3001 oder adb reverse + http://127.0.0.1:3001. Gerät: LAN-IP des Rechners.",
             color = TextDim,
             fontSize = 12.sp,
             modifier = Modifier.padding(top = 8.dp),

@@ -35,7 +35,7 @@ Install on a connected device:
 1. Start the proxy from the repo root: `cd proxy && node server.js`
 2. Open the app and paste your Anthropic API key (kept in memory only, never persisted).
 3. Set **Proxy URL**:
-   - Emulator → `http://10.0.2.2:3001`
+   - Emulator → `http://10.0.2.2:3001` (or `adb reverse tcp:3001 tcp:3001` then `http://127.0.0.1:3001`)
    - Physical device → `http://<LAN-IP>:3001` or your deployed HTTPS proxy
 4. Pick at least **Bild 1** (product photo), then tap **Content generieren**.
 
