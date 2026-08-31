@@ -22,7 +22,7 @@ class OpenAiClient(
         isLenient = true
         encodeDefaults = true
     }
-) {
+) : ChatClient {
     fun clientFor(timeoutSeconds: Long): OkHttpClient {
         return OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -33,18 +33,18 @@ class OpenAiClient(
             .build()
     }
 
-    suspend fun chat(
+    override suspend fun chat(
         apiKey: String,
         model: String,
         systemPrompt: String,
         userText: String,
-        imageDataUrls: List<String> = emptyList(),
+        imageDataUrls: List<String>,
         timeoutSeconds: Long,
-        jsonMode: Boolean = true,
-        temperature: Double = 0.4,
-        maxTokens: Int = 4096,
-        maxAttempts: Int = 2,
-        reasoningEffort: String? = null
+        jsonMode: Boolean,
+        temperature: Double,
+        maxTokens: Int,
+        maxAttempts: Int,
+        reasoningEffort: String?
     ): Result<String> {
         var lastError: AppError? = null
         repeat(maxAttempts) { attempt ->
@@ -150,6 +150,9 @@ class OpenAiClient(
     }
 
     fun testConnection(apiKey: String): Result<String> {
+        if (ChatClients.isDemoKey(apiKey)) {
+            return Result.success("Соединение успешно")
+        }
         return runCatching {
             val request = Request.Builder()
                 .url("https://api.openai.com/v1/models")

@@ -5,10 +5,19 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import de.spardirekt.agents.pro.model.ProjectImage
 import java.io.ByteArrayOutputStream
 import java.io.File
 
+fun interface ImageDataUrlEncoder {
+    fun encodeAll(images: List<ProjectImage>): List<String>
+}
+
 object ImageEncoder {
+
+    fun androidEncoder(context: Context): ImageDataUrlEncoder = ImageDataUrlEncoder { images ->
+        images.mapNotNull { toDataUrl(context, it.uri, it.localPath) }
+    }
 
     fun toDataUrl(
         context: Context,

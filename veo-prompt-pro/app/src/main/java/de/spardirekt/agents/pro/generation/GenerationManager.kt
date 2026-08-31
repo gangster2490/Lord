@@ -9,6 +9,8 @@ import de.spardirekt.agents.pro.model.CreativeMode
 import de.spardirekt.agents.pro.model.GenerationStage
 import de.spardirekt.agents.pro.model.ProjectStatus
 import de.spardirekt.agents.pro.model.VoiceLanguage
+import de.spardirekt.agents.pro.network.ChatClient
+import de.spardirekt.agents.pro.network.ChatClients
 import de.spardirekt.agents.pro.network.OpenAiClient
 import de.spardirekt.agents.pro.storage.SecureApiKeyStore
 import de.spardirekt.agents.pro.storage.SettingsStore
@@ -35,7 +37,7 @@ class GenerationManager(
     private val repository: ProjectRepository,
     private val apiKeyStore: SecureApiKeyStore,
     private val settingsStore: SettingsStore,
-    private val openAi: OpenAiClient = OpenAiClient(),
+    private val openAi: ChatClient = OpenAiClient(),
     private val json: Json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -102,7 +104,8 @@ class GenerationManager(
         }
 
         val images = repository.parseImages(project)
-        val pipeline = GenerationPipeline(appContext, openAi)
+        val client = ChatClients.fromApiKey(apiKey, live = openAi)
+        val pipeline = GenerationPipeline(appContext, client)
         val input = GenerationPipeline.PipelineInput(
             projectId = projectId,
             images = images,

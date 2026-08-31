@@ -32,6 +32,8 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 4. Generate → staged photo analysis → 8s VEO prompt
 5. Result → copy / share package; History restores drafts and finished projects
 
+To exercise generate → Result without a live OpenAI key, paste `sk-demo` as the API key (Settings or the generate dialog). The app runs the same pipeline stages with a local demo model. There is no extra Settings toggle.
+
 Models: GPT-5.6 Sol (default), Terra, Luna.
 
 ## Screens

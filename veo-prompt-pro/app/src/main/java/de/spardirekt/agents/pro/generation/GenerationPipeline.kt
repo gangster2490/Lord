@@ -13,7 +13,7 @@ import de.spardirekt.agents.pro.model.ImageCategory
 import de.spardirekt.agents.pro.model.ProductModel
 import de.spardirekt.agents.pro.model.ProjectImage
 import de.spardirekt.agents.pro.model.VoiceLanguage
-import de.spardirekt.agents.pro.network.OpenAiClient
+import de.spardirekt.agents.pro.network.ChatClient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -25,8 +25,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class GenerationPipeline(
-    private val context: Context,
-    private val openAi: OpenAiClient,
+    private val openAi: ChatClient,
+    private val imageEncoder: ImageDataUrlEncoder,
     private val json: Json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -34,6 +34,11 @@ class GenerationPipeline(
         explicitNulls = false
     }
 ) {
+    constructor(context: Context, openAi: ChatClient) : this(
+        openAi = openAi,
+        imageEncoder = ImageEncoder.androidEncoder(context)
+    )
+
     data class PipelineInput(
         val projectId: String,
         val images: List<ProjectImage>,
@@ -65,9 +70,7 @@ class GenerationPipeline(
         onStage: suspend (StageUpdate) -> Unit
     ): Result<GenerationBundle> {
         return try {
-            val dataUrls = input.images.mapNotNull { img ->
-                ImageEncoder.toDataUrl(context, img.uri, img.localPath)
-            }
+            val dataUrls = imageEncoder.encodeAll(input.images)
             if (dataUrls.isEmpty()) {
                 return Result.failure(AppError.Unknown("Нет доступных изображений для анализа."))
             }
