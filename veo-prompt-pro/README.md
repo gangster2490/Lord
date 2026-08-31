@@ -40,3 +40,7 @@ Models: GPT-5.6 Sol (default), Terra, Luna.
 - **History** — ready / draft / error projects
 - **Settings** — API key add / replace / test / remove
 - **Result** — VEO prompt, voiceover, title, 5 hashtags
+
+## Visual baseline
+
+The current light-lavender + navy-card + violet→blue gradient UI is locked. See [docs/visual-baseline/](docs/visual-baseline/README.md). Do not restyle `Theme.kt` unless a new look is explicitly requested.

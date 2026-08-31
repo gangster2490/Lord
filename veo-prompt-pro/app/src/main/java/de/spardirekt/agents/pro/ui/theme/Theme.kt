@@ -1,5 +1,16 @@
 package de.spardirekt.agents.pro.ui.theme
 
+/**
+ * Visual baseline for Veo Prompt Pro. Do not restyle these tokens, shapes,
+ * or gradients unless the product owner explicitly asks for a new look.
+ *
+ * Locked appearance (see `docs/visual-baseline/`):
+ * - Light lavender page (`backgroundLight` + `backgroundGlow`)
+ * - Dark navy cards (`cardNavy`) with 26.dp corners
+ * - Violet → blue gradient for primary actions, selected chips, and headings
+ * - Dark bottom navigation (`bottomBar`) with a light selected pill (`navPill`)
+ */
+
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
@@ -36,12 +47,18 @@ object VppColors {
 }
 
 object VppShapes {
-    val cardShape = RoundedCornerShape(26.dp)
-    val buttonShape = RoundedCornerShape(20.dp)
+    val cardRadius = 26.dp
+    val buttonRadius = 20.dp
+    val thumbRadius = 16.dp
+    val insetRadius = 18.dp
+    val navPillRadius = 18.dp
+
+    val cardShape = RoundedCornerShape(cardRadius)
+    val buttonShape = RoundedCornerShape(buttonRadius)
     val chipShape = RoundedCornerShape(50)
-    val thumbShape = RoundedCornerShape(16.dp)
-    val insetShape = RoundedCornerShape(18.dp)
-    val navPill = RoundedCornerShape(18.dp)
+    val thumbShape = RoundedCornerShape(thumbRadius)
+    val insetShape = RoundedCornerShape(insetRadius)
+    val navPill = RoundedCornerShape(navPillRadius)
 }
 
 object VppDimens {
