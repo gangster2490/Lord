@@ -89,19 +89,20 @@ fun AppHeader(
                 style = type.secondary.copy(color = VppColors.textMutedDark, fontSize = 12.sp)
             )
         }
+        if (onNewProject != null) {
+            Text(
+                "Новый проект",
+                style = type.badge.copy(color = VppColors.accentPurple, fontSize = 12.sp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onNewProject() }
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+            )
+        }
         if (trailing != null) {
+            if (onNewProject != null) Spacer(Modifier.width(8.dp))
             trailing()
         } else {
-            if (onNewProject != null) {
-                Text(
-                    "Новый проект",
-                    style = type.badge.copy(color = VppColors.accentPurple, fontSize = 12.sp),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable { onNewProject() }
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
-                )
-            }
             if (onHistory != null) {
                 HeaderSquareButton(onClick = onHistory) {
                     Icon(Icons.Filled.History, null, tint = VppColors.textLight, modifier = Modifier.size(18.dp))
