@@ -120,7 +120,7 @@ fun HistoryScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(bottom = 110.dp),
+                    contentPadding = PaddingValues(bottom = 180.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(projects, key = { it.id }) { project ->

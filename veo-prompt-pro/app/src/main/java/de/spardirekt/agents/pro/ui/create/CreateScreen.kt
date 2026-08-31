@@ -114,7 +114,7 @@ fun CreateScreen(
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = VppDimens.screenPadding)
-                .padding(top = 12.dp, bottom = 110.dp)
+                .padding(top = 12.dp, bottom = 180.dp)
         ) {
             AppHeader(
                 onNewProject = { viewModel.newProject() },
