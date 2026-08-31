@@ -55,7 +55,9 @@ object Routes {
     const val HISTORY = "history"
     const val SETTINGS = "settings"
     const val RESULT = "result/{projectId}"
+    const val NEW_PROJECT = "__new__"
     fun create(projectId: String = "") = "create?projectId=$projectId"
+    fun createFresh() = create(NEW_PROJECT)
     fun result(id: String) = "result/$id"
 }
 
@@ -86,7 +88,14 @@ fun VeoPromptProNav() {
                 val vm: CreateViewModel = viewModel()
                 val requestedId = entry.arguments?.getString("projectId").orEmpty()
                 LaunchedEffect(requestedId) {
-                    if (requestedId.isNotBlank()) vm.openProject(requestedId)
+                    if (requestedId.isBlank()) return@LaunchedEffect
+                    vm.handleNavProject(requestedId)
+                    if (requestedId == Routes.NEW_PROJECT) {
+                        navController.navigate(Routes.create()) {
+                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                            launchSingleTop = true
+                        }
+                    }
                 }
                 CreateScreen(
                     viewModel = vm,
@@ -120,10 +129,9 @@ fun VeoPromptProNav() {
                         }
                     },
                     onOpenCreate = {
-                        navController.navigate(Routes.create()) {
+                        navController.navigate(Routes.createFresh()) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
-                            restoreState = true
                         }
                     },
                     onOpenSettings = {
@@ -140,10 +148,9 @@ fun VeoPromptProNav() {
                 SettingsScreen(
                     viewModel = vm,
                     onOpenCreate = {
-                        navController.navigate(Routes.create()) {
+                        navController.navigate(Routes.createFresh()) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
-                            restoreState = true
                         }
                     },
                     onOpenHistory = {
@@ -169,7 +176,7 @@ fun VeoPromptProNav() {
                     projectId = id,
                     viewModel = vm,
                     onBackToCreate = {
-                        navController.navigate(Routes.create()) {
+                        navController.navigate(Routes.createFresh()) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true
                         }

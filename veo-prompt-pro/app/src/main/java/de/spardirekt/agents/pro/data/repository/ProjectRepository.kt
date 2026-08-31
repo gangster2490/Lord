@@ -23,7 +23,11 @@ class ProjectRepository(
 
     fun observeHistory(): Flow<List<ProjectEntity>> = dao.observeAll().map { list ->
         list.filter { entity ->
-            entity.status != ProjectStatus.Draft.name || parseImages(entity).isNotEmpty()
+            HistoryFilter.include(
+                status = entity.status,
+                imageCount = parseImages(entity).size,
+                veoPrompt = entity.veoPrompt
+            )
         }
     }
 

@@ -1,7 +1,6 @@
 package de.spardirekt.agents.pro.ui.history
 
 import android.app.Application
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -160,9 +159,10 @@ private fun HistoryItem(
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (project.thumbnailUri.isNotBlank()) {
+        val thumb = ProjectThumbnail.model(project.thumbnailUri)
+        if (thumb != null) {
             AsyncImage(
-                model = Uri.parse(project.thumbnailUri),
+                model = thumb,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

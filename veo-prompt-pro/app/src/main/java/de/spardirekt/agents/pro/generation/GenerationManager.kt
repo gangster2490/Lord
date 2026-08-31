@@ -312,7 +312,8 @@ class GenerationManager(
                 imageUrisJson = imagesJson,
                 completedStagesJson = repository.encodeCompletedStages(completed),
                 thumbnailUri = repository.parseImages(p.copy(imageUrisJson = imagesJson))
-                    .firstOrNull()?.uri ?: p.thumbnailUri
+                    .firstOrNull()?.let { it.localPath?.takeIf { path -> path.isNotBlank() } ?: it.uri }
+                    ?: p.thumbnailUri
             )
         )
     }

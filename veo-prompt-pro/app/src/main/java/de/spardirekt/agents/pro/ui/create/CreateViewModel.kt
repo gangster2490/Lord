@@ -13,6 +13,7 @@ import de.spardirekt.agents.pro.model.ProjectImage
 import de.spardirekt.agents.pro.model.ProjectStatus
 import de.spardirekt.agents.pro.model.VoiceLanguage
 import de.spardirekt.agents.pro.storage.ImageStore
+import de.spardirekt.agents.pro.ui.navigation.Routes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -129,6 +130,20 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
         attachProject(id)
     }
 
+    fun handleNavProject(id: String) {
+        if (id.isBlank()) return
+        if (id == Routes.NEW_PROJECT) {
+            newProject()
+        } else {
+            openProject(id)
+        }
+    }
+
+    private fun thumbnailOf(images: List<ProjectImage>): String {
+        val first = images.firstOrNull() ?: return ""
+        return first.localPath?.takeIf { it.isNotBlank() } ?: first.uri
+    }
+
     private fun attachProject(id: String) {
         projectId = id
         viewModelScope.launch { settingsStore.setLastProjectId(id) }
@@ -209,7 +224,7 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
             repo.save(
                 p.copy(
                     imageUrisJson = repo.encodeImages(current),
-                    thumbnailUri = current.firstOrNull()?.uri.orEmpty()
+                    thumbnailUri = thumbnailOf(current)
                 )
             )
             settingsStore.setLastProjectId(p.id)
@@ -226,7 +241,7 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
             repo.save(
                 p.copy(
                     imageUrisJson = repo.encodeImages(current),
-                    thumbnailUri = current.firstOrNull()?.uri.orEmpty()
+                    thumbnailUri = thumbnailOf(current)
                 )
             )
         }
