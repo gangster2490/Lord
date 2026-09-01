@@ -26,6 +26,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,7 +47,9 @@ import de.spardirekt.agents.pro.VeoPromptProApp
 import de.spardirekt.agents.pro.data.db.ProjectEntity
 import de.spardirekt.agents.pro.model.ProjectStatus
 import de.spardirekt.agents.pro.ui.components.AppHeader
+import de.spardirekt.agents.pro.ui.components.ConfirmDestructiveDialog
 import de.spardirekt.agents.pro.ui.components.GradientHeading
+import de.spardirekt.agents.pro.ui.components.GradientPillButton
 import de.spardirekt.agents.pro.ui.components.NavyCard
 import de.spardirekt.agents.pro.ui.components.VppTags
 import de.spardirekt.agents.pro.ui.theme.LocalBottomBarInset
@@ -82,6 +87,7 @@ fun HistoryScreen(
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     val type = LocalVppType.current
     val fmt = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+    var pendingDelete by remember { mutableStateOf<ProjectEntity?>(null) }
 
     Box(
         modifier = Modifier
@@ -117,8 +123,14 @@ fun HistoryScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Создайте первый VEO Prompt на вкладке «Создать».",
+                        "Загрузите фото товара и соберите первый промпт для VEO 3.1.",
                         style = type.secondary.copy(color = VppColors.textMuted)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    GradientPillButton(
+                        text = "Создать первый промпт",
+                        onClick = onOpenCreate,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             } else {
@@ -139,12 +151,22 @@ fun HistoryScreen(
                                     onContinueProject(project.id)
                                 }
                             },
-                            onDelete = { viewModel.delete(project.id) }
+                            onDelete = { pendingDelete = project }
                         )
                     }
                 }
             }
         }
+    }
+
+    pendingDelete?.let { project ->
+        ConfirmDestructiveDialog(
+            title = "Удалить проект?",
+            message = "«${project.title.ifBlank { "Без названия" }}» и загруженные фото будут удалены безвозвратно.",
+            confirmLabel = "Удалить",
+            onConfirm = { viewModel.delete(project.id) },
+            onDismiss = { pendingDelete = null }
+        )
     }
 }
 

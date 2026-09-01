@@ -3,6 +3,8 @@ package de.spardirekt.agents.pro.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +24,8 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -287,6 +291,78 @@ fun SelectChip(
             maxLines = 1,
             softWrap = false
         )
+    }
+}
+
+/**
+ * Label plus switch. The whole row toggles, which both widens the touch target
+ * and lets a screen reader read the label and the switch as one control instead
+ * of announcing a bare "switch".
+ */
+@Composable
+fun SettingSwitchRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    description: String? = null
+) {
+    val type = LocalVppType.current
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .toggleable(
+                value = checked,
+                onValueChange = onCheckedChange,
+                role = Role.Switch
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = type.cardTitle.copy(color = VppColors.textLight))
+            if (description != null) {
+                Text(
+                    description,
+                    style = type.secondary.copy(color = VppColors.textMuted, fontSize = 12.sp)
+                )
+            }
+        }
+        Switch(
+            checked = checked,
+            // The row owns the interaction; a second handler here would report
+            // the control twice to accessibility services.
+            onCheckedChange = null,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = VppColors.accentPurple,
+                uncheckedThumbColor = VppColors.textMuted,
+                uncheckedTrackColor = VppColors.cardInset
+            )
+        )
+    }
+}
+
+/** One row of a single-choice list, announced as a radio button. */
+@Composable
+fun RadioOptionRow(
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) VppColors.cardInset else Color.Transparent)
+            .selectable(selected = selected, onClick = onSelect, role = Role.RadioButton)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f), content = content)
+        trailing?.invoke()
     }
 }
 

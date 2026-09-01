@@ -20,6 +20,9 @@ object VppTags {
     const val API_KEY_FIELD = "api_key_field"
     const val API_KEY_SAVE = "api_key_save"
 
+    const val CONFIRM_DIALOG = "confirm_dialog"
+    const val CONFIRM_ACCEPT = "confirm_accept"
+
     const val RESULT_PROMPT = "result_prompt"
     const val RESULT_COPY_PROMPT = "result_copy_prompt"
 }

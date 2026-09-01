@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -27,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,7 +53,6 @@ import de.spardirekt.agents.pro.data.db.ProjectEntity
 import de.spardirekt.agents.pro.ui.components.AppHeader
 import de.spardirekt.agents.pro.ui.components.GradientButton
 import de.spardirekt.agents.pro.ui.components.GradientHeading
-import de.spardirekt.agents.pro.ui.components.HeaderSquareButton
 import de.spardirekt.agents.pro.ui.components.NavyCard
 import de.spardirekt.agents.pro.ui.components.OutlinedActionButton
 import de.spardirekt.agents.pro.ui.components.VppTags
@@ -151,34 +148,9 @@ fun ResultScreen(
                 .padding(horizontal = VppDimens.screenPadding)
                 .padding(top = 12.dp, bottom = 40.dp)
         ) {
-            AppHeader(
-                onNewProject = onBackToCreate,
-                trailing = {
-                    HeaderSquareButton(
-                        onClick = { if (veoPrompt.isNotBlank()) shareText(context, veoPrompt) },
-                        contentDescription = "Поделиться промптом"
-                    ) {
-                        Icon(
-                            Icons.Outlined.Share,
-                            contentDescription = null,
-                            tint = VppColors.textLight,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    HeaderSquareButton(
-                        onClick = { if (veoPrompt.isNotBlank()) copyText(context, veoPrompt) },
-                        contentDescription = "Копировать промпт"
-                    ) {
-                        Icon(
-                            Icons.Outlined.ContentCopy,
-                            contentDescription = null,
-                            tint = VppColors.textLight,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            )
+            // Copy and share live under the prompt card. Repeating them here
+            // squeezed the brand block until it truncated to "Veo P…".
+            AppHeader(onNewProject = onBackToCreate)
             Spacer(Modifier.height(18.dp))
             // No enter animation — AnimatedVisibility(visible=false) caused a blank/white flash.
             GradientHeading("Результат")

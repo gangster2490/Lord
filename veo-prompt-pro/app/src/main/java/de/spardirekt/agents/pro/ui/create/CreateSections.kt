@@ -20,8 +20,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -44,6 +42,7 @@ import de.spardirekt.agents.pro.ui.components.LightOutlineCard
 import de.spardirekt.agents.pro.ui.components.NavyCard
 import de.spardirekt.agents.pro.ui.components.SegmentedControl
 import de.spardirekt.agents.pro.ui.components.SelectChip
+import de.spardirekt.agents.pro.ui.components.SettingSwitchRow
 import de.spardirekt.agents.pro.ui.components.VppTags
 import de.spardirekt.agents.pro.ui.theme.LocalVppType
 import de.spardirekt.agents.pro.ui.theme.VppColors
@@ -214,27 +213,11 @@ fun ModeSection(
             }
         }
         Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("TikTok Shop Mode", style = type.cardTitle.copy(color = VppColors.textLight))
-                Text(
-                    "Безопасные формулировки для Shop",
-                    style = type.secondary.copy(color = VppColors.textMuted, fontSize = 12.sp)
-                )
-            }
-            Switch(
-                checked = tiktokShopMode,
-                onCheckedChange = onTiktokChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color.White,
-                    checkedTrackColor = VppColors.accentPurple,
-                    uncheckedThumbColor = VppColors.textMuted,
-                    uncheckedTrackColor = VppColors.cardInset
-                )
-            )
-        }
+        SettingSwitchRow(
+            label = "TikTok Shop Mode",
+            description = "Безопасные формулировки для Shop",
+            checked = tiktokShopMode,
+            onCheckedChange = onTiktokChange
+        )
     }
 }

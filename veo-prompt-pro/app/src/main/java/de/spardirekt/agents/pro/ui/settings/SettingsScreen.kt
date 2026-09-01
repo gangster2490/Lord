@@ -2,7 +2,6 @@ package de.spardirekt.agents.pro.ui.settings
 
 import android.app.Application
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,19 +13,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
@@ -39,11 +36,14 @@ import de.spardirekt.agents.pro.model.VoiceLanguage
 import de.spardirekt.agents.pro.network.OpenAiModelCatalog
 import de.spardirekt.agents.pro.ui.components.ApiKeyDialog
 import de.spardirekt.agents.pro.ui.components.AppHeader
+import de.spardirekt.agents.pro.ui.components.ConfirmDestructiveDialog
 import de.spardirekt.agents.pro.ui.components.DestructiveButton
 import de.spardirekt.agents.pro.ui.components.GradientHeading
 import de.spardirekt.agents.pro.ui.components.GradientPillButton
 import de.spardirekt.agents.pro.ui.components.NavyCard
+import de.spardirekt.agents.pro.ui.components.RadioOptionRow
 import de.spardirekt.agents.pro.ui.components.SegmentedControl
+import de.spardirekt.agents.pro.ui.components.SettingSwitchRow
 import de.spardirekt.agents.pro.ui.components.StatusPill
 import de.spardirekt.agents.pro.ui.components.VppTags
 import de.spardirekt.agents.pro.ui.theme.LocalBottomBarInset
@@ -150,6 +150,7 @@ fun SettingsScreen(
     )
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val type = LocalVppType.current
+    var confirming by remember { mutableStateOf(DestructiveAction.None) }
 
     Box(
         modifier = Modifier
@@ -213,7 +214,7 @@ fun SettingsScreen(
                     Spacer(Modifier.height(10.dp))
                     DestructiveButton(
                         text = "Удалить API ключ",
-                        onClick = viewModel::removeKey,
+                        onClick = { confirming = DestructiveAction.RemoveKey },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -247,21 +248,11 @@ fun SettingsScreen(
                     onSelect = { viewModel.setVoice(VoiceLanguage.valueOf(it)) }
                 )
                 Spacer(Modifier.height(14.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "TikTok Shop Mode",
-                        style = type.cardTitle.copy(color = VppColors.textLight),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Switch(
-                        checked = sett.tiktokShopMode,
-                        onCheckedChange = viewModel::setTiktok,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = VppColors.accentPurple
-                        )
-                    )
-                }
+                SettingSwitchRow(
+                    label = "TikTok Shop Mode",
+                    checked = sett.tiktokShopMode,
+                    onCheckedChange = viewModel::setTiktok
+                )
             }
 
             Spacer(Modifier.height(18.dp))
@@ -278,7 +269,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(14.dp))
                 DestructiveButton(
                     text = "Очистить историю",
-                    onClick = viewModel::clearHistory,
+                    onClick = { confirming = DestructiveAction.ClearHistory },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -296,68 +287,49 @@ fun SettingsScreen(
                 Spacer(Modifier.height(12.dp))
                 OpenAiModelCatalog.options.forEach { option ->
                     val selected = sett.model == option.id
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .then(
-                                if (selected) Modifier.background(VppColors.cardInset)
-                                else Modifier.background(Color.Transparent)
-                            )
-                            .clickable { viewModel.setModel(option.id) }
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                option.label,
-                                style = type.body.copy(
-                                    color = VppColors.textLight,
-                                    fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Bold
-                                    else androidx.compose.ui.text.font.FontWeight.Normal
-                                ),
-                                maxLines = 1
-                            )
-                            Text(
-                                option.id,
-                                style = type.secondary.copy(color = VppColors.textMuted, fontSize = 11.sp),
-                                maxLines = 1
-                            )
-                            Text(
-                                option.hint,
-                                style = type.secondary.copy(color = VppColors.textMuted, fontSize = 11.sp),
-                                maxLines = 1
-                            )
-                        }
-                        when {
-                            selected -> StatusPill("Выбран ✓", success = true)
-                            option.recommended -> Text(
-                                "рекомендуется",
-                                style = type.secondary.copy(
-                                    color = VppColors.accentPurple,
-                                    fontSize = 11.sp
+                    RadioOptionRow(
+                        selected = selected,
+                        onSelect = { viewModel.setModel(option.id) },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        trailing = {
+                            when {
+                                selected -> StatusPill("Выбран ✓", success = true)
+                                option.recommended -> Text(
+                                    "рекомендуется",
+                                    style = type.secondary.copy(
+                                        color = VppColors.accentPurple,
+                                        fontSize = 11.sp
+                                    )
                                 )
-                            )
+                            }
                         }
+                    ) {
+                        Text(
+                            option.label,
+                            style = type.body.copy(
+                                color = VppColors.textLight,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            ),
+                            maxLines = 1
+                        )
+                        Text(
+                            option.id,
+                            style = type.secondary.copy(color = VppColors.textMuted, fontSize = 11.sp),
+                            maxLines = 1
+                        )
+                        Text(
+                            option.hint,
+                            style = type.secondary.copy(color = VppColors.textMuted, fontSize = 11.sp),
+                            maxLines = 1
+                        )
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Debug logs",
-                        style = type.cardTitle.copy(color = VppColors.textLight),
-                        modifier = Modifier.weight(1f)
-                    )
-                    Switch(
-                        checked = sett.debugLogs,
-                        onCheckedChange = viewModel::setDebug,
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = VppColors.accentPurple
-                        )
-                    )
-                }
+                SettingSwitchRow(
+                    label = "Debug logs",
+                    checked = sett.debugLogs,
+                    onCheckedChange = viewModel::setDebug
+                )
             }
 
             Spacer(Modifier.height(18.dp))
@@ -382,4 +354,24 @@ fun SettingsScreen(
             onCancel = viewModel::dismissReplace
         )
     }
+
+    when (confirming) {
+        DestructiveAction.None -> Unit
+        DestructiveAction.RemoveKey -> ConfirmDestructiveDialog(
+            title = "Удалить API ключ?",
+            message = "Без ключа генерация не запустится. Ключ придётся ввести заново.",
+            confirmLabel = "Удалить",
+            onConfirm = viewModel::removeKey,
+            onDismiss = { confirming = DestructiveAction.None }
+        )
+        DestructiveAction.ClearHistory -> ConfirmDestructiveDialog(
+            title = "Очистить историю?",
+            message = "Все проекты, готовые промпты и загруженные фото будут удалены безвозвратно.",
+            confirmLabel = "Очистить",
+            onConfirm = viewModel::clearHistory,
+            onDismiss = { confirming = DestructiveAction.None }
+        )
+    }
 }
+
+private enum class DestructiveAction { None, RemoveKey, ClearHistory }
