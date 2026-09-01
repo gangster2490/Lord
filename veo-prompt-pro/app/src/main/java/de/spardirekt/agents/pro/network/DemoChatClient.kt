@@ -25,8 +25,8 @@ object DemoChatClient : ChatClient {
     ): Result<String> {
         val blob = "$systemPrompt\n$userText"
         val panCase = apiKey.contains("pan", ignoreCase = true) ||
-            blob.contains("deep black pan", ignoreCase = true) ||
-            blob.contains("wooden crossbar lid", ignoreCase = true)
+            userText.contains("deep black pan", ignoreCase = true) ||
+            userText.contains("wooden crossbar lid", ignoreCase = true)
         return Result.success(
             when (detectStage(blob)) {
                 Stage.PHOTO_ANALYSIS -> if (panCase) PAN_PHOTO_ANALYSIS_JSON else PHOTO_ANALYSIS_JSON
