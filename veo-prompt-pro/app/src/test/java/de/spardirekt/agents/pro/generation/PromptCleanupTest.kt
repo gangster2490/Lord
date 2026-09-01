@@ -477,7 +477,7 @@ HASHTAGS
         assertFalse(cleaned.contains("Озвучка"))
         assertTrue(cleaned.contains("Timeline ends at 8.0s."))
         assertTrue(cleaned.contains("Four blocks only. No continuation after 8.0s."))
-        assertTrue(cleaned.contains("0.0–2.0s"))
+        assertTrue(cleaned.contains("0.0-2.0s"))
         assertTrue(cleaned.trimEnd().endsWith("#TikTokShop") || cleaned.contains("#TikTokShop"))
         assertTrue(cleaned.endsWith("\n"))
         assertFalse(cleaned.endsWith("\n\n"))
