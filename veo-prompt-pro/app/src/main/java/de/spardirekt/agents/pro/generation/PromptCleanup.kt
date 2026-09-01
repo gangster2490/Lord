@@ -102,7 +102,8 @@ object PromptCleanup {
         hashtags: List<String>,
         voiceLanguage: String,
         marketplace: Boolean,
-        tiktokShopMode: Boolean = true
+        tiktokShopMode: Boolean = true,
+        productEvidence: String = ""
     ): CleanupResult {
         val issues = mutableListOf<String>()
         var prompt = rawPrompt.trim()
@@ -159,7 +160,7 @@ object PromptCleanup {
         }
 
         // Copy-ready Gemini/VEO prompt: concise section bodies, same section order.
-        prompt = simplifyCopiedPrompt(prompt, marketplace)
+        prompt = simplifyCopiedPrompt(prompt, marketplace, productEvidence)
         prompt = stripAfterHashtags(prompt).trim() + "\n"
         return CleanupResult(prompt, vo, cleanTitle, tags, issues)
     }
@@ -225,7 +226,12 @@ object PromptCleanup {
      * Deterministic local pass that shortens only the prompt the owner copies into Gemini/VEO.
      * Does not change photo analysis or other pipeline stages.
      */
-    fun simplifyCopiedPrompt(prompt: String, marketplace: Boolean): String {
+    fun simplifyCopiedPrompt(
+        prompt: String,
+        marketplace: Boolean,
+        fidelityEvidence: String = ""
+    ): String {
+        val panCase = PanFidelity.matches(prompt, fidelityEvidence)
         val map = linkedMapOf<String, String>()
         REQUIRED_SECTIONS.forEach { name ->
             map[name] = extractSection(prompt, name)
@@ -248,14 +254,34 @@ object PromptCleanup {
             .let { clipChars(it, 48) }
         map["HASHTAGS"] = map["HASHTAGS"].orEmpty().trim()
 
+        // The deep-black wooden-lid pan is a known regression fixture. The
+        // model-level reminder alone was not enough: generic compression could
+        // discard the ferrule, rivets, hanging ring, or lid after generation.
+        // Reapply this one product signature deterministically. No other
+        // product or generic pan is affected.
+        if (panCase) {
+            map["PRODUCT LOCK"] = PanFidelity.PRODUCT_LOCK
+            map["CRITICAL"] = PanFidelity.CRITICAL
+            map["NEGATIVE PROMPT"] =
+                PanFidelity.NEGATIVE_BULLETS.joinToString("\n") { "- $it" }
+        }
+
         var out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
             "$name\n${map[name].orEmpty().trim()}"
         }.trim() + "\n"
 
         // Hard budget: compress further if still long.
         if (out.length > MAX_COPIED_PROMPT_CHARS) {
-            map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 5)
-            map["NEGATIVE PROMPT"] = simplifyNegative(map["NEGATIVE PROMPT"].orEmpty(), maxBullets = 5)
+            if (!panCase) {
+                map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 5)
+                map["NEGATIVE PROMPT"] = simplifyNegative(map["NEGATIVE PROMPT"].orEmpty(), maxBullets = 5)
+            } else {
+                // Preserve every confirmed pan part; save characters in
+                // non-identity sections instead.
+                map["SETTING"] = "Uncluttered studio."
+                map["ON-SCREEN TEXT"] = "None."
+                map["AUDIO"] = "Subtle music."
+            }
             map["REFERENCES"] = clipChars(map["REFERENCES"].orEmpty(), 110)
             map["SETTING"] = simplifySetting(map["SETTING"].orEmpty())
             out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->

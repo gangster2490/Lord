@@ -238,7 +238,8 @@ class GenerationPipeline(
                 hashtags = bundle.hashtags,
                 voiceLanguage = input.voiceLanguage.name,
                 marketplace = marketplace,
-                tiktokShopMode = input.tiktokShopMode
+                tiktokShopMode = input.tiktokShopMode,
+                productEvidence = productModelJson
             )
             var completeness = PromptCleanup.validateCompleteness(cleaned.veoPrompt, cleaned.hashtags)
             var repaired = cleaned
@@ -252,7 +253,8 @@ class GenerationPipeline(
                     hashtags = cleaned.hashtags.ifEmpty { bundle.hashtags },
                     voiceLanguage = input.voiceLanguage.name,
                     marketplace = marketplace,
-                    tiktokShopMode = input.tiktokShopMode
+                    tiktokShopMode = input.tiktokShopMode,
+                    productEvidence = productModelJson
                 )
                 completeness = PromptCleanup.validateCompleteness(repaired.veoPrompt, repaired.hashtags)
                 if (PromptCleanup.needsCompletenessRepair(repaired.veoPrompt, repaired.hashtags)) {
@@ -264,7 +266,8 @@ class GenerationPipeline(
                         hashtags = repaired.hashtags,
                         voiceLanguage = input.voiceLanguage.name,
                         marketplace = marketplace,
-                        tiktokShopMode = input.tiktokShopMode
+                        tiktokShopMode = input.tiktokShopMode,
+                        productEvidence = productModelJson
                     )
                     completeness = PromptCleanup.validateCompleteness(repaired.veoPrompt, repaired.hashtags)
                 }
