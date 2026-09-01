@@ -404,7 +404,7 @@ VOICE: ${voice.name}
 TIKTOK SHOP MODE: $tiktok
 VOICEOVER section: leave a short placeholder. The spoken line is generated separately.
 
-Keep PRODUCT LOCK short: one lock sentence + product-specific details only. No fidelity essays. No legacy sections (no VISUAL FIDELITY, no SAFETY AUDIT, no PRODUCT FIDELITY CORE).
+Keep PRODUCT LOCK fidelity-first: include the exact-identity rule and every evidence-backed identity-critical detail from the product model. Do not compress or truncate product-specific content. Do not include internal doctrine or legacy sections (no VISUAL FIDELITY, no SAFETY AUDIT, no PRODUCT FIDELITY CORE).
 
 Remember: do not resend or rely on inventing unseen mechanisms.
 """.trimIndent()
