@@ -150,16 +150,16 @@ object FinalPromptValidator {
         var prompt = response.veoPrompt.replace("\r\n", "\n")
         var title = response.title.trim()
         var tags = response.hashtags.toList()
+        val sections = parseSections(prompt)
 
-        if (headerPresent(prompt, "TITLE")) {
-            val extracted = sectionBody(prompt, "TITLE")
-            if (title.isBlank()) title = extracted.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
-            prompt = removeSection(prompt, "TITLE")
+        if (title.isBlank()) {
+            title = sections["TITLE"].orEmpty().lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
         }
-        if (headerPresent(prompt, "HASHTAGS")) {
-            val extracted = sectionBody(prompt, "HASHTAGS")
-            if (tags.isEmpty()) tags = extractHashtags(extracted)
-            prompt = removeSection(prompt, "HASHTAGS")
+        if (tags.isEmpty()) {
+            tags = extractHashtags(sections["HASHTAGS"].orEmpty())
+        }
+        if (sections.containsKey("TITLE") || sections.containsKey("HASHTAGS")) {
+            prompt = removeSection(prompt, "TITLE")
         }
         return response.copy(
             veoPrompt = prompt.trim(),

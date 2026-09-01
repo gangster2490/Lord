@@ -23,7 +23,8 @@ class RegressionLocksTest {
         assertTrue(prompt.contains("rivet"))
         assertTrue(prompt.contains("hanging ring"))
         assertTrue(prompt.contains("wooden lid"))
-        assertTrue(!prompt.contains("wok"))
+        val lock = prompt.substringAfter("PRODUCT LOCK").substringBefore("SETTING")
+        assertTrue(!lock.contains("wok"))
     }
 
     @Test

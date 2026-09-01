@@ -81,7 +81,11 @@ object RegressionLocks {
             val tokens = detail.lowercase().split(" ")
             tokens.none { token -> lower.contains(token) }
         }
-        val forbiddenHits = spec.forbidden.filter { lower.contains(it.lowercase()) }
+        val positive = prompt.lineSequence()
+            .map { it.trim().lowercase() }
+            .filterNot { it.startsWith("- no") || it.startsWith("no ") || it.startsWith("-no") }
+            .joinToString("\n")
+        val forbiddenHits = spec.forbidden.filter { positive.contains(it.lowercase()) }
         return missing.map { "missing:$it" } + forbiddenHits.map { "forbidden:$it" }
     }
 }
