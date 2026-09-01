@@ -177,6 +177,18 @@ class GenerationPipelineTest {
         assertTrue(result.exceptionOrNull() is AppError.Network)
     }
 
+    @Test
+    fun unusableFinalPromptIsAFailureNotAFakeReadyResult() = runBlocking {
+        val client = RecordingChatClient(UnusableFinalPromptClient)
+        val pipeline = GenerationPipeline(client, encoder())
+        val stagesSeen = mutableListOf<GenerationStage>()
+        val result = pipeline.run(input()) { update -> stagesSeen += update.stage }
+        assertTrue(result.isFailure)
+        val err = result.exceptionOrNull() as AppError
+        assertTrue(err.detail.contains("VEO prompt") || err.userMessage.isNotBlank())
+        assertFalse(stagesSeen.contains(GenerationStage.DONE))
+    }
+
     private class RecordingChatClient(
         private val inner: ChatClient = DemoChatClient
     ) : ChatClient {
@@ -204,6 +216,33 @@ class GenerationPipelineTest {
                 finalPromptUser = userText
             }
             return inner.chat(
+                apiKey, model, systemPrompt, userText, imageDataUrls,
+                timeoutSeconds, jsonMode, temperature, maxTokens, maxAttempts, reasoningEffort
+            )
+        }
+    }
+
+    private object UnusableFinalPromptClient : ChatClient {
+        override suspend fun chat(
+            apiKey: String,
+            model: String,
+            systemPrompt: String,
+            userText: String,
+            imageDataUrls: List<String>,
+            timeoutSeconds: Long,
+            jsonMode: Boolean,
+            temperature: Double,
+            maxTokens: Int,
+            maxAttempts: Int,
+            reasoningEffort: String?
+        ): Result<String> {
+            val stage = DemoChatClient.detectStage("$systemPrompt\n$userText")
+            if (stage == DemoChatClient.Stage.FINAL_PROMPT ||
+                stage == DemoChatClient.Stage.TARGETED_REPAIR
+            ) {
+                return Result.success("""{"error":"invalid_api_key","message":"Incorrect API key provided"}""")
+            }
+            return DemoChatClient.chat(
                 apiKey, model, systemPrompt, userText, imageDataUrls,
                 timeoutSeconds, jsonMode, temperature, maxTokens, maxAttempts, reasoningEffort
             )

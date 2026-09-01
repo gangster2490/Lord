@@ -139,6 +139,10 @@ class GenerationManager(
 
         result.fold(
             onSuccess = { bundle ->
+                if (bundle.veoPrompt.isBlank()) {
+                    fail(projectId, AppError.Server("Модель не вернула VEO prompt."))
+                    return
+                }
                 val current = repository.get(projectId) ?: return
                 repository.save(
                     current.copy(
@@ -200,6 +204,10 @@ class GenerationManager(
                     }
                     again.fold(
                         onSuccess = { bundle ->
+                            if (bundle.veoPrompt.isBlank()) {
+                                fail(projectId, AppError.Server("Модель не вернула VEO prompt."))
+                                return
+                            }
                             val cur = repository.get(projectId) ?: return
                             repository.save(
                                 cur.copy(
@@ -276,7 +284,9 @@ class GenerationManager(
         repository.save(
             p.copy(
                 generationStage = update.stage.name,
-                status = if (update.stage == GenerationStage.DONE) {
+                status = if (update.stage == GenerationStage.DONE &&
+                    !update.bundle?.veoPrompt.isNullOrBlank()
+                ) {
                     ProjectStatus.Ready.name
                 } else {
                     ProjectStatus.Generating.name
@@ -290,22 +300,22 @@ class GenerationManager(
                 // Never persist the raw model draft. Only DONE carries the cleaned
                 // Gemini/VEO prompt from PromptCleanup.finalize.
                 veoPrompt = if (update.stage == GenerationStage.DONE) {
-                    update.bundle?.veoPrompt?.ifBlank { p.veoPrompt } ?: p.veoPrompt
+                    update.bundle?.veoPrompt.orEmpty()
                 } else {
                     p.veoPrompt
                 },
                 voiceover = if (update.stage == GenerationStage.DONE) {
-                    update.bundle?.voiceover?.ifBlank { p.voiceover } ?: p.voiceover
+                    update.bundle?.voiceover.orEmpty()
                 } else {
                     p.voiceover
                 },
                 title = if (update.stage == GenerationStage.DONE) {
-                    update.bundle?.title?.ifBlank { p.title } ?: p.title
+                    update.bundle?.title.orEmpty()
                 } else {
                     p.title
                 },
                 hashtagsJson = if (update.stage == GenerationStage.DONE) {
-                    update.bundle?.hashtags?.let { repository.encodeHashtags(it) } ?: p.hashtagsJson
+                    update.bundle?.hashtags?.let { repository.encodeHashtags(it) } ?: "[]"
                 } else {
                     p.hashtagsJson
                 },

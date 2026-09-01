@@ -187,6 +187,11 @@ class GenerationPipeline(
             }
 
             var bundle = decodeBundle(finalJson, analysisJson, productModelJson, creativePlanJson)
+            if (bundle.veoPrompt.isBlank()) {
+                return Result.failure(
+                    AppError.Server("Модель не вернула VEO prompt.")
+                )
+            }
 
             // Quality gate + targeted repair
             onStage(StageUpdate(GenerationStage.FINAL_VALIDATION, analysis, productModel, creativePlan, bundle))
@@ -204,7 +209,13 @@ class GenerationPipeline(
                     maxAttempts = 1
                 ).getOrNull()
                 if (repaired != null) {
-                    bundle = decodeBundle(repaired, analysisJson, productModelJson, creativePlanJson)
+                    val next = decodeBundle(repaired, analysisJson, productModelJson, creativePlanJson)
+                    if (next.veoPrompt.isBlank()) {
+                        return Result.failure(
+                            AppError.Server("Модель не вернула VEO prompt.")
+                        )
+                    }
+                    bundle = next
                 }
             }
 
@@ -257,19 +268,11 @@ class GenerationPipeline(
                     productEvidence = productModelJson
                 )
                 completeness = PromptCleanup.validateCompleteness(repaired.veoPrompt, repaired.hashtags)
-                if (PromptCleanup.needsCompletenessRepair(repaired.veoPrompt, repaired.hashtags)) {
-                    // Last resort: rebuild from empty shell + known VO/title/tags.
-                    repaired = PromptCleanup.finalize(
-                        rawPrompt = "",
-                        voiceover = repaired.voiceover,
-                        title = repaired.title,
-                        hashtags = repaired.hashtags,
-                        voiceLanguage = input.voiceLanguage.name,
-                        marketplace = marketplace,
-                        tiktokShopMode = input.tiktokShopMode,
-                        productEvidence = productModelJson
+                DebugLog.d("Completeness after local repair: $completeness")
+                if (repaired.veoPrompt.isBlank()) {
+                    return Result.failure(
+                        AppError.Server("Модель не вернула VEO prompt.")
                     )
-                    completeness = PromptCleanup.validateCompleteness(repaired.veoPrompt, repaired.hashtags)
                 }
                 DebugLog.d("Completeness after local repair: $completeness")
             }
