@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material3.Icon
@@ -34,13 +35,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
@@ -54,6 +59,7 @@ import de.spardirekt.agents.pro.ui.components.GradientHeading
 import de.spardirekt.agents.pro.ui.components.HeaderSquareButton
 import de.spardirekt.agents.pro.ui.components.NavyCard
 import de.spardirekt.agents.pro.ui.components.OutlinedActionButton
+import de.spardirekt.agents.pro.ui.components.VppTags
 import de.spardirekt.agents.pro.ui.theme.LocalVppType
 import de.spardirekt.agents.pro.ui.theme.VppColors
 import de.spardirekt.agents.pro.ui.theme.VppDimens
@@ -126,6 +132,7 @@ fun ResultScreen(
                     )
                 )
             )
+            .testTag(VppTags.RESULT_SCREEN)
     ) {
         Column(
             modifier = Modifier
@@ -138,16 +145,28 @@ fun ResultScreen(
             AppHeader(
                 onNewProject = onBackToCreate,
                 trailing = {
-                    HeaderSquareButton(onClick = {
-                        if (veoPrompt.isNotBlank()) shareText(context, veoPrompt)
-                    }) {
-                        Icon(Icons.Outlined.Share, null, tint = VppColors.textLight, modifier = Modifier.size(18.dp))
+                    HeaderSquareButton(
+                        onClick = { if (veoPrompt.isNotBlank()) shareText(context, veoPrompt) },
+                        contentDescription = "Поделиться промптом"
+                    ) {
+                        Icon(
+                            Icons.Outlined.Share,
+                            contentDescription = null,
+                            tint = VppColors.textLight,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                     Spacer(Modifier.width(8.dp))
-                    HeaderSquareButton(onClick = {
-                        if (veoPrompt.isNotBlank()) copyText(context, veoPrompt)
-                    }) {
-                        Icon(Icons.Outlined.ContentCopy, null, tint = VppColors.textLight, modifier = Modifier.size(18.dp))
+                    HeaderSquareButton(
+                        onClick = { if (veoPrompt.isNotBlank()) copyText(context, veoPrompt) },
+                        contentDescription = "Копировать промпт"
+                    ) {
+                        Icon(
+                            Icons.Outlined.ContentCopy,
+                            contentDescription = null,
+                            tint = VppColors.textLight,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             )
@@ -196,6 +215,7 @@ private fun ResultBody(
     onCopyTags: () -> Unit
 ) {
     val type = LocalVppType.current
+    var promptExpanded by remember(entity.id) { mutableStateOf(false) }
 
     NavyCard {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -217,19 +237,61 @@ private fun ResultBody(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,
                     lineHeight = 19.sp
-                )
+                ),
+                // The full 12-section prompt is hundreds of lines. Collapsed by
+                // default so the copy actions and the rest of the package stay
+                // one screen away instead of a long scroll.
+                maxLines = if (promptExpanded) Int.MAX_VALUE else COLLAPSED_PROMPT_LINES,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag(VppTags.RESULT_PROMPT)
+            )
+        }
+        if (veoPrompt.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedActionButton(
+                text = if (promptExpanded) "Свернуть промпт" else "Показать промпт полностью",
+                onClick = { promptExpanded = !promptExpanded },
+                height = 44.dp,
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
 
     Spacer(Modifier.height(14.dp))
-    GradientButton(text = "✦ Копировать VEO Prompt", onClick = onCopyPrompt)
+    GradientButton(
+        text = "✦ Копировать VEO Prompt",
+        onClick = onCopyPrompt,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(VppTags.RESULT_COPY_PROMPT)
+    )
     Spacer(Modifier.height(10.dp))
-    OutlinedActionButton(text = "Поделиться VEO Prompt", onClick = onSharePrompt)
-    Spacer(Modifier.height(10.dp))
-    OutlinedActionButton(text = "Копировать весь пакет", onClick = onCopyPackage)
-    Spacer(Modifier.height(10.dp))
-    OutlinedActionButton(text = "Поделиться всем пакетом", onClick = onSharePackage)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedActionButton(
+            text = "Поделиться",
+            onClick = onSharePrompt,
+            icon = Icons.Outlined.Share,
+            contentDescription = "Поделиться VEO Prompt",
+            height = 46.dp,
+            modifier = Modifier.weight(1f)
+        )
+        OutlinedActionButton(
+            text = "Пакет",
+            onClick = onCopyPackage,
+            icon = Icons.Outlined.ContentCopy,
+            contentDescription = "Копировать весь пакет",
+            height = 46.dp,
+            modifier = Modifier.weight(1f)
+        )
+        OutlinedActionButton(
+            text = "Пакет",
+            onClick = onSharePackage,
+            icon = Icons.Outlined.IosShare,
+            contentDescription = "Поделиться всем пакетом",
+            height = 46.dp,
+            modifier = Modifier.weight(1f)
+        )
+    }
 
     Spacer(Modifier.height(14.dp))
     NavyCard {
@@ -343,6 +405,8 @@ private fun SummaryRow(label: String, value: String) {
         )
     }
 }
+
+private const val COLLAPSED_PROMPT_LINES = 14
 
 private fun copyText(context: Context, text: String) {
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

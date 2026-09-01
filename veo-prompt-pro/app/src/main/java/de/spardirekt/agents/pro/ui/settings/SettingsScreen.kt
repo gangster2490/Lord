@@ -2,7 +2,6 @@ package de.spardirekt.agents.pro.ui.settings
 
 import android.app.Application
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,26 +15,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -44,15 +37,20 @@ import de.spardirekt.agents.pro.VeoPromptProApp
 import de.spardirekt.agents.pro.model.AppMode
 import de.spardirekt.agents.pro.model.VoiceLanguage
 import de.spardirekt.agents.pro.network.OpenAiModelCatalog
+import de.spardirekt.agents.pro.ui.components.ApiKeyDialog
 import de.spardirekt.agents.pro.ui.components.AppHeader
+import de.spardirekt.agents.pro.ui.components.DestructiveButton
 import de.spardirekt.agents.pro.ui.components.GradientHeading
+import de.spardirekt.agents.pro.ui.components.GradientPillButton
 import de.spardirekt.agents.pro.ui.components.NavyCard
 import de.spardirekt.agents.pro.ui.components.SegmentedControl
 import de.spardirekt.agents.pro.ui.components.StatusPill
+import de.spardirekt.agents.pro.ui.components.VppTags
+import de.spardirekt.agents.pro.ui.theme.LocalBottomBarInset
 import de.spardirekt.agents.pro.ui.theme.LocalVppType
 import de.spardirekt.agents.pro.ui.theme.VppColors
 import de.spardirekt.agents.pro.ui.theme.VppDimens
-import de.spardirekt.agents.pro.ui.theme.VppShapes
+import de.spardirekt.agents.pro.ui.theme.VppLayout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -162,6 +160,7 @@ fun SettingsScreen(
                     listOf(VppColors.backgroundLight, VppColors.backgroundGlow.copy(alpha = 0.45f), VppColors.backgroundLight)
                 )
             )
+            .testTag(VppTags.SETTINGS_SCREEN)
     ) {
         Column(
             modifier = Modifier
@@ -169,7 +168,10 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
                 .padding(horizontal = VppDimens.screenPadding)
-                .padding(top = 12.dp, bottom = 180.dp)
+                .padding(
+                    top = VppLayout.screenTopPadding,
+                    bottom = LocalBottomBarInset.current + VppLayout.floatingContentGap
+                )
         ) {
             AppHeader(onNewProject = onOpenCreate, onHistory = onOpenHistory, onMenu = null)
             Spacer(Modifier.height(18.dp))
@@ -196,20 +198,25 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SettingsAction(if (ui.hasKey) "Заменить" else "Добавить") { viewModel.openReplace() }
-                    SettingsAction("Проверить") { viewModel.testConnection() }
+                    GradientPillButton(
+                        text = if (ui.hasKey) "Заменить" else "Добавить",
+                        onClick = viewModel::openReplace,
+                        modifier = Modifier.weight(1f)
+                    )
+                    GradientPillButton(
+                        text = "Проверить",
+                        onClick = viewModel::testConnection,
+                        enabled = !ui.busy,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-                Spacer(Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .border(1.dp, VppColors.error.copy(alpha = 0.7f), RoundedCornerShape(14.dp))
-                        .clickable { viewModel.removeKey() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Удалить API ключ", color = VppColors.error)
+                if (ui.hasKey) {
+                    Spacer(Modifier.height(10.dp))
+                    DestructiveButton(
+                        text = "Удалить API ключ",
+                        onClick = viewModel::removeKey,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
 
@@ -270,17 +277,11 @@ fun SettingsScreen(
                     onSelect = viewModel::setHistoryFormat
                 )
                 Spacer(Modifier.height(14.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .border(1.dp, VppColors.error.copy(alpha = 0.7f), RoundedCornerShape(14.dp))
-                        .clickable { viewModel.clearHistory() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Очистить историю", color = VppColors.error)
-                }
+                DestructiveButton(
+                    text = "Очистить историю",
+                    onClick = viewModel::clearHistory,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             Spacer(Modifier.height(18.dp))
@@ -375,68 +376,11 @@ fun SettingsScreen(
     }
 
     if (ui.showReplaceDialog) {
-        Dialog(onDismissRequest = viewModel::dismissReplace) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(VppShapes.cardShape)
-                    .background(VppColors.cardNavy)
-                    .padding(22.dp)
-            ) {
-                Text("OpenAI API", style = type.sectionTitle.copy(color = VppColors.textLight))
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Добавьте API-ключ для анализа фотографий и создания промптов.",
-                    style = type.secondary.copy(color = VppColors.textMuted)
-                )
-                Spacer(Modifier.height(12.dp))
-                BasicTextField(
-                    value = ui.keyInput,
-                    onValueChange = viewModel::setKeyInput,
-                    visualTransformation = PasswordVisualTransformation(),
-                    textStyle = type.body.copy(color = VppColors.textLight),
-                    cursorBrush = SolidColor(VppColors.accentPurple),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(VppColors.cardInset)
-                        .padding(14.dp)
-                )
-                Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SettingsAction("Сохранить", Modifier.weight(1f)) { viewModel.saveKey() }
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(44.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .border(1.dp, VppColors.textMuted.copy(alpha = 0.4f), RoundedCornerShape(14.dp))
-                            .clickable { viewModel.dismissReplace() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Отмена", color = VppColors.textLight)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsAction(
-    text: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .height(44.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(Brush.horizontalGradient(listOf(VppColors.accentPurple, VppColors.accentBlue)))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text, color = Color.White)
+        ApiKeyDialog(
+            value = ui.keyInput,
+            onValueChange = viewModel::setKeyInput,
+            onSave = viewModel::saveKey,
+            onCancel = viewModel::dismissReplace
+        )
     }
 }

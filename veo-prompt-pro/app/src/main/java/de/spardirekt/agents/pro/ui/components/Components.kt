@@ -1,16 +1,12 @@
 package de.spardirekt.agents.pro.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -25,23 +21,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.spardirekt.agents.pro.ui.theme.GradientAccent
@@ -95,8 +88,9 @@ fun AppHeader(
                 style = type.badge.copy(color = VppColors.accentPurple, fontSize = 12.sp),
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable { onNewProject() }
+                    .clickable(onClickLabel = "Новый проект") { onNewProject() }
                     .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .semantics(mergeDescendants = true) { role = Role.Button }
             )
         }
         if (trailing != null) {
@@ -104,29 +98,51 @@ fun AppHeader(
             trailing()
         } else {
             if (onHistory != null) {
-                HeaderSquareButton(onClick = onHistory) {
-                    Icon(Icons.Filled.History, null, tint = VppColors.textLight, modifier = Modifier.size(18.dp))
+                HeaderSquareButton(onClick = onHistory, contentDescription = "История") {
+                    Icon(
+                        Icons.Filled.History,
+                        contentDescription = null,
+                        tint = VppColors.textLight,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
             if (onMenu != null) {
                 Spacer(Modifier.width(8.dp))
-                HeaderSquareButton(onClick = onMenu) {
-                    Icon(Icons.Filled.Menu, null, tint = VppColors.textLight, modifier = Modifier.size(18.dp))
+                HeaderSquareButton(onClick = onMenu, contentDescription = "Настройки") {
+                    Icon(
+                        Icons.Filled.Menu,
+                        contentDescription = null,
+                        tint = VppColors.textLight,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
     }
 }
 
+/**
+ * Icon-only header action. [contentDescription] is required because the glyph
+ * alone tells a screen reader nothing.
+ */
 @Composable
-fun HeaderSquareButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+fun HeaderSquareButton(
+    onClick: () -> Unit,
+    contentDescription: String,
+    content: @Composable () -> Unit
+) {
     Box(
         modifier = Modifier
             .size(40.dp)
             .shadow(6.dp, RoundedCornerShape(12.dp), clip = false)
             .clip(RoundedCornerShape(12.dp))
             .background(VppColors.cardNavy)
-            .clickable(onClick = onClick),
+            .clickable(onClickLabel = contentDescription, onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                this.contentDescription = contentDescription
+            },
         contentAlignment = Alignment.Center
     ) { content() }
 }
@@ -163,6 +179,7 @@ fun NavyCard(
 fun LightOutlineCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
@@ -171,73 +188,18 @@ fun LightOutlineCard(
             .clip(VppShapes.cardShape)
             .border(1.5.dp, VppColors.outlineSoft, VppShapes.cardShape)
             .background(Color.White.copy(alpha = 0.55f))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null) {
+                    Modifier
+                        .clickable(onClickLabel = onClickLabel, onClick = onClick)
+                        .semantics { role = Role.Button }
+                } else {
+                    Modifier
+                }
+            )
             .padding(18.dp),
         content = content
     )
-}
-
-@Composable
-fun GradientButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.98f else 1f, label = "press")
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(60.dp)
-            .scale(scale)
-            .shadow(if (enabled) 12.dp else 0.dp, VppShapes.buttonShape, clip = false)
-            .clip(VppShapes.buttonShape)
-            .background(
-                if (enabled) GradientAccent
-                else Brush.horizontalGradient(listOf(Color(0xFF9A9AB0), Color(0xFF8A8AA0)))
-            )
-            .clickable(
-                enabled = enabled,
-                interactionSource = interaction,
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = text,
-            style = LocalVppType.current.buttonLabel.copy(color = Color.White)
-        )
-    }
-}
-
-@Composable
-fun OutlinedActionButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(52.dp)
-            .clip(VppShapes.buttonShape)
-            .border(1.5.dp, VppColors.accentPurple.copy(alpha = 0.55f), VppShapes.buttonShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text,
-            style = LocalVppType.current.buttonLabel.copy(
-                color = VppColors.textLight,
-                fontSize = 14.sp
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
 }
 
 @Composable
@@ -266,7 +228,11 @@ fun SegmentedControl(
                         if (isSelected) Modifier.background(GradientAccent)
                         else Modifier.background(Color.Transparent)
                     )
-                    .clickable { onSelect(option) },
+                    .clickable { onSelect(option) }
+                    .semantics(mergeDescendants = true) {
+                        role = Role.RadioButton
+                        this.selected = isSelected
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -283,42 +249,32 @@ fun SegmentedControl(
 }
 
 @Composable
-fun ChipRow(
-    options: List<String>,
-    selected: String,
-    onSelect: (String) -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Use Flow conceptually via wrapping in parent LazyRow typically;
-        // here keep single-line horizontal scroll friendly chips in caller.
-    }
-}
-
-@Composable
 fun SelectChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit
 ) {
+    val isSelected = selected
     Box(
         modifier = Modifier
             .height(34.dp)
             .clip(VppShapes.chipShape)
             .then(
-                if (selected) Modifier.background(GradientAccent)
+                if (isSelected) Modifier.background(GradientAccent)
                 else Modifier.background(VppColors.cardInset)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 14.dp)
+            .semantics(mergeDescendants = true) {
+                role = Role.RadioButton
+                this.selected = isSelected
+            },
         contentAlignment = Alignment.Center
     ) {
         Text(
             label,
             style = LocalVppType.current.badge.copy(
-                color = if (selected) Color.White else VppColors.textMuted,
+                color = if (isSelected) Color.White else VppColors.textMuted,
                 fontSize = 12.sp
             ),
             maxLines = 1,

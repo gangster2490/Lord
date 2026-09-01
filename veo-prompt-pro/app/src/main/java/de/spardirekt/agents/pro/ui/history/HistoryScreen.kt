@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,9 +46,12 @@ import de.spardirekt.agents.pro.model.ProjectStatus
 import de.spardirekt.agents.pro.ui.components.AppHeader
 import de.spardirekt.agents.pro.ui.components.GradientHeading
 import de.spardirekt.agents.pro.ui.components.NavyCard
+import de.spardirekt.agents.pro.ui.components.VppTags
+import de.spardirekt.agents.pro.ui.theme.LocalBottomBarInset
 import de.spardirekt.agents.pro.ui.theme.LocalVppType
 import de.spardirekt.agents.pro.ui.theme.VppColors
 import de.spardirekt.agents.pro.ui.theme.VppDimens
+import de.spardirekt.agents.pro.ui.theme.VppLayout
 import de.spardirekt.agents.pro.ui.theme.VppShapes
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -88,6 +92,7 @@ fun HistoryScreen(
                     listOf(VppColors.backgroundLight, VppColors.backgroundGlow.copy(alpha = 0.5f), VppColors.backgroundLight)
                 )
             )
+            .testTag(VppTags.HISTORY_SCREEN)
     ) {
         Column(
             modifier = Modifier
@@ -119,7 +124,9 @@ fun HistoryScreen(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(bottom = 180.dp),
+                    contentPadding = PaddingValues(
+                        bottom = LocalBottomBarInset.current + VppLayout.floatingContentGap
+                    ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(projects, key = { it.id }) { project ->
