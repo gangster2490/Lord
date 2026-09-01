@@ -56,6 +56,7 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
     private var projectId: String? = null
     private var observeJob: Job? = null
     private var wasGenerating = false
+    private val resultNav = ResultNavigationGate()
 
     init {
         viewModelScope.launch {
@@ -64,7 +65,7 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
                 if (generation.activeProjectId.value != id) return@collect
                 _state.update { it.copy(stage = st, isGenerating = generation.isRunning.value) }
                 if (st == GenerationStage.DONE) {
-                    _state.update { it.copy(navigateToResultId = id, isGenerating = false) }
+                    requestResultNavigation(id)
                 }
             }
         }
@@ -74,7 +75,7 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
                 val mine = id != null && generation.activeProjectId.value == id
                 if (mine) {
                     if (wasGenerating && !running && _state.value.stage == GenerationStage.DONE) {
-                        _state.update { it.copy(navigateToResultId = id, isGenerating = false) }
+                        requestResultNavigation(id)
                     }
                     wasGenerating = running
                     _state.update { it.copy(isGenerating = running) }
@@ -154,6 +155,9 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
                 val images = repo.parseImages(entity)
                 val generating = generation.isBusyFor(entity.id) ||
                     entity.status == ProjectStatus.Generating.name
+                val shouldOfferResult = wasGenerating &&
+                    entity.status == ProjectStatus.Ready.name &&
+                    entity.veoPrompt.isNotBlank()
                 _state.update {
                     it.copy(
                         project = entity,
@@ -170,13 +174,11 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
                             .getOrDefault(GenerationStage.IDLE),
                         isGenerating = generating,
                         errorMessage = entity.errorState,
-                        errorDetail = entity.errorDetail,
-                        navigateToResultId = if (
-                            wasGenerating &&
-                            entity.status == ProjectStatus.Ready.name &&
-                            entity.veoPrompt.isNotBlank()
-                        ) entity.id else it.navigateToResultId
+                        errorDetail = entity.errorDetail
                     )
+                }
+                if (shouldOfferResult) {
+                    requestResultNavigation(entity.id)
                 }
             }
         }
@@ -192,6 +194,7 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
                 tiktok = sett.tiktokShopMode
             )
             wasGenerating = false
+            resultNav.reset()
             _state.value = CreateUiState(
                 project = draft,
                 voice = sett.defaultVoice,
@@ -305,6 +308,12 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(navigateToResultId = null) }
     }
 
+    private fun requestResultNavigation(id: String) {
+        val offered = resultNav.offer(id) ?: return
+        wasGenerating = false
+        _state.update { it.copy(navigateToResultId = offered, isGenerating = false) }
+    }
+
     private fun startGeneration(resume: Boolean) {
         val id = projectId ?: return
         if (_state.value.images.isEmpty()) {
@@ -313,6 +322,7 @@ class CreateViewModel(app: Application) : AndroidViewModel(app) {
             }
             return
         }
+        resultNav.onGenerationStarted()
         wasGenerating = true
         _state.update {
             it.copy(

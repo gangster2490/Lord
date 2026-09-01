@@ -113,7 +113,11 @@ fun VeoPromptProNav() {
                             restoreState = true
                         }
                     },
-                    onOpenResult = { id -> navController.navigate(Routes.result(id)) }
+                    onOpenResult = { id ->
+                        navController.navigate(Routes.result(id)) {
+                            launchSingleTop = true
+                        }
+                    }
                 )
             }
             composable(Routes.HISTORY) {
