@@ -77,8 +77,7 @@ fun HistoryScreen(
     viewModel: HistoryViewModel,
     onOpenResult: (String) -> Unit,
     onContinueProject: (String) -> Unit,
-    onOpenCreate: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenCreate: () -> Unit
 ) {
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     val type = LocalVppType.current
@@ -101,7 +100,7 @@ fun HistoryScreen(
                 .padding(horizontal = VppDimens.screenPadding)
                 .padding(top = 12.dp)
         ) {
-            AppHeader(onNewProject = onOpenCreate, onHistory = null, onMenu = onOpenSettings)
+            AppHeader(onNewProject = onOpenCreate)
             Spacer(Modifier.height(18.dp))
             GradientHeading("История")
             Spacer(Modifier.height(6.dp))

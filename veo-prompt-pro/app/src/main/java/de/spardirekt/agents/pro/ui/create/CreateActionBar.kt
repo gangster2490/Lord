@@ -48,13 +48,13 @@ fun CreateActionBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            // Short fade at the very top, opaque below it, so the form scrolling
+            // underneath does not read through the bar.
             .background(
                 Brush.verticalGradient(
-                    listOf(
-                        VppColors.backgroundLight.copy(alpha = 0f),
-                        VppColors.backgroundLight.copy(alpha = 0.92f),
-                        VppColors.backgroundLight
-                    )
+                    0f to VppColors.backgroundLight.copy(alpha = 0f),
+                    0.12f to VppColors.backgroundLight,
+                    1f to VppColors.backgroundLight
                 )
             )
             .padding(horizontal = VppDimens.screenPadding)

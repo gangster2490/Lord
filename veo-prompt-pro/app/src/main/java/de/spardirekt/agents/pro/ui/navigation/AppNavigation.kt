@@ -117,20 +117,6 @@ fun VeoPromptProNav() {
                     }
                     CreateScreen(
                         viewModel = vm,
-                        onOpenHistory = {
-                            navController.navigate(Routes.HISTORY) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        onOpenSettings = {
-                            navController.navigate(Routes.SETTINGS) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
                         onOpenResult = { id ->
                             navController.navigate(Routes.result(id)) {
                                 launchSingleTop = true
@@ -155,13 +141,6 @@ fun VeoPromptProNav() {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                             }
-                        },
-                        onOpenSettings = {
-                            navController.navigate(Routes.SETTINGS) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
                         }
                     )
                 }
@@ -173,13 +152,6 @@ fun VeoPromptProNav() {
                             navController.navigate(Routes.createFresh()) {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
-                            }
-                        },
-                        onOpenHistory = {
-                            navController.navigate(Routes.HISTORY) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
                             }
                         }
                     )
@@ -202,9 +174,7 @@ fun VeoPromptProNav() {
                                 popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                 launchSingleTop = true
                             }
-                        },
-                        onOpenHistory = { navController.navigate(Routes.HISTORY) },
-                        onOpenSettings = { navController.navigate(Routes.SETTINGS) }
+                        }
                     )
                 }
             }

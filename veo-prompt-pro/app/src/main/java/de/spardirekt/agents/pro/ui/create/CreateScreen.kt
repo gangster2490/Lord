@@ -41,11 +41,13 @@ import de.spardirekt.agents.pro.ui.theme.VppColors
 import de.spardirekt.agents.pro.ui.theme.VppDimens
 import de.spardirekt.agents.pro.ui.theme.VppLayout
 
+/**
+ * History and Settings are reachable from the bottom navigation, so the header
+ * here carries only the "new project" action instead of repeating both tabs.
+ */
 @Composable
 fun CreateScreen(
     viewModel: CreateViewModel,
-    onOpenHistory: () -> Unit,
-    onOpenSettings: () -> Unit,
     onOpenResult: (String) -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -93,11 +95,7 @@ fun CreateScreen(
                     bottom = bottomBarInset + actionBarHeight + VppLayout.floatingContentGap
                 )
         ) {
-            AppHeader(
-                onNewProject = { viewModel.newProject() },
-                onHistory = onOpenHistory,
-                onMenu = onOpenSettings
-            )
+            AppHeader(onNewProject = { viewModel.newProject() })
             Spacer(Modifier.height(18.dp))
             GradientHeading("Генератор промптов для видео")
             Spacer(Modifier.height(8.dp))

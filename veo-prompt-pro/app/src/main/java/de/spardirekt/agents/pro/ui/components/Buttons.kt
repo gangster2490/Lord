@@ -121,6 +121,10 @@ fun GradientPillButton(
 /**
  * Secondary action. Pass [icon] to shrink the label — used where several
  * secondary actions share one row and the icon carries the meaning.
+ *
+ * [contentColor] defaults to the on-navy label because most outlined actions sit
+ * inside a dark card; pass [VppColors.textDark] when the button sits directly on
+ * the light page, otherwise the label washes out against it.
  */
 @Composable
 fun OutlinedActionButton(
@@ -129,7 +133,8 @@ fun OutlinedActionButton(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     contentDescription: String? = null,
-    height: Dp = 52.dp
+    height: Dp = 52.dp,
+    contentColor: Color = VppColors.textLight
 ) {
     Row(
         modifier = modifier
@@ -154,7 +159,7 @@ fun OutlinedActionButton(
         Text(
             text,
             style = LocalVppType.current.buttonLabel.copy(
-                color = VppColors.textLight,
+                color = contentColor,
                 fontSize = if (icon != null) 13.sp else 14.sp
             ),
             maxLines = 1,

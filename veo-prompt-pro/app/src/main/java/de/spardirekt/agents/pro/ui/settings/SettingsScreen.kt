@@ -143,8 +143,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    onOpenCreate: () -> Unit,
-    onOpenHistory: () -> Unit
+    onOpenCreate: () -> Unit
 ) {
     val sett by viewModel.settings.collectAsStateWithLifecycle(
         initialValue = de.spardirekt.agents.pro.storage.SettingsStore.AppSettings()
@@ -173,7 +172,7 @@ fun SettingsScreen(
                     bottom = LocalBottomBarInset.current + VppLayout.floatingContentGap
                 )
         ) {
-            AppHeader(onNewProject = onOpenCreate, onHistory = onOpenHistory, onMenu = null)
+            AppHeader(onNewProject = onOpenCreate)
             Spacer(Modifier.height(18.dp))
             GradientHeading("Настройки")
             Spacer(Modifier.height(18.dp))

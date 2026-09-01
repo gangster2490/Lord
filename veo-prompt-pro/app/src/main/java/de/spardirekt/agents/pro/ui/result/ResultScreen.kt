@@ -27,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material3.Icon
@@ -70,13 +69,25 @@ import kotlinx.coroutines.flow.stateIn
 
 class ResultViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = VeoPromptProApp.instance.projectRepository
+    private val streams = mutableMapOf<String, StateFlow<ProjectEntity?>>()
 
+    /**
+     * Cached per project id.
+     *
+     * This used to build a fresh StateFlow on every call. Because the screen
+     * calls it straight from composition, each recomposition produced a new flow
+     * that started at null, which reset the just-delivered project and triggered
+     * another recomposition — the body stayed blank forever and the loop kept
+     * restarting the Room query until the app hit an ANR.
+     */
     fun observe(projectId: String): StateFlow<ProjectEntity?> =
-        repo.observe(projectId).stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            initialValue = null
-        )
+        streams.getOrPut(projectId) {
+            repo.observe(projectId).stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                initialValue = null
+            )
+        }
 
     fun hashtags(entity: ProjectEntity): List<String> =
         ResultComposition.hashtags(entity, repo.parseHashtags(entity))
@@ -96,9 +107,7 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
 fun ResultScreen(
     projectId: String,
     viewModel: ResultViewModel,
-    onBackToCreate: () -> Unit,
-    onOpenHistory: () -> Unit,
-    onOpenSettings: () -> Unit
+    onBackToCreate: () -> Unit
 ) {
     val project by viewModel.observe(projectId).collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -266,32 +275,33 @@ private fun ResultBody(
             .testTag(VppTags.RESULT_COPY_PROMPT)
     )
     Spacer(Modifier.height(10.dp))
+    // Four stacked full-width buttons pushed the rest of the package off-screen.
+    // Two rows keep every label spelled out; these sit on the light page, not
+    // inside a card, so they take the dark label colour.
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedActionButton(
             text = "Поделиться",
             onClick = onSharePrompt,
-            icon = Icons.Outlined.Share,
-            contentDescription = "Поделиться VEO Prompt",
             height = 46.dp,
+            contentColor = VppColors.textDark,
             modifier = Modifier.weight(1f)
         )
         OutlinedActionButton(
-            text = "Пакет",
+            text = "Копировать пакет",
             onClick = onCopyPackage,
-            icon = Icons.Outlined.ContentCopy,
-            contentDescription = "Копировать весь пакет",
             height = 46.dp,
-            modifier = Modifier.weight(1f)
-        )
-        OutlinedActionButton(
-            text = "Пакет",
-            onClick = onSharePackage,
-            icon = Icons.Outlined.IosShare,
-            contentDescription = "Поделиться всем пакетом",
-            height = 46.dp,
+            contentColor = VppColors.textDark,
             modifier = Modifier.weight(1f)
         )
     }
+    Spacer(Modifier.height(8.dp))
+    OutlinedActionButton(
+        text = "Поделиться всем пакетом",
+        onClick = onSharePackage,
+        height = 46.dp,
+        contentColor = VppColors.textDark,
+        modifier = Modifier.fillMaxWidth()
+    )
 
     Spacer(Modifier.height(14.dp))
     NavyCard {

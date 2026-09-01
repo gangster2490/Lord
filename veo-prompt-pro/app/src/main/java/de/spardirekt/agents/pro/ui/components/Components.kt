@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.spardirekt.agents.pro.ui.theme.GradientAccent
@@ -73,13 +74,19 @@ fun AppHeader(
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
+            // Single line: on a 360.dp phone the brand used to wrap onto three
+            // rows and push the whole page down.
             Text(
                 "Veo Prompt Pro",
-                style = type.cardTitle.copy(color = VppColors.textDark, fontWeight = FontWeight.Bold)
+                style = type.cardTitle.copy(color = VppColors.textDark, fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 "VEO 3.1 Product Ads",
-                style = type.secondary.copy(color = VppColors.textMutedDark, fontSize = 12.sp)
+                style = type.secondary.copy(color = VppColors.textMutedDark, fontSize = 12.sp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
         if (onNewProject != null) {
