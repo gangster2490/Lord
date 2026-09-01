@@ -91,7 +91,9 @@ Return JSON only:
 CURRENT STAGE: FINAL_PROMPT
 
 Generate the production-ready VEO 3.1 package for Gemini / VEO copy-paste.
-Keep every section SHORT and copy-ready. No essays. No repeated doctrine.
+Fidelity and completeness take priority over brevity.
+Do not summarize, compress, or omit evidence-backed product details.
+Avoid repeated internal doctrine, but retain every product-specific instruction.
 
 Voice language: $voice
   DE: natural German ~12–18 spoken words
@@ -101,21 +103,27 @@ TikTok Shop Mode: ${if (tiktokShop) "ON" else "OFF"}
 ${lockedVoiceoverBlock(voice, lockedVoiceover)}
 Do not resend or invent unseen mechanisms.
 Do NOT include TIKTOK SHOP SAFETY AUDIT inside veoPrompt.
+The JSON field MUST be named veoPrompt. Never name it mainPrompt.
+Never copy internal CORE headings into veoPrompt, even as "HEADER: body" on one line.
+Forbidden headings inside veoPrompt: VISUAL FIDELITY, PRODUCT FIDELITY, HOOK, HANDS, PEOPLE, QUALITY GATE, SAFETY AUDIT, PRODUCT MODEL, CREATIVE DIRECTOR, PRIMARY REFERENCE, MAIN REFERENCE, MAIN PROMPT.
 
-SECTION LENGTH RULES (hard — keep the copied prompt SHORT):
-FORMAT: one short line (9:16, photorealistic, exactly 8.0s)
-REFERENCES: ONE short sentence of what photos confirm
-PRODUCT LOCK: one short lock sentence + ONE line of 5–8 product-specific details (no fidelity essay)
-SETTING: one short line
-SHOT SEQUENCE: exactly four short timed lines (0.0–2.0 / 2.0–4.0 / 4.0–6.0 / 6.0–8.0). No meta paragraphs.
+SECTION CONTENT RULES:
+FORMAT: state 9:16, photorealistic style, and exactly 8.0s
+REFERENCES: summarize all relevant visual evidence needed to reproduce the exact product
+PRODUCT LOCK: exact-identity rule plus approximately 5–12 evidence-backed identity-critical details; keep every confirmed pan component
+SETTING: complete product-appropriate environment and lighting direction
+SHOT SEQUENCE: exactly four timed blocks (0.0–2.0 / 2.0–4.0 / 4.0–6.0 / 6.0–8.0), each with complete camera, product-continuity, and physical-action direction
 ON-SCREEN TEXT: ONLY the actual overlay words that may appear in the video (or None). Never put production instructions, limits, or prompt labels here.
 VOICEOVER: spoken line or OFF
-AUDIO: one short line
-CRITICAL: one short line
-NEGATIVE PROMPT: 5–6 short bullets, product-specific when possible
-TITLE: one short title
+AUDIO: complete scene-specific audio direction
+CRITICAL: all non-negotiable continuity and fidelity requirements
+NEGATIVE PROMPT: approximately 8–15 concise PRODUCT-SPECIFIC restrictions; preserve every identified high-risk fidelity failure
+TITLE: one product-specific title
 HASHTAGS: exactly 5
-Target total veoPrompt length: under ~1200 characters.
+
+There is no character target or prompt-length budget.
+Never shorten a shot, PRODUCT LOCK, CRITICAL rule, or NEGATIVE PROMPT to fit an arbitrary size.
+Every sentence and every bullet must end complete; never emit an ellipsis caused by truncation.
 
 Return JSON only. veoPrompt MUST be one JSON string. Use $nl for line breaks. Never put raw line breaks inside the JSON string.
 {
@@ -139,7 +147,8 @@ HASHTAGS must be EXACTLY 5.
 The VOICEOVER section and json.voiceover must be identical.
 COMPLETENESS (hard): every required section MUST be present with a non-empty body —
 FORMAT, REFERENCES, PRODUCT LOCK, SETTING, SHOT SEQUENCE, ON-SCREEN TEXT, VOICEOVER, AUDIO, CRITICAL, NEGATIVE PROMPT, TITLE, HASHTAGS.
-Never truncate mid-section. Never omit the TITLE/HASHTAGS tail. If length is tight, shorten section bodies — do not drop sections.
+Never truncate mid-section. Never omit the TITLE/HASHTAGS tail.
+Never shorten or remove evidence-backed product details. Use the available output-token budget for the complete response.
 Do NOT paste long internal fidelity essays into PRODUCT LOCK or CRITICAL.
 Do NOT duplicate marketplace rules across sections.
 Do NOT include legacy sections: VISUAL FIDELITY, PRODUCT FIDELITY, SAFETY AUDIT, QUALITY GATE, CREATIVE DIRECTOR, PRODUCT MODEL, PRIMARY/MAIN REFERENCE.

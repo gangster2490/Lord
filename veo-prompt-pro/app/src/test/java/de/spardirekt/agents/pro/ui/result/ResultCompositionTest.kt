@@ -205,6 +205,36 @@ HASHTAGS
     }
 
     @Test
+    fun resultDisplayDoesNotRecomposeOrTruncateStoredPrompt() {
+        val identityTail = "final photographed identity marker remains intact"
+        val shotTail = "final frame preserves every small photographed component without substitution"
+        val richLock = (1..16).joinToString(", ") {
+            "identity detail $it with exact geometry"
+        } + ", $identityTail"
+        val richNegatives = (1..12).joinToString("\n") {
+            "- product-specific restriction $it remains complete"
+        }
+        val richPrompt = cleanPrompt
+            .replace("Preserve black tubular frame.", richLock)
+            .replace(
+                "6.0–8.0s — HERO / CTA",
+                "6.0–8.0s — HERO / CTA: $shotTail"
+            )
+            .replace("- no generic chair", richNegatives)
+
+        val composed = ResultComposition.veoPrompt(
+            entity(prompt = richPrompt),
+            listOf("#a", "#b", "#c", "#d", "#TikTokShop")
+        )
+
+        assertTrue("expected complete prompt beyond old display budget", composed.length > 1100)
+        assertTrue(composed.contains(identityTail))
+        assertTrue(composed.contains(shotTail))
+        assertTrue(composed.contains("product-specific restriction 12 remains complete"))
+        assertFalse(composed.contains("…"))
+    }
+
+    @Test
     fun fullPackagePutsMetadataBeforeVeoPrompt_nothingAfterHashtags() {
         val pkg = ResultComposition.fullPackage(entity(), listOf("#a", "#b", "#c", "#d", "#TikTokShop"))
         val voIdx = pkg.indexOf("Озвучка")

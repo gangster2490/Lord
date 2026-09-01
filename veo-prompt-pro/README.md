@@ -9,8 +9,8 @@ This app does **not** generate video. You copy the prompt into Veo.
 | Field | Value |
 |---|---|
 | applicationId | `de.spardirekt.agents.pro` |
-| versionName | `3.2.17` |
-| versionCode | 22 |
+| versionName | `3.2.19` |
+| versionCode | 24 |
 | minSdk | 26 |
 | targetSdk | 35 |
 

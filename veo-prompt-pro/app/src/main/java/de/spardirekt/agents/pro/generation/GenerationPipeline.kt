@@ -173,7 +173,7 @@ class GenerationPipeline(
                     timeoutSeconds = 240,
                     jsonMode = true,
                     temperature = 0.5,
-                    maxTokens = 4500
+                    maxTokens = 8000
                 ).getOrElse { return Result.failure(it as? AppError ?: AppError.Unknown(it.message.orEmpty())) }
             } else {
                 finalJson = buildJsonObject {
@@ -187,6 +187,11 @@ class GenerationPipeline(
             }
 
             var bundle = decodeBundle(finalJson, analysisJson, productModelJson, creativePlanJson)
+            if (bundle.veoPrompt.isBlank()) {
+                return Result.failure(
+                    AppError.Server("Модель не вернула VEO prompt.")
+                )
+            }
 
             // Quality gate + targeted repair
             onStage(StageUpdate(GenerationStage.FINAL_VALIDATION, analysis, productModel, creativePlan, bundle))
@@ -200,11 +205,17 @@ class GenerationPipeline(
                     userText = "Current JSON:\n${json.encodeToString(bundle)}\nProduct model:\n$productModelJson",
                     timeoutSeconds = 120,
                     jsonMode = true,
-                    maxTokens = 4000,
+                    maxTokens = 8000,
                     maxAttempts = 1
                 ).getOrNull()
                 if (repaired != null) {
-                    bundle = decodeBundle(repaired, analysisJson, productModelJson, creativePlanJson)
+                    val next = decodeBundle(repaired, analysisJson, productModelJson, creativePlanJson)
+                    if (next.veoPrompt.isBlank()) {
+                        return Result.failure(
+                            AppError.Server("Модель не вернула VEO prompt.")
+                        )
+                    }
+                    bundle = next
                 }
             }
 
@@ -238,7 +249,8 @@ class GenerationPipeline(
                 hashtags = bundle.hashtags,
                 voiceLanguage = input.voiceLanguage.name,
                 marketplace = marketplace,
-                tiktokShopMode = input.tiktokShopMode
+                tiktokShopMode = input.tiktokShopMode,
+                productEvidence = productModelJson
             )
             var completeness = PromptCleanup.validateCompleteness(cleaned.veoPrompt, cleaned.hashtags)
             var repaired = cleaned
@@ -252,21 +264,15 @@ class GenerationPipeline(
                     hashtags = cleaned.hashtags.ifEmpty { bundle.hashtags },
                     voiceLanguage = input.voiceLanguage.name,
                     marketplace = marketplace,
-                    tiktokShopMode = input.tiktokShopMode
+                    tiktokShopMode = input.tiktokShopMode,
+                    productEvidence = productModelJson
                 )
                 completeness = PromptCleanup.validateCompleteness(repaired.veoPrompt, repaired.hashtags)
-                if (PromptCleanup.needsCompletenessRepair(repaired.veoPrompt, repaired.hashtags)) {
-                    // Last resort: rebuild from empty shell + known VO/title/tags.
-                    repaired = PromptCleanup.finalize(
-                        rawPrompt = "",
-                        voiceover = repaired.voiceover,
-                        title = repaired.title,
-                        hashtags = repaired.hashtags,
-                        voiceLanguage = input.voiceLanguage.name,
-                        marketplace = marketplace,
-                        tiktokShopMode = input.tiktokShopMode
+                DebugLog.d("Completeness after local repair: $completeness")
+                if (repaired.veoPrompt.isBlank()) {
+                    return Result.failure(
+                        AppError.Server("Модель не вернула VEO prompt.")
                     )
-                    completeness = PromptCleanup.validateCompleteness(repaired.veoPrompt, repaired.hashtags)
                 }
                 DebugLog.d("Completeness after local repair: $completeness")
             }
@@ -401,7 +407,7 @@ VOICE: ${voice.name}
 TIKTOK SHOP MODE: $tiktok
 VOICEOVER section: leave a short placeholder. The spoken line is generated separately.
 
-Keep PRODUCT LOCK short: one lock sentence + product-specific details only. No fidelity essays. No legacy sections (no VISUAL FIDELITY, no SAFETY AUDIT, no PRODUCT FIDELITY CORE).
+Keep PRODUCT LOCK fidelity-first: include the exact-identity rule and every evidence-backed identity-critical detail from the product model. Do not compress or truncate product-specific content. Do not include internal doctrine or legacy sections (no VISUAL FIDELITY, no SAFETY AUDIT, no PRODUCT FIDELITY CORE).
 
 Remember: do not resend or rely on inventing unseen mechanisms.
 """.trimIndent()

@@ -39,4 +39,21 @@ class AgentCorePromptTest {
             assertFalse(prompt.contains("Primary Reference selection"))
         }
     }
+
+    @Test
+    fun finalPromptStageHasNoLegacyCompositionBudget() {
+        val contract = PromptTemplates.finalPromptSystem("DE", true)
+            .substringAfter("CURRENT STAGE: FINAL_PROMPT")
+
+        assertFalse(contract.contains("under ~1200"))
+        assertFalse(contract.contains("5–6 short bullets"))
+        assertFalse(contract.contains("ONE line of 5–8"))
+        assertFalse(contract.contains("keep the copied prompt SHORT", ignoreCase = true))
+        assertTrue(contract.contains("approximately 5–12"))
+        assertTrue(contract.contains("approximately 8–15"))
+        assertTrue(contract.contains("There is no character target or prompt-length budget."))
+        assertTrue(contract.contains("never emit an ellipsis caused by truncation"))
+        assertTrue(contract.contains("Never name it mainPrompt"))
+        assertTrue(contract.contains("Forbidden headings inside veoPrompt"))
+    }
 }

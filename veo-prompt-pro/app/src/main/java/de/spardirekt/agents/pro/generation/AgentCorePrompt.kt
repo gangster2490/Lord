@@ -420,6 +420,9 @@ Preserve bowl shape, lid, handles, drain structure.
 
 TEST F — Deep black pan with wooden lid:
 Preserve deep black bowl shape, high curved sides, long dark wooden handle, hanging ring, gold-tone ferrule, riveted shank, wooden crossbar lid.
+Never turn this specific product into a shallow frying pan, saucepan, wok, or generic cookware.
+Never remove, shorten, recolor, or replace its wooden handle or wooden crossbar lid.
+Apply this lock ONLY when the evidence identifies this exact pan; do not add these attributes to other cookware.
 
 ==================================================
 FINAL OWNER EXPERIENCE

@@ -28,7 +28,8 @@ class GenerationPipelineTest {
             ProjectImage(id = "img_1", uri = "file:///tmp/demo.jpg", localPath = "/tmp/demo.jpg")
         ),
         voice: VoiceLanguage = VoiceLanguage.DE,
-        wish: String = "luxury cream"
+        wish: String = "luxury cream",
+        apiKey: String = "sk-demo"
     ) = GenerationPipeline.PipelineInput(
         projectId = "pipeline-test",
         images = images,
@@ -37,7 +38,7 @@ class GenerationPipelineTest {
         mode = AppMode.Simple,
         creativeMode = CreativeMode.Auto,
         tiktokShopMode = true,
-        apiKey = "sk-demo",
+        apiKey = apiKey,
         model = "gpt-5.6-sol"
     )
 
@@ -119,6 +120,45 @@ class GenerationPipelineTest {
     }
 
     @Test
+    fun panRuntimePathUsesFidelityFirstPromptAndPreservesCompleteOutput() = runBlocking {
+        val client = RecordingChatClient()
+        val pipeline = GenerationPipeline(client, encoder())
+        val result = pipeline.run(
+            input(
+                wish = "Deep Black Pan with wooden crossbar lid",
+                apiKey = "sk-demo-pan"
+            )
+        ) { }
+        assertTrue(result.isSuccess)
+        val bundle = result.getOrThrow()
+
+        assertTrue(bundle.productModelJson.contains("wooden crossbar lid"))
+        assertTrue("prompt must exceed the removed legacy budget", bundle.veoPrompt.length > 1200)
+        listOf(
+            "deep black bowl",
+            "high curved sides",
+            "long dark wooden handle",
+            "hanging ring",
+            "gold-tone ferrule",
+            "riveted shank",
+            "wooden crossbar lid",
+            "no impossible hand anatomy"
+        ).forEach { detail ->
+            assertTrue("runtime prompt missing '$detail'", bundle.veoPrompt.contains(detail))
+        }
+        assertTrue(bundle.veoPrompt.contains("all unobstructed"))
+        assertFalse(bundle.veoPrompt.contains("…"))
+
+        val finalContract = client.finalPromptSystem.substringAfter("CURRENT STAGE: FINAL_PROMPT")
+        assertFalse(finalContract.contains("under ~1200"))
+        assertFalse(finalContract.contains("5–6 short bullets"))
+        assertFalse(finalContract.contains("ONE line of 5–8"))
+        assertTrue(finalContract.contains("There is no character target or prompt-length budget."))
+        assertFalse(client.finalPromptUser.contains("Keep PRODUCT LOCK short"))
+        assertTrue(client.finalPromptUser.contains("Do not compress or truncate product-specific content"))
+    }
+
+    @Test
     fun voiceOffSkipsSpokenLineAndWritesOff() = runBlocking {
         val client = RecordingChatClient()
         val pipeline = GenerationPipeline(client, encoder())
@@ -137,10 +177,25 @@ class GenerationPipelineTest {
         assertTrue(result.exceptionOrNull() is AppError.Network)
     }
 
+    @Test
+    fun unusableFinalPromptIsAFailureNotAFakeReadyResult() = runBlocking {
+        val client = RecordingChatClient(UnusableFinalPromptClient)
+        val pipeline = GenerationPipeline(client, encoder())
+        val stagesSeen = mutableListOf<GenerationStage>()
+        val result = pipeline.run(input()) { update -> stagesSeen += update.stage }
+        assertTrue(result.isFailure)
+        val err = result.exceptionOrNull() as AppError
+        assertTrue(err.detail.contains("VEO prompt") || err.userMessage.isNotBlank())
+        assertFalse(stagesSeen.contains(GenerationStage.DONE))
+    }
+
     private class RecordingChatClient(
         private val inner: ChatClient = DemoChatClient
     ) : ChatClient {
         val stages = mutableListOf<DemoChatClient.Stage>()
+        var finalPromptSystem: String = ""
+        var finalPromptUser: String = ""
+
         override suspend fun chat(
             apiKey: String,
             model: String,
@@ -154,8 +209,40 @@ class GenerationPipelineTest {
             maxAttempts: Int,
             reasoningEffort: String?
         ): Result<String> {
-            stages += DemoChatClient.detectStage("$systemPrompt\n$userText")
+            val stage = DemoChatClient.detectStage("$systemPrompt\n$userText")
+            stages += stage
+            if (stage == DemoChatClient.Stage.FINAL_PROMPT) {
+                finalPromptSystem = systemPrompt
+                finalPromptUser = userText
+            }
             return inner.chat(
+                apiKey, model, systemPrompt, userText, imageDataUrls,
+                timeoutSeconds, jsonMode, temperature, maxTokens, maxAttempts, reasoningEffort
+            )
+        }
+    }
+
+    private object UnusableFinalPromptClient : ChatClient {
+        override suspend fun chat(
+            apiKey: String,
+            model: String,
+            systemPrompt: String,
+            userText: String,
+            imageDataUrls: List<String>,
+            timeoutSeconds: Long,
+            jsonMode: Boolean,
+            temperature: Double,
+            maxTokens: Int,
+            maxAttempts: Int,
+            reasoningEffort: String?
+        ): Result<String> {
+            val stage = DemoChatClient.detectStage("$systemPrompt\n$userText")
+            if (stage == DemoChatClient.Stage.FINAL_PROMPT ||
+                stage == DemoChatClient.Stage.TARGETED_REPAIR
+            ) {
+                return Result.success("""{"error":"invalid_api_key","message":"Incorrect API key provided"}""")
+            }
+            return DemoChatClient.chat(
                 apiKey, model, systemPrompt, userText, imageDataUrls,
                 timeoutSeconds, jsonMode, temperature, maxTokens, maxAttempts, reasoningEffort
             )
