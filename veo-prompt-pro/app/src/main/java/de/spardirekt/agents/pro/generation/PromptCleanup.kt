@@ -62,6 +62,7 @@ object PromptCleanup {
         "CONFIDENCE",
         "FACT PRIORITY",
         "MARKETPLACE NOISE",
+        "MAIN PROMPT",
         "ОЗВУЧКА",
         "НАЗВАНИЕ",
         "ХЕШТЕГИ"
@@ -359,9 +360,14 @@ object PromptCleanup {
             issues += "safety_audit_leaked"
         }
         LEGACY_SECTIONS.forEach { legacy ->
-            if (Regex("""(?im)^${Regex.escape(legacy)}\s*:?\s*$""").containsMatchIn(prompt)) {
-                issues += "legacy_section_$legacy"
+            val leaked = prompt.lineSequence().any { line ->
+                val t = line.trim()
+                t.startsWith(legacy, ignoreCase = true) &&
+                    (t.length == legacy.length ||
+                        (!t[legacy.length].isLetterOrDigit() && t[legacy.length] != '_')) &&
+                    !isTimedShotLine(t)
             }
+            if (leaked) issues += "legacy_section_$legacy"
         }
         val after = prompt.substringAfterLast("HASHTAGS", "")
         val leftover = after.lineSequence().drop(1)
@@ -408,7 +414,7 @@ object PromptCleanup {
         )
         return boilerplate.fold(line.trim()) { text, sentence ->
             text.replace(Regex("""(?i)${Regex.escape(sentence)}\.?"""), "")
-        }.trim().trimStart(':', ';', '-', '—').trim()
+        }.trim().trimStart(':', ';').trim()
     }
 
     /** FEATURE / DEMO may use at most one hand — never two hands / both hands. */
@@ -483,74 +489,85 @@ object PromptCleanup {
         val match = regex.find(prompt) ?: return ""
         val start = match.range.last + 1
         val rest = prompt.substring(start)
-        val boundaryNames = (REQUIRED_SECTIONS + LEGACY_SECTIONS)
+        val next = REQUIRED_SECTIONS
             .filter { !it.equals(section, true) }
-        val next = boundaryNames
             .mapNotNull { name ->
-                val pattern = if (LEGACY_SECTIONS.any { it.equals(name, true) }) {
-                    // Standalone legacy header only
-                    Regex("""(?im)^${Regex.escape(name)}\s*:?\s*$""")
-                } else {
-                    Regex("""(?im)^${Regex.escape(name)}\b""")
-                }
-                pattern.find(rest)?.range?.first
+                Regex("""(?im)^${Regex.escape(name)}\b""").find(rest)?.range?.first
             }
             .minOrNull()
         val body = if (next != null) rest.substring(0, next) else rest
-        return stripLegacyInlineHeaders(body.trim())
+        return stripLegacyFromBody(body.trim())
     }
 
     /**
-     * Drop entire legacy doctrine blocks (header + body until next known header).
-     * Required 12-section structure is rebuilt afterward.
+     * Keep only the 12 required sections. Legacy CORE headings — including
+     * `HEADER: body on the same line` and HOOK/HANDS blocks inserted inside
+     * SHOT SEQUENCE — are dropped without cutting later timed shot lines.
      */
     fun stripLegacySections(prompt: String): String {
         if (prompt.isBlank()) return prompt
-        // Required headers may be followed by body on later lines.
-        // Legacy headers must be alone on the line (optional trailing ':') so we
-        // do not treat inline doctrine like "CORE PRINCIPLE: …" as a section cut.
-        val requiredAlt = REQUIRED_SECTIONS.joinToString("|") { Regex.escape(it) }
-        val legacyAlt = LEGACY_SECTIONS.joinToString("|") { Regex.escape(it) }
-        val headerRegex = Regex(
-            "(?im)^(?:(?:$requiredAlt)\\b\\s*:?\\s*|(?:$legacyAlt)\\s*:?\\s*$)"
-        )
-        val matches = headerRegex.findAll(prompt).toList()
-        if (matches.isEmpty()) return prompt
-
-        val allHeaders = (REQUIRED_SECTIONS + LEGACY_SECTIONS)
-            .distinctBy { it.uppercase() }
-            .sortedByDescending { it.length }
-
-        fun headerNameAt(index: Int): String {
-            val slice = prompt.substring(index, minOf(prompt.length, index + 80))
-            return allHeaders.first { h -> slice.startsWith(h, ignoreCase = true) }
-        }
-
-        val keep = StringBuilder()
-        for (i in matches.indices) {
-            val m = matches[i]
-            val name = headerNameAt(m.range.first)
-            val requiredName = REQUIRED_SECTIONS.firstOrNull { it.equals(name, true) }
-            if (requiredName == null) continue
-            val bodyStart = m.range.last + 1
-            val bodyEnd = matches.getOrNull(i + 1)?.range?.first ?: prompt.length
-            val body = stripLegacyInlineHeaders(prompt.substring(bodyStart, bodyEnd).trim())
-            if (keep.isNotEmpty()) keep.append("\n\n")
-            keep.append(requiredName)
-            if (body.isNotBlank()) {
-                keep.append('\n').append(body)
-            }
-        }
-        return if (keep.isEmpty()) prompt else keep.toString().trim() + "\n"
+        val rebuilt = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
+            val body = extractSection(prompt, name).trim()
+            if (body.isBlank()) name else "$name\n$body"
+        }.trim()
+        return if (rebuilt.isBlank()) prompt else rebuilt + "\n"
     }
 
-    private fun stripLegacyInlineHeaders(body: String): String {
+    private fun stripLegacyFromBody(body: String): String {
         if (body.isBlank()) return body
-        // Only cut at true standalone legacy section headers (line = header only).
-        val legacyAlt = LEGACY_SECTIONS.joinToString("|") { Regex.escape(it) }
-        val cut = Regex("(?im)^(?:$legacyAlt)\\s*:?\\s*$").find(body)?.range?.first
-        return if (cut != null) body.substring(0, cut).trimEnd() else body.trim()
+        val out = mutableListOf<String>()
+        var skipBlock = false
+        for (raw in body.lineSequence()) {
+            val line = raw.trim()
+            val header = legacyHeaderPrefix(line)
+            if (header != null) {
+                val idx = line.indexOf(header, ignoreCase = true)
+                val rest = if (idx >= 0) {
+                    line.substring(idx + header.length).trim().trimStart(':').trim()
+                } else {
+                    ""
+                }
+                skipBlock = rest.isBlank()
+                continue
+            }
+            if (skipBlock) {
+                if (line.isBlank()) {
+                    skipBlock = false
+                    continue
+                }
+                // Resume at the next required heading or a timed shot that
+                // belongs to SHOT SEQUENCE. Doctrine paragraphs and leftover
+                // CORE PRINCIPLE bullets stay dropped until then.
+                if (isTimedShotLine(line) || line.startsWith("#")) {
+                    skipBlock = false
+                } else {
+                    continue
+                }
+            }
+            val cleaned = removeLegacyFidelityDoctrine(line)
+                .replace(Regex("(?i)PRODUCT DESIGN\\s*=\\s*LOCKED\\.?"), "")
+                .trim()
+            val withoutBullet = cleaned.trimStart('-', '—', '•', '*').trim()
+            if (withoutBullet.isBlank()) continue
+            out += cleaned
+        }
+        return out.joinToString("\n")
     }
+
+    private fun legacyHeaderPrefix(line: String): String? {
+        val t = line.trim().trimStart('#').trim()
+        if (t.isEmpty() || isTimedShotLine(t)) return null
+        return LEGACY_SECTIONS
+            .sortedByDescending { it.length }
+            .firstOrNull { name ->
+                t.startsWith(name, ignoreCase = true) &&
+                    (t.length == name.length ||
+                        (!t[name.length].isLetterOrDigit() && t[name.length] != '_'))
+            }
+    }
+
+    private fun isTimedShotLine(line: String): Boolean =
+        Regex("""^\s*\d+\.\d+\s*[-–—]""").containsMatchIn(line)
 
     private fun replaceSection(prompt: String, section: String, body: String): String {
         val map = linkedMapOf<String, String>()
@@ -572,7 +589,9 @@ object PromptCleanup {
             map["FORMAT"] = "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
             issues += "format_injected"
         }
-        if (map["SHOT SEQUENCE"].isNullOrBlank() || !hasFourBlocks(map["SHOT SEQUENCE"].orEmpty())) {
+        if (map["SHOT SEQUENCE"].isNullOrBlank() ||
+            map["SHOT SEQUENCE"].orEmpty().lineSequence().none { isTimedShotLine(it) }
+        ) {
             map["SHOT SEQUENCE"] = CANONICAL_SHOT_SEQUENCE
             issues += "shot_sequence_injected"
         }
@@ -619,11 +638,6 @@ object PromptCleanup {
         return REQUIRED_SECTIONS.joinToString("\n\n") { name ->
             "$name\n${map[name].orEmpty().trim()}"
         }.trim() + "\n"
-    }
-
-    private fun hasFourBlocks(sequence: String): Boolean {
-        return listOf("0.0", "2.0", "4.0", "6.0", "8.0").all { sequence.contains(it) } &&
-            !Regex("(?i)(9 scenes|25[-–]35|long-form)").containsMatchIn(sequence)
     }
 
     private fun padHashtags(tags: List<String>, title: String): List<String> {

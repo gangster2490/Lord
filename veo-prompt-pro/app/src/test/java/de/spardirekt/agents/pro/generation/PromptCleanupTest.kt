@@ -389,6 +389,132 @@ secret
     }
 
     @Test
+    fun finalize_stripsInlineLegacyHeaders_andKeepsLaterShotLines() {
+        val marker =
+            "the wooden crossbar lid, hanging ring, ferrule, rivets, and photographed bowl profile remain fully visible"
+        val raw = """
+FORMAT
+Vertical 9:16. Exactly 8.0s.
+
+VISUAL FIDELITY: Use the uploaded product photos as strict visual references. PRODUCT DESIGN = LOCKED.
+
+REFERENCES
+Photos confirm the deep black pan.
+
+PRODUCT LOCK
+Preserve the deep black bowl and wooden crossbar lid.
+
+SETTING
+Kitchen.
+
+SHOT SEQUENCE
+0.0–2.0s — HOOK: macro along the dark wooden handle to the gold-tone ferrule without hiding hardware.
+HOOK
+The product must be visible from frame 0.
+Prefer: macro detail, tactile interaction.
+2.0–4.0s — IDENTITY: full deep black bowl, high curved sides, long handle, and wooden crossbar lid.
+4.0–6.0s — FEATURE / DEMO: one hand lifts the wooden crossbar lid; pan stays rigid.
+6.0–8.0s — HERO / CTA: $marker.
+
+ON-SCREEN TEXT
+None.
+
+VOICEOVER
+OFF
+
+AUDIO
+Quiet room tone.
+
+CRITICAL
+Keep identity.
+
+NEGATIVE PROMPT
+- no generic replacement product
+
+TITLE
+Deep Black Pan
+
+HASHTAGS
+#pan #kitchen #cookware #home #TikTokShop
+""".trimIndent()
+
+        val result = PromptCleanup.finalize(
+            rawPrompt = raw,
+            voiceover = "OFF",
+            title = "Deep Black Pan",
+            hashtags = listOf("#pan", "#kitchen", "#cookware", "#home", "#TikTokShop"),
+            voiceLanguage = "OFF",
+            marketplace = false
+        )
+
+        assertFalse(result.veoPrompt.contains("VISUAL FIDELITY"))
+        assertFalse(result.veoPrompt.contains("PRODUCT DESIGN = LOCKED"))
+        assertFalse(Regex("""(?im)^HOOK\b""").containsMatchIn(result.veoPrompt))
+        assertFalse(result.veoPrompt.contains("The product must be visible from frame 0."))
+        assertTrue(result.veoPrompt.contains("macro along the dark wooden handle"))
+        assertTrue(result.veoPrompt.contains("full deep black bowl"))
+        assertTrue(result.veoPrompt.contains(marker))
+        assertFalse(result.veoPrompt.contains("…"))
+        assertTrue(result.veoPrompt.contains("wooden crossbar lid"))
+    }
+
+    @Test
+    fun prepareStoredPrompt_doesNotReplaceDetailedShotsWithCanonicalStub() {
+        val longShot =
+            "0.0–2.0s — HOOK: begin on the hanging ring and travel along the dark wooden handle to the gold-tone ferrule and visible rivets while the pan remains physically rigid."
+        val raw = """
+FORMAT
+Vertical 9:16. Exactly 8.0s.
+
+REFERENCES
+Photos confirm the pan.
+
+PRODUCT LOCK
+deep black bowl, wooden handle
+
+SETTING
+Kitchen.
+
+SHOT SEQUENCE
+$longShot
+2.0–4.0s — IDENTITY: complete three-quarter view
+4.0–6.0s — FEATURE / DEMO: one hand lifts lid
+6.0–8.0s — HERO / CTA: stable full-product hold
+
+ON-SCREEN TEXT
+None.
+
+VOICEOVER
+OFF
+
+AUDIO
+Quiet room.
+
+CRITICAL
+Keep identity.
+
+NEGATIVE PROMPT
+- no redesign
+
+TITLE
+Deep Black Pan
+
+HASHTAGS
+#a #b #c #d #TikTokShop
+""".trimIndent()
+        val composed = PromptCleanup.prepareStoredPromptForDisplay(
+            rawPrompt = raw,
+            voiceover = "OFF",
+            title = "Deep Black Pan",
+            hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop"),
+            marketplace = false
+        )
+        assertTrue(composed.contains("travel along the dark wooden handle"))
+        assertTrue(composed.contains("gold-tone ferrule and visible rivets"))
+        assertFalse(composed.contains("product visible with strongest verified detail"))
+    }
+
+    @Test
     fun prepareStoredPrompt_locksExactTwelveSectionGeminiShapeWithoutTruncation() {
         val messy = """
 ```text

@@ -173,7 +173,7 @@ class GenerationPipeline(
                     timeoutSeconds = 240,
                     jsonMode = true,
                     temperature = 0.5,
-                    maxTokens = 4500
+                    maxTokens = 8000
                 ).getOrElse { return Result.failure(it as? AppError ?: AppError.Unknown(it.message.orEmpty())) }
             } else {
                 finalJson = buildJsonObject {
@@ -205,7 +205,7 @@ class GenerationPipeline(
                     userText = "Current JSON:\n${json.encodeToString(bundle)}\nProduct model:\n$productModelJson",
                     timeoutSeconds = 120,
                     jsonMode = true,
-                    maxTokens = 4000,
+                    maxTokens = 8000,
                     maxAttempts = 1
                 ).getOrNull()
                 if (repaired != null) {

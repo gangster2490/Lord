@@ -53,5 +53,7 @@ class AgentCorePromptTest {
         assertTrue(contract.contains("approximately 8–15"))
         assertTrue(contract.contains("There is no character target or prompt-length budget."))
         assertTrue(contract.contains("never emit an ellipsis caused by truncation"))
+        assertTrue(contract.contains("Never name it mainPrompt"))
+        assertTrue(contract.contains("Forbidden headings inside veoPrompt"))
     }
 }

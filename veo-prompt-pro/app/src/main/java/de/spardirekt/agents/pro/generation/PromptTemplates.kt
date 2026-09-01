@@ -103,6 +103,9 @@ TikTok Shop Mode: ${if (tiktokShop) "ON" else "OFF"}
 ${lockedVoiceoverBlock(voice, lockedVoiceover)}
 Do not resend or invent unseen mechanisms.
 Do NOT include TIKTOK SHOP SAFETY AUDIT inside veoPrompt.
+The JSON field MUST be named veoPrompt. Never name it mainPrompt.
+Never copy internal CORE headings into veoPrompt, even as "HEADER: body" on one line.
+Forbidden headings inside veoPrompt: VISUAL FIDELITY, PRODUCT FIDELITY, HOOK, HANDS, PEOPLE, QUALITY GATE, SAFETY AUDIT, PRODUCT MODEL, CREATIVE DIRECTOR, PRIMARY REFERENCE, MAIN REFERENCE, MAIN PROMPT.
 
 SECTION CONTENT RULES:
 FORMAT: state 9:16, photorealistic style, and exactly 8.0s
