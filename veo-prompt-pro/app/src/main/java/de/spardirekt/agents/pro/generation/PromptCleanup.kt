@@ -83,10 +83,6 @@ object PromptCleanup {
         "no CGI/cartoon look"
     )
 
-    /** Soft ceiling for the copied Gemini/VEO body (chars). */
-    const val MAX_COPIED_PROMPT_CHARS = 1100
-
-
     data class CleanupResult(
         val veoPrompt: String,
         val voiceover: String,
@@ -113,10 +109,7 @@ object PromptCleanup {
             .trim()
         prompt = stripLegacySections(prompt)
 
-        prompt = dedupeParagraphs(prompt)
         prompt = normalizePunctuation(prompt)
-        prompt = removeDuplicateVisualFidelity(prompt)
-        prompt = removeDuplicateMarketplaceRules(prompt)
         prompt = ensureSectionOrder(prompt, marketplace, issues)
 
         var vo = cleanupVoiceover(
@@ -148,6 +141,8 @@ object PromptCleanup {
         tags = ensureFiveHashtags(tags, cleanTitle, tiktokShopMode)
         if (tags.size != 5) issues += "hashtags_normalized_to_5"
         prompt = replaceSection(prompt, "HASHTAGS", tags.joinToString(" "))
+        prompt = cleanGeneratedSections(prompt)
+        prompt = applyPanFidelity(prompt, productEvidence)
 
         if (!prompt.contains("0.0") || !prompt.contains("8.0")) {
             issues += "timeline_markers_weak"
@@ -159,24 +154,25 @@ object PromptCleanup {
             }
         }
 
-        // Copy-ready Gemini/VEO prompt: concise section bodies, same section order.
-        prompt = simplifyCopiedPrompt(prompt, marketplace, productEvidence)
         prompt = stripAfterHashtags(prompt).trim() + "\n"
         return CleanupResult(prompt, vo, cleanTitle, tags, issues)
     }
 
     /**
-     * Rebuild the Gemini/VEO copy body from a stored (possibly dirty) prompt.
-     * Syncs VOICEOVER / TITLE / HASHTAGS from the Result cards.
-     * Local only — does not call the model or change pipeline stages.
+     * Prepares a stored prompt for display without shortening model output.
+     *
+     * This only removes non-display legacy sections, repairs the required
+     * structure, and syncs VOICEOVER / TITLE / HASHTAGS from their cards.
+     * Generated section bodies are otherwise preserved verbatim.
      */
-    fun composeCopiedPrompt(
+    fun prepareStoredPromptForDisplay(
         rawPrompt: String,
         voiceover: String,
         title: String,
         hashtags: List<String>,
         marketplace: Boolean,
-        tiktokShopMode: Boolean = true
+        tiktokShopMode: Boolean = true,
+        productEvidence: String = ""
     ): String {
         var prompt = rawPrompt.trim()
         if (prompt.isBlank()) return ""
@@ -189,10 +185,7 @@ object PromptCleanup {
         prompt = stripAfterHashtags(prompt)
         prompt = prompt.replace(Regex("(?is)\\n*TIKTOK SHOP SAFETY AUDIT[\\s\\S]*$"), "").trim()
         prompt = stripLegacySections(prompt)
-        prompt = dedupeParagraphs(prompt)
         prompt = normalizePunctuation(prompt)
-        prompt = removeDuplicateVisualFidelity(prompt)
-        prompt = removeDuplicateMarketplaceRules(prompt)
 
         val issues = mutableListOf<String>()
         prompt = ensureSectionOrder(prompt, marketplace, issues)
@@ -208,8 +201,8 @@ object PromptCleanup {
         var tags = normalizeHashtags(hashtags.ifEmpty { extractHashtags(prompt) })
         tags = ensureFiveHashtags(tags, cleanTitle, tiktokShopMode)
         prompt = replaceSection(prompt, "HASHTAGS", tags.joinToString(" "))
-
-        prompt = simplifyCopiedPrompt(prompt, marketplace)
+        prompt = cleanGeneratedSections(prompt)
+        prompt = applyPanFidelity(prompt, productEvidence)
         return stripAfterHashtags(prompt).trim() + "\n"
     }
 
@@ -222,206 +215,88 @@ object PromptCleanup {
             )
     }
 
-    /**
-     * Deterministic local pass that shortens only the prompt the owner copies into Gemini/VEO.
-     * Does not change photo analysis or other pipeline stages.
-     */
-    fun simplifyCopiedPrompt(
-        prompt: String,
-        marketplace: Boolean,
-        fidelityEvidence: String = ""
-    ): String {
-        val panCase = PanFidelity.matches(prompt, fidelityEvidence)
-        val map = linkedMapOf<String, String>()
-        REQUIRED_SECTIONS.forEach { name ->
-            map[name] = extractSection(prompt, name)
-        }
-        map["FORMAT"] = "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
-        map["REFERENCES"] = simplifyReferences(map["REFERENCES"].orEmpty(), marketplace)
-        map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 6)
-        map["SETTING"] = simplifySetting(map["SETTING"].orEmpty())
-        map["SHOT SEQUENCE"] = simplifyShotSequence(map["SHOT SEQUENCE"].orEmpty())
-        map["ON-SCREEN TEXT"] = simplifyOnScreenText(map["ON-SCREEN TEXT"].orEmpty())
-        map["VOICEOVER"] = map["VOICEOVER"].orEmpty().lineSequence()
-            .firstOrNull { it.isNotBlank() }?.trim().orEmpty()
-            .ifBlank { "OFF" }
-        map["AUDIO"] = clipWords(firstSentences(map["AUDIO"].orEmpty(), 1), 8)
-            .ifBlank { "Subtle music. Clear voice." }
-        map["CRITICAL"] = simplifyCritical(marketplace)
-        map["NEGATIVE PROMPT"] = simplifyNegative(map["NEGATIVE PROMPT"].orEmpty(), maxBullets = 6)
-        map["TITLE"] = map["TITLE"].orEmpty().lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
-            .ifBlank { "Product Ad" }
-            .let { clipChars(it, 48) }
-        map["HASHTAGS"] = map["HASHTAGS"].orEmpty().trim()
+    private fun cleanGeneratedSections(prompt: String): String {
+        var cleaned = prompt
 
-        // The deep-black wooden-lid pan is a known regression fixture. The
-        // model-level reminder alone was not enough: generic compression could
-        // discard the ferrule, rivets, hanging ring, or lid after generation.
-        // Reapply this one product signature deterministically. No other
-        // product or generic pan is affected.
-        if (panCase) {
-            map["PRODUCT LOCK"] = PanFidelity.PRODUCT_LOCK
-            map["CRITICAL"] = PanFidelity.CRITICAL
-            map["NEGATIVE PROMPT"] =
-                PanFidelity.NEGATIVE_BULLETS.joinToString("\n") { "- $it" }
-        }
-
-        var out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
-            "$name\n${map[name].orEmpty().trim()}"
-        }.trim() + "\n"
-
-        // Hard budget: compress further if still long.
-        if (out.length > MAX_COPIED_PROMPT_CHARS) {
-            if (!panCase) {
-                map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 5)
-                map["NEGATIVE PROMPT"] = simplifyNegative(map["NEGATIVE PROMPT"].orEmpty(), maxBullets = 5)
-            } else {
-                // Preserve every confirmed pan part; save characters in
-                // non-identity sections instead.
-                map["SETTING"] = "Uncluttered studio."
-                map["ON-SCREEN TEXT"] = "None."
-                map["AUDIO"] = "Subtle music."
-            }
-            map["REFERENCES"] = clipChars(map["REFERENCES"].orEmpty(), 110)
-            map["SETTING"] = simplifySetting(map["SETTING"].orEmpty())
-            out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
-                "$name\n${map[name].orEmpty().trim()}"
-            }.trim() + "\n"
-        }
-        return finalCleanupCopiedPrompt(out, marketplace)
-    }
-
-    /**
-     * Last local pass for the Gemini/VEO copy body.
-     * Locks exact 12-section shape, spacing, and residue stripping.
-     * Does not call the model.
-     */
-    fun finalCleanupCopiedPrompt(prompt: String, marketplace: Boolean = false): String {
-        if (prompt.isBlank()) return ""
-        var text = prompt.trim()
-        text = text.replace(Regex("```(?:json)?|```"), "")
-        text = stripAfterHashtags(text)
-        text = stripLegacySections(text)
-        text = text.replace(Regex("(?is)\\n*TIKTOK SHOP SAFETY AUDIT[\\s\\S]*$"), "").trim()
-        text = text.replace(Regex("(?im)^(Озвучка|Название|Хештеги)\\b.*$"), "")
-        text = text.replace(Regex("""(?im)^Timeline ends at.*$"""), "")
-        text = text.replace(Regex("""(?im)^Four blocks only\..*$"""), "")
-        text = text.replace(Regex("""(?im)^No continuation after.*$"""), "")
-
-        val map = linkedMapOf<String, String>()
-        REQUIRED_SECTIONS.forEach { name ->
-            map[name] = polishSectionBody(name, extractSection(text, name), marketplace)
-        }
-
-        // Guarantee required non-blank defaults for every structural section.
-        if (map["FORMAT"].isNullOrBlank()) {
-            map["FORMAT"] = "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
-        }
-        if (map["REFERENCES"].isNullOrBlank()) {
-            map["REFERENCES"] = "Uploaded product photos are the visual evidence."
-        }
-        if (map["SHOT SEQUENCE"].isNullOrBlank() || !hasFourBlocks(map["SHOT SEQUENCE"].orEmpty())) {
-            map["SHOT SEQUENCE"] = CANONICAL_SHOT_SEQUENCE
-        }
-        if (map["PRODUCT LOCK"].isNullOrBlank()) {
-            map["PRODUCT LOCK"] = SHORT_PRODUCT_LOCK
-        }
-        if (map["SETTING"].isNullOrBlank()) {
-            map["SETTING"] = "Uncluttered premium studio."
-        }
-        if (map["ON-SCREEN TEXT"].isNullOrBlank()) map["ON-SCREEN TEXT"] = "None."
-        if (map["VOICEOVER"].isNullOrBlank()) map["VOICEOVER"] = "OFF"
-        if (map["AUDIO"].isNullOrBlank()) map["AUDIO"] = "Subtle music. Clear voice."
-        if (map["CRITICAL"].isNullOrBlank()) {
-            map["CRITICAL"] = "Keep product identity. Exactly 8.0s. Four blocks only."
-        }
-        if (map["NEGATIVE PROMPT"].isNullOrBlank()) {
-            map["NEGATIVE PROMPT"] = SHORT_NEGATIVE.joinToString("\n") { "- $it" }
-        }
-        if (map["TITLE"].isNullOrBlank()) map["TITLE"] = "Product Ad"
-        if (map["HASHTAGS"].isNullOrBlank()) {
-            map["HASHTAGS"] = "#TikTokShop #ProductAd #MustSee #HomeFinds #ShopNow"
-        }
-        if (marketplace) {
-            val refs = map["REFERENCES"].orEmpty()
-            if (!refs.contains("marketplace", ignoreCase = true)) {
-                map["REFERENCES"] = listOf(refs, SHORT_MARKETPLACE)
-                    .filter { it.isNotBlank() }
-                    .joinToString(" ")
-                    .trim()
-            }
-        }
-
-        // Pad hashtag count to exactly 5 when present but short.
-        val tags = Regex("#[\\p{L}\\p{N}_]+")
-            .findAll(map["HASHTAGS"].orEmpty())
-            .map { it.value }
-            .distinct()
+        val productLockLines = extractSection(cleaned, "PRODUCT LOCK")
+            .lineSequence()
+            .map(::removeLegacyFidelityDoctrine)
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase() }
             .toList()
-        if (tags.size != 5) {
-            map["HASHTAGS"] = ensureFiveHashtags(tags, map["TITLE"].orEmpty(), tiktokShopMode = true)
-                .joinToString(" ")
-        }
-
-        return REQUIRED_SECTIONS.joinToString("\n\n") { name ->
-            "$name\n${map[name].orEmpty().trim()}"
-        }.trim() + "\n"
-    }
-
-    private fun polishSectionBody(name: String, raw: String, marketplace: Boolean): String {
-        var body = raw.trim()
-            .replace(Regex("\r\n?"), "\n")
-            .replace(Regex("[ \t]+"), " ")
-            .replace(Regex(" *\n *"), "\n")
-            .replace(Regex("\n{2,}"), "\n")
-            .trim()
-        body = stripLegacyInlineHeaders(body)
-        body = body.replace(Regex("(?is)PRODUCT DESIGN\\s*=\\s*LOCKED\\.?"), "")
-            .replace(Regex("(?is)CORE PRINCIPLE\\s*:.*"), "")
-            .trim()
-
-        return when (name) {
-            "FORMAT" -> "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
-            "SHOT SEQUENCE" -> normalizeShotSequence(body)
-            "NEGATIVE PROMPT" -> body.lineSequence()
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-                .map { line ->
-                    val t = line.removePrefix("-").trim()
-                    "- $t"
-                }
-                .distinctBy { it.lowercase() }
-                .take(6)
-                .joinToString("\n")
-            "HASHTAGS" -> Regex("#[\\p{L}\\p{N}_]+")
-                .findAll(body)
-                .map { it.value }
-                .distinct()
-                .take(5)
-                .joinToString(" ")
-            "TITLE", "VOICEOVER", "SETTING", "AUDIO", "CRITICAL" ->
-                body.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.joinToString(" ").trim()
-            "ON-SCREEN TEXT" -> simplifyOnScreenText(body)
-            "PRODUCT LOCK" -> body.lineSequence()
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-                .filterNot { isGenericFidelityBoilerplate(it) }
-                .joinToString("\n")
-            "REFERENCES" -> {
-                val one = body.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.joinToString(" ")
-                if (marketplace && !one.contains("marketplace", ignoreCase = true)) {
-                    "$one $SHORT_MARKETPLACE".trim()
-                } else one
+        val productLock = buildList {
+            if (productLockLines.none { it.contains("uploaded product photos", ignoreCase = true) }) {
+                add(SHORT_PRODUCT_LOCK)
             }
-            else -> body
-        }.trim()
+            addAll(productLockLines)
+        }.joinToString("\n")
+        cleaned = replaceSection(cleaned, "PRODUCT LOCK", productLock)
+
+        val overlays = cleanOnScreenText(extractSection(cleaned, "ON-SCREEN TEXT"))
+        cleaned = replaceSection(cleaned, "ON-SCREEN TEXT", overlays)
+
+        val shotSequence = extractSection(cleaned, "SHOT SEQUENCE")
+            .lineSequence()
+            .joinToString("\n") { line ->
+                if (line.contains("FEATURE", ignoreCase = true) || line.contains("4.0")) {
+                    enforceOneHandInFeatureDemo(line)
+                } else {
+                    line
+                }
+            }
+            .trim()
+        return replaceSection(cleaned, "SHOT SEQUENCE", shotSequence)
     }
+
+    /**
+     * Adds the exact known pan signature without replacing or shortening any
+     * product-specific content generated from the uploaded images.
+     */
+    private fun applyPanFidelity(prompt: String, productEvidence: String): String {
+        if (!PanFidelity.matches(prompt, productEvidence)) return prompt
+
+        var locked = prompt
+        locked = replaceSection(
+            locked,
+            "PRODUCT LOCK",
+            mergeDistinctLines(
+                required = PanFidelity.PRODUCT_LOCK,
+                generated = extractSection(locked, "PRODUCT LOCK")
+            )
+        )
+        locked = replaceSection(
+            locked,
+            "CRITICAL",
+            mergeDistinctLines(
+                required = PanFidelity.CRITICAL,
+                generated = extractSection(locked, "CRITICAL")
+            )
+        )
+
+        val requiredNegatives = PanFidelity.NEGATIVE_BULLETS.joinToString("\n") { "- $it" }
+        locked = replaceSection(
+            locked,
+            "NEGATIVE PROMPT",
+            mergeDistinctLines(
+                required = requiredNegatives,
+                generated = extractSection(locked, "NEGATIVE PROMPT")
+            )
+        )
+        return locked
+    }
+
+    private fun mergeDistinctLines(required: String, generated: String): String =
+        (required.lineSequence() + generated.lineSequence())
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.removePrefix("-").trim().lowercase() }
+            .joinToString("\n")
 
     /**
      * ON-SCREEN TEXT must only contain actual overlay copy that may appear in the video.
-     * Never keep production instructions, prompt labels, or meta rules here.
+     * Production instructions are removed, but generated overlay copy is never clipped.
      */
-    fun simplifyOnScreenText(raw: String): String {
+    fun cleanOnScreenText(raw: String): String {
         val cleaned = raw.lineSequence()
             .map { it.trim().trimStart('-', '•', '*').trim() }
             .filter { it.isNotBlank() }
@@ -434,11 +309,9 @@ object PromptCleanup {
             .filter { it.isNotBlank() }
             .filterNot { isOnScreenInstruction(it) }
             .distinct()
-            .take(3)
             .toList()
         if (cleaned.isEmpty()) return "None."
-        val joined = cleaned.joinToString(" · ")
-        return clipChars(joined, 80)
+        return cleaned.joinToString(" · ")
     }
 
     private fun isOnScreenInstruction(line: String): Boolean {
@@ -470,33 +343,6 @@ object PromptCleanup {
             l.contains("on-screen text section") ||
             l.contains("overlay rule") ||
             REQUIRED_SECTIONS.any { sec -> l.equals(sec, ignoreCase = true) }
-    }
-
-    private fun normalizeShotSequence(raw: String): String {
-        val lines = if (hasFourBlocks(raw)) {
-            Regex("""(?m)^\s*0\.0[^\n]*|^\s*2\.0[^\n]*|^\s*4\.0[^\n]*|^\s*6\.0[^\n]*""")
-                .findAll(raw)
-                .map { normalizeShotLine(enforceOneHandInFeatureDemo(it.value.trim())) }
-                .distinct()
-                .take(4)
-                .toList()
-        } else {
-            emptyList()
-        }
-        return if (lines.size == 4) lines.joinToString("\n") else CANONICAL_SHOT_SEQUENCE
-    }
-
-    private fun normalizeShotLine(line: String): String {
-        return clipShotLine(
-            line
-                .replace(Regex("""\b0\.0\s*[-–—]\s*2\.0"""), "0.0–2.0")
-                .replace(Regex("""\b2\.0\s*[-–—]\s*4\.0"""), "2.0–4.0")
-                .replace(Regex("""\b4\.0\s*[-–—]\s*6\.0"""), "4.0–6.0")
-                .replace(Regex("""\b6\.0\s*[-–—]\s*8\.0"""), "6.0–8.0")
-                .replace(Regex("""\s+—\s+"""), " — ")
-                .replace(Regex("""\s{2,}"""), " ")
-                .trim()
-        )
     }
 
     fun validateCompleteness(prompt: String, hashtags: List<String>): List<String> {
@@ -549,99 +395,20 @@ object PromptCleanup {
         }
     }
 
-    private fun simplifyFormat(raw: String): String {
-        return "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
-    }
-
-    private fun simplifySetting(raw: String): String {
-        val first = firstSentences(stripLongDoctrine(raw), 1)
-        val known = Regex(
-            """(?i)\b((?:uncluttered\s+)?(?:premium\s+)?(?:studio|kitchen|workshop|desk|garage|camping|lake|outdoor|countertop)(?:\s+environment)?)\b"""
-        ).find(first)?.groupValues?.getOrNull(1)?.trim()
-        val body = when {
-            !known.isNullOrBlank() -> known.replace(Regex("(?i)\\benvironment\\b"), "").trim()
-            else -> clipWords(first, 4)
-        }.ifBlank { "Uncluttered premium studio" }
-        return body.trimEnd('.', ',') + "."
-    }
-
-    private fun simplifyReferences(raw: String, marketplace: Boolean): String {
-        var text = stripLongDoctrine(raw)
-        text = clipWords(firstSentences(text, 1), 16)
-        if (text.isBlank()) {
-            text = "Uploaded product photos are the visual evidence."
-        }
-        if (marketplace && !text.contains("marketplace", ignoreCase = true)) {
-            text = "$text $SHORT_MARKETPLACE".trim()
-        }
-        return clipChars(text, 140)
-    }
-
-    private fun simplifyProductLock(raw: String): String = compressProductLock(raw, maxDetails = 8)
-
-    private fun compressProductLock(raw: String, maxDetails: Int): String {
-        val withoutEssay = stripLongDoctrine(raw)
-        val tokens = mutableListOf<String>()
-        withoutEssay
-            .lineSequence()
-            .map { it.trim().trimStart('-', '•', '*').trim() }
-            .filter { it.isNotBlank() }
-            .filterNot { line -> isGenericFidelityBoilerplate(line) }
-            .filterNot { line ->
-                line.contains("Match uploaded product photos exactly", ignoreCase = true) ||
-                    line.contains("Match the uploaded product photos exactly", ignoreCase = true)
-            }
-            .forEach { line ->
-                line.split(Regex("[,;]|(?:\\s+and\\s+)"))
-                    .map { it.trim().trimEnd('.') }
-                    .map {
-                        it.removePrefix("Preserve ").removePrefix("preserve ")
-                            .removePrefix("Keep ").removePrefix("keep ")
-                            .trim()
-                    }
-                    .filter { it.length in 3..70 }
-                    .filterNot { isGenericFidelityBoilerplate(it) }
-                    .forEach { tokens += it }
-            }
-        val details = tokens.distinctBy { it.lowercase() }.take(maxDetails)
-        return buildString {
-            append(SHORT_PRODUCT_LOCK)
-            if (details.isNotEmpty()) {
-                append("\n")
-                append(details.joinToString(", "))
-            }
-        }.trim()
-    }
-
-    private fun isGenericFidelityBoilerplate(line: String): Boolean {
-        val l = line.lowercase()
-        return l.contains("core principle") ||
-            l.contains("creative presentation") ||
-            l.contains("product design = locked") ||
-            l.contains("strict visual references") ||
-            l.contains("do not reinterpret") ||
-            l.contains("do not replace the photographed") ||
-            l.contains("do not redesign, modernize") ||
-            l.contains("if creative instructions conflict") ||
-            l.contains("generated product must remain") ||
-            l.contains("preserve the exact overall silhouette") ||
-            l.contains("proportions, construction, colors, materials, controls, handles, hinges") ||
-            l.contains("same silhouette, proportions, colors, materials")
-    }
-
-    private fun simplifyShotSequence(raw: String): String {
-        if (hasFourBlocks(raw)) {
-            val blocks = Regex("""(?m)^\s*0\.0[^\n]*|^\s*2\.0[^\n]*|^\s*4\.0[^\n]*|^\s*6\.0[^\n]*""")
-                .findAll(raw)
-                .map { clipShotLine(enforceOneHandInFeatureDemo(it.value.trim())) }
-                .distinct()
-                .take(4)
-                .toList()
-            if (blocks.size == 4) {
-                return blocks.joinToString("\n")
-            }
-        }
-        return CANONICAL_SHOT_SEQUENCE
+    private fun removeLegacyFidelityDoctrine(line: String): String {
+        val boilerplate = listOf(
+            "Use the uploaded product photos as strict visual references for the physical product",
+            "The generated product must remain the same physical product shown in the uploaded photos",
+            "Preserve the exact overall silhouette, proportions, construction, colors, materials, controls, handles, hinges, accessories, markings and distinctive visual details",
+            "Do not reinterpret the product based on category knowledge",
+            "Do not replace the photographed product with a generic or similar product",
+            "Do not redesign, modernize, simplify or stylize the product",
+            "If creative instructions conflict with accurate product identity, preserve the photographed product and simplify the creative action instead",
+            "CORE PRINCIPLE: CREATIVE PRESENTATION = FLEXIBLE; PRODUCT DESIGN = LOCKED"
+        )
+        return boilerplate.fold(line.trim()) { text, sentence ->
+            text.replace(Regex("""(?i)${Regex.escape(sentence)}\.?"""), "")
+        }.trim().trimStart(':', ';', '-', '—').trim()
     }
 
     /** FEATURE / DEMO may use at most one hand — never two hands / both hands. */
@@ -665,90 +432,6 @@ object PromptCleanup {
         return out.replace(Regex("""\s{2,}"""), " ").trim()
     }
 
-    private fun clipShotLine(line: String): String {
-        // Drop filler that bloats timed lines without adding identity.
-        var cleaned = line
-            .replace(Regex("""(?i)\bimmediately\b"""), "")
-            .replace(Regex("""(?i),\s*physically plausible"""), "")
-            .replace(Regex("""(?i)\bphysically plausible\b"""), "")
-            .replace(Regex("""(?i)\bdesirable\b"""), "")
-            .replace(Regex("""(?i)\bclear full/product-true framing\b"""), "full product framing")
-            .replace(Regex("""(?i)\bwith strongest verified detail\b"""), "strongest detail")
-            .replace(Regex("""\s{2,}"""), " ")
-            .trim()
-        val max = 68
-        if (cleaned.length <= max) return cleaned
-        val cut = cleaned.substring(0, max)
-        val at = cut.lastIndexOf(' ').takeIf { it > 32 } ?: max
-        return cut.substring(0, at).trimEnd(',', ';', ':', '—', '-') + "…"
-    }
-
-    private fun simplifyCritical(marketplace: Boolean): String {
-        return if (marketplace) {
-            "Keep product identity. Exactly 8.0s. Four blocks. No listing UI."
-        } else {
-            "Keep product identity. Exactly 8.0s. Four blocks only."
-        }
-    }
-
-    private fun simplifyNegative(raw: String, maxBullets: Int = 6): String {
-        val bullets = raw.lineSequence()
-            .map { it.trim().removePrefix("-").trim() }
-            .filter { it.isNotBlank() }
-            .filterNot {
-                it.contains("malformed hands", ignoreCase = true) ||
-                    it.contains("impossible mechanics", ignoreCase = true)
-            }
-            .map { clipChars(it, 72) }
-            .distinctBy { it.lowercase() }
-            .take(maxBullets)
-            .toList()
-        val chosen = if (bullets.size >= 4) bullets else SHORT_NEGATIVE
-        return chosen.take(maxBullets).joinToString("\n") { "- $it" }
-    }
-
-    private fun clipChars(text: String, max: Int): String {
-        val t = text.trim()
-        if (t.length <= max) return t
-        val cut = t.substring(0, max)
-        val at = cut.lastIndexOf(' ').takeIf { it > max / 2 } ?: max
-        return cut.substring(0, at).trimEnd(',', ';', '.') + "…"
-    }
-
-    private fun clipWords(text: String, maxWords: Int): String {
-        val words = text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-        if (words.size <= maxWords) return text.trim()
-        return words.take(maxWords).joinToString(" ").trimEnd(',', ';', '.') + "."
-    }
-
-    private fun stripLongDoctrine(text: String): String {
-        var out = text
-        out = out.replace(
-            Regex("(?is)Use the uploaded product photos as strict visual references[\\s\\S]{0,800}?PRODUCT DESIGN = LOCKED\\.?"),
-            ""
-        )
-        out = out.replace(
-            Regex("(?is)The generated product must remain the same physical product shown in the uploaded photos\\.?"),
-            ""
-        )
-        out = out.replace(
-            Regex("(?is)Preserve the exact overall silhouette, proportions, construction, colors, materials, controls, handles, hinges, accessories, markings and distinctive visual details\\.?"),
-            ""
-        )
-        out = out.replace(
-            Regex("(?is)The uploaded marketplace screenshots are reference material only\\.[\\s\\S]{0,500}?Recreate only the physical product\\.?"),
-            ""
-        )
-        return out.replace(Regex("\n{3,}"), "\n\n").trim()
-    }
-
-    private fun firstSentences(text: String, max: Int): String {
-        val cleaned = text.replace(Regex("\\s+"), " ").trim()
-        if (cleaned.isBlank()) return ""
-        val parts = cleaned.split(Regex("(?<=[.!?])\\s+")).filter { it.isNotBlank() }
-        return parts.take(max).joinToString(" ").trim()
-    }
-
     private fun stripAfterHashtags(prompt: String): String {
         val idx = Regex("(?im)^HASHTAGS\\b").find(prompt)?.range?.first ?: return prompt
         val head = prompt.substring(0, idx)
@@ -769,42 +452,6 @@ object PromptCleanup {
             }
         }
         return (head + keep.joinToString("\n")).trimEnd()
-    }
-
-    private fun dedupeParagraphs(text: String): String {
-        val parts = text.split(Regex("\n{2,}"))
-        val seen = linkedSetOf<String>()
-        val out = mutableListOf<String>()
-        parts.forEach { p ->
-            val norm = p.trim().replace(Regex("\\s+"), " ").lowercase()
-            if (norm.isBlank()) return@forEach
-            if (seen.add(norm)) out += p.trim()
-        }
-        return out.joinToString("\n\n")
-    }
-
-    private fun removeDuplicateVisualFidelity(text: String): String {
-        val pattern = Regex(
-            "(?is)(Use the uploaded product photos as strict visual references[\\s\\S]{0,500}?PRODUCT DESIGN = LOCKED\\.?)"
-        )
-        val matches = pattern.findAll(text).toList()
-        if (matches.size <= 1) return text
-        var result = text
-        matches.drop(1).forEach { m ->
-            result = result.replace(m.value, "")
-        }
-        return result.replace(Regex("\n{3,}"), "\n\n")
-    }
-
-    private fun removeDuplicateMarketplaceRules(text: String): String {
-        val pattern = Regex(
-            "(?is)(The uploaded marketplace screenshots are reference material only\\.[\\s\\S]{0,400}?Recreate only the physical product\\.?)"
-        )
-        val matches = pattern.findAll(text).toList()
-        if (matches.size <= 1) return text
-        var result = text
-        matches.drop(1).forEach { m -> result = result.replace(m.value, "") }
-        return result.replace(Regex("\n{3,}"), "\n\n")
     }
 
     private fun normalizePunctuation(text: String): String {

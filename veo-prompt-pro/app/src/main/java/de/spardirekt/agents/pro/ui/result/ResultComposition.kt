@@ -16,27 +16,20 @@ object ResultComposition {
         "TITLE", "HASHTAGS"
     )
 
-    /**
-     * Clean main VEO prompt for the prompt card and “Копировать VEO Prompt”.
-     * Always runs the current local cleanup (legacy strip + final shape lock).
-     */
+    /** Complete VEO prompt for the prompt card and “Копировать VEO Prompt”. */
     fun veoPrompt(entity: ProjectEntity, storedTags: List<String> = emptyList()): String {
         val raw = entity.veoPrompt.trim()
         if (raw.isBlank()) return ""
         val tags = hashtags(entity, storedTags)
         val name = title(entity).let { if (it == "—") "" else it }
-        val composed = PromptCleanup.composeCopiedPrompt(
+        return PromptCleanup.prepareStoredPromptForDisplay(
             rawPrompt = raw,
             voiceover = voiceover(entity),
             title = name,
             hashtags = tags,
             marketplace = marketplaceDetected(entity),
-            tiktokShopMode = entity.tiktokShopMode
-        )
-        // Belt-and-suspenders: lock exact 12-section shape even if compose path changes.
-        return PromptCleanup.finalCleanupCopiedPrompt(
-            composed,
-            marketplace = marketplaceDetected(entity)
+            tiktokShopMode = entity.tiktokShopMode,
+            productEvidence = entity.productModelJson
         )
     }
 

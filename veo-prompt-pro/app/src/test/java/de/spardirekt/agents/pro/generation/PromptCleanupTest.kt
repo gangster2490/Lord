@@ -81,11 +81,6 @@ Something secret
         assertTrue(result.veoPrompt.contains("marketplace", ignoreCase = true))
         assertFalse(result.veoPrompt.contains("PRODUCT DESIGN = LOCKED"))
         assertFalse(result.veoPrompt.contains("CORE PRINCIPLE"))
-        // Copied prompt stays concise — no long fidelity essay
-        assertTrue(
-            "too long: ${result.veoPrompt.length}",
-            result.veoPrompt.length <= PromptCleanup.MAX_COPIED_PROMPT_CHARS
-        )
     }
 
     @Test
@@ -155,7 +150,7 @@ HASHTAGS
     }
 
     @Test
-    fun simplifyCopiedPrompt_stripsFidelityEssay_keepsProductDetails() {
+    fun finalize_stripsLegacyDoctrine_butPreservesCompleteGeneratedDetails() {
         val verbose = """
 FORMAT
 Vertical 9:16.
@@ -232,28 +227,22 @@ HASHTAGS
         assertFalse(result.veoPrompt.contains("PRODUCT DESIGN = LOCKED"))
         assertFalse(result.veoPrompt.contains("Do not reinterpret the product based on category knowledge"))
         assertFalse(result.veoPrompt.contains("Preserve the exact overall silhouette"))
-        assertTrue(result.veoPrompt.contains("black tubular") || result.veoPrompt.contains("perforated upper backrest"))
+        assertTrue(result.veoPrompt.contains("black tubular X-braced frame"))
+        assertTrue(result.veoPrompt.contains("perforated upper backrest"))
+        assertTrue(result.veoPrompt.contains("red circular right-front tray"))
+        assertTrue(result.veoPrompt.contains("silver clamps"))
+        assertTrue(result.veoPrompt.contains("disc feet"))
         assertTrue(result.veoPrompt.contains("0.0–2.0s"))
-        assertFalse(result.veoPrompt.contains("Timeline ends at 8.0s. Four blocks only. No extra scenes."))
+        assertTrue(result.veoPrompt.contains("Timeline ends at 8.0s. Four blocks only. No extra scenes."))
         val negLines = PromptCleanup.extractSection(result.veoPrompt, "NEGATIVE PROMPT")
             .lineSequence().count { it.trim().startsWith("-") }
-        assertTrue("neg bullets=$negLines", negLines in 4..6)
-        assertTrue(
-            "still too long: ${result.veoPrompt.length}",
-            result.veoPrompt.length <= PromptCleanup.MAX_COPIED_PROMPT_CHARS
-        )
-        assertTrue(
-            "should be much shorter than verbose input (${verbose.length})",
-            result.veoPrompt.length < verbose.length / 2 || result.veoPrompt.length < 1200
-        )
-        println("SIMPLIFIED_PROMPT_LENGTH=${result.veoPrompt.length}")
-        println("----- SIMPLIFIED PROMPT -----")
-        println(result.veoPrompt)
-        println("----- END -----")
+        assertEquals(14, negLines)
+        assertTrue(result.veoPrompt.contains("- no CGI/cartoon look"))
+        assertFalse(result.veoPrompt.contains("…"))
     }
 
     @Test
-    fun composeCopiedPrompt_syncsCardFields_andStripsEssay() {
+    fun prepareStoredPrompt_syncsCardFields_andStripsEssayWithoutCompression() {
         val raw = """
 FORMAT
 Vertical 9:16. Exactly 8.0 seconds.
@@ -295,7 +284,7 @@ Old
 HASHTAGS
 #x
 """.trimIndent()
-        val composed = PromptCleanup.composeCopiedPrompt(
+        val composed = PromptCleanup.prepareStoredPromptForDisplay(
             rawPrompt = raw,
             voiceover = "Загляни в TikTok Shop.",
             title = "Fishing Chair",
@@ -311,7 +300,7 @@ HASHTAGS
         assertTrue(PromptCleanup.extractSection(composed, "HASHTAGS").contains("#TikTokShop"))
         assertFalse(composed.contains("PRODUCT DESIGN = LOCKED"))
         assertFalse(composed.contains("Preserve the exact overall silhouette"))
-        assertTrue(composed.contains("black tubular") || composed.contains("red tray"))
+        assertTrue(composed.contains("black tubular frame and red tray"))
     }
 
     @Test
@@ -397,11 +386,10 @@ secret
             "legacy leftovers: ${issues.filter { it.startsWith("legacy_") }}",
             issues.none { it.startsWith("legacy_section_") }
         )
-        assertTrue(result.veoPrompt.length <= PromptCleanup.MAX_COPIED_PROMPT_CHARS)
     }
 
     @Test
-    fun finalCleanup_locksExactTwelveSectionGeminiShape() {
+    fun prepareStoredPrompt_locksExactTwelveSectionGeminiShapeWithoutTruncation() {
         val messy = """
 ```text
 FORMAT
@@ -460,7 +448,13 @@ HASHTAGS
 Озвучка: leak
 """.trimIndent()
 
-        val cleaned = PromptCleanup.finalCleanupCopiedPrompt(messy, marketplace = true)
+        val cleaned = PromptCleanup.prepareStoredPromptForDisplay(
+            rawPrompt = messy,
+            voiceover = "OFF",
+            title = "Fishing Chair",
+            hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop"),
+            marketplace = true
+        )
 
         // Exact header order, nothing else
         val headers = Regex(
@@ -481,13 +475,12 @@ HASHTAGS
         assertFalse(cleaned.contains("VISUAL FIDELITY"))
         assertFalse(cleaned.contains("```"))
         assertFalse(cleaned.contains("Озвучка"))
-        assertFalse(cleaned.contains("Timeline ends"))
-        assertFalse(cleaned.contains("Four blocks only. No continuation"))
+        assertTrue(cleaned.contains("Timeline ends at 8.0s."))
+        assertTrue(cleaned.contains("Four blocks only. No continuation after 8.0s."))
         assertTrue(cleaned.contains("0.0–2.0s"))
         assertTrue(cleaned.trimEnd().endsWith("#TikTokShop") || cleaned.contains("#TikTokShop"))
         assertTrue(cleaned.endsWith("\n"))
         assertFalse(cleaned.endsWith("\n\n"))
-        assertTrue(cleaned.length <= PromptCleanup.MAX_COPIED_PROMPT_CHARS)
         val issues = PromptCleanup.validateCompleteness(
             cleaned,
             listOf("#a", "#b", "#c", "#d", "#TikTokShop")
@@ -500,13 +493,13 @@ HASHTAGS
     }
 
     @Test
-    fun simplifyOnScreenText_stripsProductionInstructions_keepsRealCopy() {
-        assertEquals("None.", PromptCleanup.simplifyOnScreenText("Max 2–3 short overlays. No price or fake urgency."))
-        assertEquals("None.", PromptCleanup.simplifyOnScreenText("Do not repeat the whole voiceover."))
-        assertEquals("None.", PromptCleanup.simplifyOnScreenText("FORMAT"))
+    fun cleanOnScreenText_stripsProductionInstructions_keepsAllRealCopy() {
+        assertEquals("None.", PromptCleanup.cleanOnScreenText("Max 2–3 short overlays. No price or fake urgency."))
+        assertEquals("None.", PromptCleanup.cleanOnScreenText("Do not repeat the whole voiceover."))
+        assertEquals("None.", PromptCleanup.cleanOnScreenText("FORMAT"))
         assertEquals(
             "Compact fold",
-            PromptCleanup.simplifyOnScreenText(
+            PromptCleanup.cleanOnScreenText(
                 """
                 Max 2–3 concise product-specific overlays.
                 Compact fold
@@ -516,7 +509,11 @@ HASHTAGS
         )
         assertEquals(
             "Folds flat · Soft hold",
-            PromptCleanup.simplifyOnScreenText("Text: Folds flat\nOverlay: Soft hold")
+            PromptCleanup.cleanOnScreenText("Text: Folds flat\nOverlay: Soft hold")
+        )
+        assertEquals(
+            "One · Two · Three · Four",
+            PromptCleanup.cleanOnScreenText("One\nTwo\nThree\nFour")
         )
     }
 
@@ -562,7 +559,13 @@ Tray Chair
 HASHTAGS
 #a #b #c #d #TikTokShop
 """.trimIndent()
-        val cleaned = PromptCleanup.finalCleanupCopiedPrompt(raw, marketplace = false)
+        val cleaned = PromptCleanup.prepareStoredPromptForDisplay(
+            rawPrompt = raw,
+            voiceover = "OFF",
+            title = "Tray Chair",
+            hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop"),
+            marketplace = false
+        )
         val onScreen = cleaned.substringAfter("ON-SCREEN TEXT").substringBefore("VOICEOVER").trim()
         assertEquals("None.", onScreen)
         val feature = cleaned.lineSequence().first { it.contains("FEATURE", ignoreCase = true) }
@@ -570,6 +573,76 @@ HASHTAGS
         assertFalse(feature.contains("both hands", ignoreCase = true))
         assertFalse(cleaned.contains("Max 2"))
         assertFalse(cleaned.contains("No price"))
+    }
+
+    @Test
+    fun finalize_preservesPanPromptPastLegacy1100CharacterBoundary() {
+        val productDetails = (1..12).joinToString(", ") {
+            "confirmed pan identity detail $it with exact photographed geometry"
+        }
+        val negativeRules = (1..12).joinToString("\n") {
+            "- preserve generated product-specific restriction $it through the final line"
+        }
+        val finalShotMarker =
+            "the wooden crossbar lid, hanging ring, ferrule, rivets, and photographed bowl profile remain fully visible"
+        val raw = """
+FORMAT
+Vertical 9:16. Photorealistic commercial TikTok Shop product ad. Exactly 8.0 seconds total.
+
+REFERENCES
+All uploaded product, detail, alternate-angle, handle, ferrule, rivet, lid, and bowl photos jointly confirm the same physical pan and every photographed component.
+
+PRODUCT LOCK
+$productDetails
+
+SETTING
+Warm uncluttered kitchen counter with directional window light, realistic contact shadows, and enough negative space to keep the complete pan silhouette readable.
+
+SHOT SEQUENCE
+0.0–2.0s — HOOK: macro glide from the hanging ring along the dark wooden handle to the gold-tone ferrule without hiding any photographed hardware.
+2.0–4.0s — IDENTITY: pull back to the complete deep black bowl, high curved sides, riveted shank, long handle, and wooden crossbar lid in their exact proportions.
+4.0–6.0s — FEATURE / DEMO: one hand lifts and returns the wooden crossbar lid while the pan remains rigid and every component stays on the photographed side.
+6.0–8.0s — HERO / CTA: settle into a complete three-quarter product hold where $finalShotMarker.
+
+ON-SCREEN TEXT
+Deep form
+Wooden detail
+Built to stand out
+
+VOICEOVER
+OFF
+
+AUDIO
+Quiet room tone, soft wood contact from the lid, and restrained music without an invented mechanical click.
+
+CRITICAL
+Maintain exact product continuity in every frame; do not simplify the lid, handle assembly, ferrule, rivets, ring, or bowl profile.
+
+NEGATIVE PROMPT
+$negativeRules
+
+TITLE
+Deep Black Pan
+
+HASHTAGS
+#pan #kitchen #cookware #home #TikTokShop
+""".trimIndent()
+
+        val result = PromptCleanup.finalize(
+            rawPrompt = raw,
+            voiceover = "OFF",
+            title = "Deep Black Pan",
+            hashtags = listOf("#pan", "#kitchen", "#cookware", "#home", "#TikTokShop"),
+            voiceLanguage = "OFF",
+            marketplace = false
+        )
+
+        assertTrue("expected a full prompt beyond the removed legacy budget", result.veoPrompt.length > 1100)
+        assertTrue(result.veoPrompt.contains("confirmed pan identity detail 12"))
+        assertTrue(result.veoPrompt.contains(finalShotMarker))
+        assertTrue(result.veoPrompt.contains("product-specific restriction 12 through the final line"))
+        assertTrue(result.veoPrompt.contains("Built to stand out"))
+        assertFalse(result.veoPrompt.contains("…"))
     }
 
     @Test

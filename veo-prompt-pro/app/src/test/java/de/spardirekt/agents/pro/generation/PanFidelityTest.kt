@@ -50,7 +50,7 @@ class PanFidelityTest {
         val result = PromptCleanup.finalize(
             rawPrompt = completePrompt(
                 title = "Deep Black Pan",
-                productLock = "Keep the pan black."
+                productLock = "Keep the pan black.\nPreserve the visible hand-carved lid grain and etched underside mark."
             ),
             voiceover = "OFF",
             title = "Deep Black Pan",
@@ -60,12 +60,11 @@ class PanFidelityTest {
         )
 
         assertPanSignature(result.veoPrompt)
+        assertTrue(result.veoPrompt.contains("hand-carved lid grain"))
+        assertTrue(result.veoPrompt.contains("etched underside mark"))
         assertTrue(result.veoPrompt.contains("no shallow pan, saucepan"))
         assertTrue(result.veoPrompt.contains("no missing wooden crossbar lid"))
-        assertTrue(
-            "pan prompt exceeded copy budget: ${result.veoPrompt.length}",
-            result.veoPrompt.length <= PromptCleanup.MAX_COPIED_PROMPT_CHARS
-        )
+        assertFalse(result.veoPrompt.contains("…"))
     }
 
     @Test
