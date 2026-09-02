@@ -124,6 +124,16 @@ fun ResultScreen(
                 if (state.safetyPolicyVersion.isNotBlank()) {
                     Text("Policy ${state.safetyPolicyVersion}", color = UltraColors.textMuted, fontSize = 12.sp)
                 }
+                Text(
+                    "TikTok Shop AIGC Hard Rules",
+                    color = UltraColors.violet,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                if (state.aigcPolicyVersion.isNotBlank()) {
+                    Text("AIGC ${state.aigcPolicyVersion}", color = UltraColors.textMuted, fontSize = 12.sp)
+                }
                 state.safetyItems.forEach { item ->
                     Text("• $item", fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
                 }

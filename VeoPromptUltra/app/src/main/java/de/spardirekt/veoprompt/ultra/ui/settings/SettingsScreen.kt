@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.spardirekt.veoprompt.ultra.compliance.AigcHardRules
 import de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy
 import de.spardirekt.veoprompt.ultra.config.ModelConfig
 import de.spardirekt.veoprompt.ultra.model.CreativeMode
@@ -158,6 +159,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 DiagLine("model config", "${diagnostics.modelLabel} · ${diagnostics.modelId}")
                 DiagLine("database", diagnostics.databaseStatus)
                 DiagLine("compliance policy", diagnostics.compliancePolicy)
+                DiagLine("AIGC hard rules", diagnostics.aigcPolicy)
             }
         }
         item(key = "about") {
@@ -169,6 +171,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     "TikTok Shop Content Quality & Compliance Policy ${TikTokShopPolicy.VERSION}. Аудит хранится отдельно от veoPrompt.",
+                    color = UltraColors.textMuted,
+                    fontSize = 12.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "${AigcHardRules.TITLE} ${AigcHardRules.VERSION}. ${AigcHardRules.SOURCE}.",
                     color = UltraColors.textMuted,
                     fontSize = 12.sp
                 )

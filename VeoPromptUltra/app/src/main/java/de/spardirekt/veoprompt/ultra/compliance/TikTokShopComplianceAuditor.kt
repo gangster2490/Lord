@@ -40,13 +40,17 @@ object TikTokShopComplianceAuditor {
         val overlay = FinalPromptValidator.sectionBody(prompt, "ON-SCREEN TEXT")
         val spoken = listOf(voiceover, title, overlay).joinToString("\n")
 
-        if (tiktokShopMode) {
-            findings += Finding(
-                code = "AI_LABEL",
-                severity = "INFO",
-                field = "package",
-                message = "VEO-видео нужно пометить как AI-generated при публикации, если платформа этого требует."
-            )
+        val aigc = AigcHardRulesAuditor.audit(
+            prompt = prompt,
+            voiceover = voiceover,
+            title = title,
+            overlay = overlay,
+            productModel = productModel,
+            tiktokShopMode = tiktokShopMode
+        )
+        prompt = aigc.prompt
+        aigc.findings.forEach { hit ->
+            findings += Finding(hit.code, hit.severity, hit.field, hit.message)
         }
 
         findings += scanPhrases(spoken, "voiceover", TikTokShopPolicy.BANNED_SUPERLATIVES, "CL_SUPERLATIVE", "HIGH")
@@ -131,7 +135,8 @@ object TikTokShopComplianceAuditor {
         val audit = SafetyAudit(
             riskLevel = risk,
             items = items,
-            policyVersion = TikTokShopPolicy.VERSION
+            policyVersion = TikTokShopPolicy.VERSION,
+            aigcPolicyVersion = AigcHardRules.VERSION
         )
         return Result(
             response = response.copy(
@@ -169,7 +174,11 @@ object TikTokShopComplianceAuditor {
             TikTokShopPolicy.BANNED_MEDICAL +
             TikTokShopPolicy.BANNED_SYMPATHY +
             TikTokShopPolicy.BANNED_HARD_CTA +
-            TikTokShopPolicy.BANNED_OFF_PLATFORM
+            TikTokShopPolicy.BANNED_OFF_PLATFORM +
+            AigcHardRules.BANNED_IMPERSONATION +
+            AigcHardRules.BANNED_FALSE_ENDORSE +
+            AigcHardRules.BANNED_UNREALISTIC +
+            AigcHardRules.BANNED_FEAR
         banned.forEach { phrase ->
             out = out.replace(Regex("(?i)${Regex.escape(phrase)}"), "")
         }

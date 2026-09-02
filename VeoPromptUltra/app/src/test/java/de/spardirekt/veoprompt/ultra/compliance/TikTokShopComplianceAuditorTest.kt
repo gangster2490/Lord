@@ -35,7 +35,10 @@ class TikTokShopComplianceAuditorTest {
         assertTrue(result.response.veoPrompt.contains(result.response.voiceover))
         assertFalse(result.response.veoPrompt.contains("SAFETY AUDIT"))
         assertTrue(result.audit.policyVersion == TikTokShopPolicy.VERSION)
-        assertTrue(result.audit.items.any { it.contains("AI_LABEL") })
+        assertEquals(AigcHardRules.VERSION, result.audit.aigcPolicyVersion)
+        assertTrue(result.audit.items.any { it.contains("AIGC_DISCLOSE") })
+        assertTrue(result.response.veoPrompt.contains("AIGC HARD LOCK") || result.response.veoPrompt.contains("AI-generated content toggle"))
+        assertFalse(result.response.veoPrompt.contains("AIGC AUDIT"))
     }
 
     @Test

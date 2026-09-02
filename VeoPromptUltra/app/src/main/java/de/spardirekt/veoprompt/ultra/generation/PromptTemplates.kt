@@ -1,5 +1,6 @@
 package de.spardirekt.veoprompt.ultra.generation
 
+import de.spardirekt.veoprompt.ultra.compliance.AigcHardRules
 import de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy
 import de.spardirekt.veoprompt.ultra.model.CreativeMode
 import de.spardirekt.veoprompt.ultra.model.VoiceLanguage
@@ -144,6 +145,11 @@ Promotion:
 AI:
 - AI must not alter the product.
 - The owner should label the published VEO video as AI-generated when required.
+
+==================================================
+${AigcHardRules.TITLE.uppercase()}
+==================================================
+${AigcHardRules.systemPromptBlock()}
 
 ==================================================
 ON-SCREEN TEXT

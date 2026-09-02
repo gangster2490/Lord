@@ -9,6 +9,7 @@ data class ResultViewState(
     val safetyRisk: String = "LOW",
     val safetyItems: List<String> = emptyList(),
     val safetyPolicyVersion: String = "",
+    val aigcPolicyVersion: String = "",
     val tiktokShopMode: Boolean = true,
     val language: String = "DE",
     val creativeMode: String = "AUTO",

@@ -30,7 +30,8 @@ data class DiagnosticsState(
     val modelLabel: String = ModelConfig.Profile.DEFAULT.label,
     val databaseStatus: String = "unknown",
     val hasApiKey: Boolean = false,
-    val compliancePolicy: String = de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy.VERSION
+    val compliancePolicy: String = de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy.VERSION,
+    val aigcPolicy: String = de.spardirekt.veoprompt.ultra.compliance.AigcHardRules.VERSION
 )
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
@@ -125,7 +126,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                     modelLabel = ModelConfig.profile(sett.model).label,
                     databaseStatus = if (count >= 0) "OK · ${AppDatabase.NAME} · $count проектов" else "error",
                     hasApiKey = apiKeys.hasKey(),
-                    compliancePolicy = de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy.VERSION
+                    compliancePolicy = de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy.VERSION,
+                    aigcPolicy = de.spardirekt.veoprompt.ultra.compliance.AigcHardRules.VERSION
                 )
             }
         }

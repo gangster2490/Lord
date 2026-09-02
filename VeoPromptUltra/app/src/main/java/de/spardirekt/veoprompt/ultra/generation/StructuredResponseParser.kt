@@ -134,7 +134,8 @@ object StructuredResponseParser {
         return SafetyAudit(
             riskLevel = readString(obj, "riskLevel").ifBlank { "LOW" },
             items = items,
-            policyVersion = readString(obj, "policyVersion")
+            policyVersion = readString(obj, "policyVersion"),
+            aigcPolicyVersion = readString(obj, "aigcPolicyVersion")
         )
     }
 }

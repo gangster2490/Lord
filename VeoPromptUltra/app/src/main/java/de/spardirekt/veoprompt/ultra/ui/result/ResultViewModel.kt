@@ -44,6 +44,7 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
                 safetyRisk = audit.riskLevel,
                 safetyItems = audit.items,
                 safetyPolicyVersion = audit.policyVersion,
+                aigcPolicyVersion = audit.aigcPolicyVersion,
                 tiktokShopMode = entity.tiktokShopMode,
                 language = entity.voiceLanguage,
                 creativeMode = entity.creativeMode,

@@ -63,6 +63,10 @@ class GenerationPipelineTest {
         assertTrue(bundle.veoPrompt.contains("deep rounded bowl"))
         assertFalse(bundle.veoPrompt.contains("SAFETY AUDIT"))
         assertTrue(bundle.safetyAudit.policyVersion.isNotBlank())
+        assertEquals(de.spardirekt.veoprompt.ultra.compliance.AigcHardRules.VERSION, bundle.safetyAudit.aigcPolicyVersion)
+        assertTrue(bundle.safetyAudit.items.any { it.contains("AIGC_DISCLOSE") })
+        assertFalse(bundle.veoPrompt.contains("AIGC AUDIT"))
+        assertFalse(bundle.veoPrompt.contains("SAFETY AUDIT"))
     }
 
     @Test

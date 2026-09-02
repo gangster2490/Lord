@@ -187,7 +187,8 @@ data class CreativeDirection(
 data class SafetyAudit(
     val riskLevel: String = "LOW",
     val items: List<String> = emptyList(),
-    val policyVersion: String = ""
+    val policyVersion: String = "",
+    val aigcPolicyVersion: String = ""
 )
 
 @Serializable
