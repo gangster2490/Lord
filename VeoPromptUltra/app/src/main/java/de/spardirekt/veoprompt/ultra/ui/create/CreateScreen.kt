@@ -216,6 +216,14 @@ fun CreateScreen(
                     Chip("Simple", state.mode == AppMode.Simple) { viewModel.setMode(AppMode.Simple) }
                     Chip("Advanced", state.mode == AppMode.Advanced) { viewModel.setMode(AppMode.Advanced) }
                 }
+                if (state.mode == AppMode.Advanced) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Advanced: в результате будут visual signature, Product Lock и полный Safety Audit.",
+                        color = UltraColors.textMuted,
+                        fontSize = 12.sp
+                    )
+                }
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("TikTok Shop Mode", modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)

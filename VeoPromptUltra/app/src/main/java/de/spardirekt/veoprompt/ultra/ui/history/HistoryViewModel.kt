@@ -28,6 +28,12 @@ class HistoryViewModel(app: Application) : AndroidViewModel(app) {
     fun duplicate(entity: ProjectEntity, onCreated: (String) -> Unit) {
         viewModelScope.launch {
             val copy = repo.duplicate(entity)
+            val images = ImageStore.copyProjectImages(
+                getApplication(),
+                repo.parseImages(entity),
+                copy.id
+            )
+            repo.attachCopiedImages(copy, images)
             onCreated(copy.id)
         }
     }
@@ -35,6 +41,12 @@ class HistoryViewModel(app: Application) : AndroidViewModel(app) {
     fun newVersion(entity: ProjectEntity, onCreated: (String) -> Unit) {
         viewModelScope.launch {
             val copy = repo.newVersion(entity)
+            val images = ImageStore.copyProjectImages(
+                getApplication(),
+                repo.parseImages(entity),
+                copy.id
+            )
+            repo.attachCopiedImages(copy, images)
             onCreated(copy.id)
         }
     }

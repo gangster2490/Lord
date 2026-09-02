@@ -1,6 +1,7 @@
 package de.spardirekt.veoprompt.ultra.compliance
 
 import de.spardirekt.veoprompt.ultra.generation.FinalPromptValidator
+import de.spardirekt.veoprompt.ultra.generation.VoiceoverRules
 import de.spardirekt.veoprompt.ultra.model.ProductModel
 import de.spardirekt.veoprompt.ultra.model.SafetyAudit
 import de.spardirekt.veoprompt.ultra.model.StructuredResponse
@@ -74,6 +75,11 @@ object TikTokShopComplianceAuditor {
                     "Неподтверждённое утверждение: «$term»."
                 )
             }
+        }
+
+        VoiceoverRules.issues(voiceover, voice).forEach { issue ->
+            val severity = if (issue.startsWith("voiceover_word_count")) "INFO" else "MEDIUM"
+            findings += Finding("CQ_VOICEOVER", severity, "voiceover", "Озвучка: $issue")
         }
 
         if (!prompt.contains("same single physical product", ignoreCase = true) &&

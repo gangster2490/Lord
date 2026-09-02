@@ -22,7 +22,7 @@ class TikTokShopComplianceAuditorTest {
         val result = TikTokShopComplianceAuditor.audit(
             StructuredResponse(
                 veoPrompt = prompt,
-                voiceover = "Tiefer Topf, fester Holzdeckel, einfach kochen.",
+                voiceover = "Tiefer Topf mit festem Holzdeckel hält die Hitze lange und sicher.",
                 title = "Tiefe Pfanne mit Holzdeckel",
                 hashtags = listOf("#Pfanne", "#Kochen", "#Holzdeckel", "#Kitchen", "#TikTokShop")
             ),
@@ -31,7 +31,8 @@ class TikTokShopComplianceAuditorTest {
             tiktokShopMode = true
         )
         assertEquals("LOW", result.audit.riskLevel)
-        assertEquals(prompt, result.response.veoPrompt)
+        assertTrue(result.response.veoPrompt.contains("PRODUCT LOCK"))
+        assertTrue(result.response.veoPrompt.contains(result.response.voiceover))
         assertFalse(result.response.veoPrompt.contains("SAFETY AUDIT"))
         assertTrue(result.audit.policyVersion == TikTokShopPolicy.VERSION)
         assertTrue(result.audit.items.any { it.contains("AI_LABEL") })

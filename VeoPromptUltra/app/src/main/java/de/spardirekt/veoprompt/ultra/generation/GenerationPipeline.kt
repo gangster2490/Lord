@@ -120,13 +120,17 @@ class GenerationPipeline(
                     jsonMode = true,
                     maxTokens = 3000
                 ).getOrElse { return fail(it) }
-                productModel = decodeProductModel(productModelJson)
+                productModel = ProductQualityGate.lockAppearance(decodeProductModel(productModelJson), analysis)
+                productModelJson = json.encodeToString(productModel)
                 onStage(StageUpdate(GenerationStage.PRODUCT_MODEL, analysis, productModel))
             } else if (productModelJson.isNotBlank()) {
-                productModel = decodeProductModel(productModelJson)
+                productModel = ProductQualityGate.lockAppearance(decodeProductModel(productModelJson), analysis)
+                productModelJson = json.encodeToString(productModel)
             }
 
             if (GenerationStage.VISUAL_LOCK in startOrder) {
+                productModel = ProductQualityGate.lockAppearance(productModel ?: ProductModel(), analysis)
+                productModelJson = json.encodeToString(productModel)
                 onStage(StageUpdate(GenerationStage.VISUAL_LOCK, analysis, productModel))
             }
 

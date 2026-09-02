@@ -1,6 +1,7 @@
 package de.spardirekt.veoprompt.ultra.generation
 
 import de.spardirekt.veoprompt.ultra.model.ProductModel
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,6 +26,20 @@ class RegressionLocksTest {
         assertTrue(prompt.contains("wooden lid"))
         val lock = prompt.substringAfter("PRODUCT LOCK").substringBefore("SETTING")
         assertTrue(!lock.contains("wok"))
+    }
+
+    @Test
+    fun allRegressionProductsHaveSpecs() {
+        assertEquals(6, RegressionLocks.all.size)
+        val ids = RegressionLocks.all.map { it.id }
+        assertTrue(ids.containsAll(listOf(
+            "deep_black_pan_wooden_lid",
+            "fishing_chair",
+            "ph_screwdriver_bits",
+            "rice_washing_container",
+            "closed_portable_stove_case",
+            "contact_grill"
+        )))
     }
 
     @Test

@@ -77,6 +77,15 @@ class ProjectRepository(
         return copy
     }
 
+    suspend fun attachCopiedImages(entity: ProjectEntity, images: List<ProjectImage>): ProjectEntity {
+        val updated = entity.copy(
+            imageUrisJson = encodeImages(images),
+            thumbnailUri = images.firstOrNull()?.let { it.localPath ?: it.uri }.orEmpty()
+        )
+        dao.upsert(updated)
+        return updated
+    }
+
     suspend fun newVersion(source: ProjectEntity): ProjectEntity {
         val now = System.currentTimeMillis()
         val copy = source.copy(

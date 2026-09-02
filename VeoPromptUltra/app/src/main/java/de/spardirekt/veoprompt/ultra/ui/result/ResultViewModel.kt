@@ -29,12 +29,12 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
             val audit = runCatching {
                 json.decodeFromString(SafetyAudit.serializer(), entity.safetyAuditJson)
             }.getOrDefault(SafetyAudit())
-            val modelIdentity = runCatching {
+            val model = runCatching {
                 json.decodeFromString(
                     de.spardirekt.veoprompt.ultra.model.ProductModel.serializer(),
                     entity.productModelJson
-                ).productIdentity
-            }.getOrDefault("")
+                )
+            }.getOrNull()
             _state.value = ResultViewState(
                 projectId = entity.id,
                 veoPrompt = entity.veoPrompt,
@@ -49,7 +49,9 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
                 creativeMode = entity.creativeMode,
                 status = entity.status,
                 expanded = false,
-                productIdentity = modelIdentity,
+                productIdentity = model?.productIdentity.orEmpty(),
+                visualSignature = model?.visualSignature.orEmpty(),
+                appMode = entity.mode,
                 loaded = true
             )
         }

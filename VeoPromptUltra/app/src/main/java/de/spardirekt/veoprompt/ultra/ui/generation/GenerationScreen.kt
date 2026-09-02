@@ -51,19 +51,25 @@ fun GenerationScreen(
     val stage by manager.stage.collectAsStateWithLifecycle()
     val running by manager.isRunning.collectAsStateWithLifecycle()
     var showDetail by remember { mutableStateOf(false) }
+    var openedResult by remember(projectId) { mutableStateOf(false) }
 
     LaunchedEffect(projectId) {
         createViewModel.openProject(projectId)
     }
-    LaunchedEffect(state.navigateToResultId) {
-        val id = state.navigateToResultId ?: return@LaunchedEffect
+    fun openOnce(id: String) {
+        if (openedResult || id.isBlank()) return
+        openedResult = true
         createViewModel.consumeNavigation()
         onOpenResult(id)
+    }
+    LaunchedEffect(state.navigateToResultId) {
+        val id = state.navigateToResultId ?: return@LaunchedEffect
+        openOnce(id)
     }
     LaunchedEffect(state.project?.status, state.project?.id) {
         val p = state.project ?: return@LaunchedEffect
         if (p.id == projectId && p.status == ProjectStatus.Ready.name && p.veoPrompt.isNotBlank()) {
-            onOpenResult(p.id)
+            openOnce(p.id)
         }
     }
 

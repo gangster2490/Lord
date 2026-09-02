@@ -33,6 +33,25 @@ object ImageStore {
         File(context.filesDir, "projects").deleteRecursively()
     }
 
+    fun copyProjectImages(
+        context: Context,
+        source: List<ProjectImage>,
+        targetProjectId: String
+    ): List<ProjectImage> {
+        return source.mapIndexed { index, image ->
+            val newId = java.util.UUID.randomUUID().toString()
+            val from = image.localPath?.takeIf { it.isNotBlank() }?.let { File(it) }
+            if (from != null && from.exists()) {
+                persist(context, targetProjectId, newId, Uri.fromFile(from)).copy(
+                    category = image.category,
+                    orderIndex = index
+                )
+            } else {
+                image.copy(id = newId, orderIndex = index)
+            }
+        }
+    }
+
     private fun projectDir(context: Context, projectId: String): File {
         return File(context.filesDir, "projects/$projectId")
     }

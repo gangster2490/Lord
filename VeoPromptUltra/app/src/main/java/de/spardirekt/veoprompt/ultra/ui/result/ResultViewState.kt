@@ -15,6 +15,8 @@ data class ResultViewState(
     val status: String = "",
     val expanded: Boolean = false,
     val productIdentity: String = "",
+    val visualSignature: List<String> = emptyList(),
+    val appMode: String = "Simple",
     val loaded: Boolean = false
 ) {
     fun preview(): String {

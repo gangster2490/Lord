@@ -157,6 +157,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 DiagLine("last safe error", diagnostics.lastSafeError)
                 DiagLine("model config", "${diagnostics.modelLabel} · ${diagnostics.modelId}")
                 DiagLine("database", diagnostics.databaseStatus)
+                DiagLine("compliance policy", diagnostics.compliancePolicy)
             }
         }
         item(key = "about") {

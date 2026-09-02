@@ -125,8 +125,20 @@ fun ResultScreen(
                 Spacer(Modifier.height(6.dp))
                 Text("Язык: ${state.language}", fontSize = 13.sp)
                 Text("Creative: ${state.creativeMode}", fontSize = 13.sp)
+                Text("Mode: ${state.appMode}", fontSize = 13.sp)
                 if (state.productIdentity.isNotBlank()) {
                     Text(state.productIdentity, fontSize = 13.sp, color = UltraColors.textMuted)
+                }
+            }
+        }
+        if (state.appMode == "Advanced" && state.visualSignature.isNotEmpty()) {
+            item(key = "signature-$projectId") {
+                PearlCard {
+                    Text("Visual Signature", fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    state.visualSignature.forEach { detail ->
+                        Text("• $detail", fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+                    }
                 }
             }
         }
