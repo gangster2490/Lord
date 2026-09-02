@@ -41,7 +41,7 @@ object MoneyFormat {
 
     private fun formatter(currencyCode: String): NumberFormat {
         val locale = when (currencyCode) {
-            "RUB" -> Locale("ru", "RU")
+            "RUB" -> Locale.forLanguageTag("ru-RU")
             "USD" -> Locale.US
             else -> Locale.GERMANY
         }

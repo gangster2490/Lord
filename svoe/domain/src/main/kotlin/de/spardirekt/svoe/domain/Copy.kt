@@ -6,7 +6,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object Copy {
-    private val ru = Locale("ru", "RU")
+    private val ru = Locale.forLanguageTag("ru-RU")
     private val dateFmt = DateTimeFormatter.ofPattern("EEEE, d MMMM", ru)
     private val shortDate = DateTimeFormatter.ofPattern("d MMM", ru)
     private val monthFmt = DateTimeFormatter.ofPattern("LLLL yyyy", ru)

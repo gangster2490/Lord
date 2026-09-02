@@ -4,15 +4,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -54,7 +54,7 @@ private val Tabs = listOf(
     Tab("home", "Сегодня", Icons.Outlined.WbSunny, Icons.Rounded.WbSunny),
     Tab("tasks", "Задачи", Icons.Outlined.CheckCircle, Icons.Rounded.CheckCircle),
     Tab("habits", "Привычки", Icons.Outlined.AutoAwesome, Icons.Rounded.AutoAwesome),
-    Tab("journal", "Дневник", Icons.Outlined.MenuBook, Icons.Rounded.MenuBook),
+    Tab("journal", "Дневник", Icons.AutoMirrored.Outlined.MenuBook, Icons.AutoMirrored.Rounded.MenuBook),
     Tab("wallet", "Деньги", Icons.Outlined.AccountBalanceWallet, Icons.Rounded.AccountBalanceWallet),
 )
 

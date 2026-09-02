@@ -6,15 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import de.spardirekt.svoe.domain.ThemeMode
 import de.spardirekt.svoe.ui.SvoeApp
-import de.spardirekt.svoe.ui.theme.Night
-import de.spardirekt.svoe.ui.theme.Paper
 import de.spardirekt.svoe.ui.theme.SvoeTheme
 
 class MainActivity : ComponentActivity() {
@@ -34,8 +31,6 @@ class MainActivity : ComponentActivity() {
                 val view = LocalView.current
                 SideEffect {
                     val window = (view.context as ComponentActivity).window
-                    window.statusBarColor = (if (dark) Night else Paper).toArgb()
-                    window.navigationBarColor = (if (dark) Night else Paper).toArgb()
                     WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !dark
                     WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !dark
                 }
