@@ -16,7 +16,7 @@ object RegressionLocks {
 
     val PAN = ProductLockSpec(
         id = "deep_black_pan_wooden_lid",
-        identityHints = listOf("pan", "сковород", "pfanne", "lid", "крышк"),
+        identityHints = listOf("pan", "сковород", "pfanne", "крышк"),
         requiredDetails = listOf(
             "deep rounded bowl",
             "high sides",
@@ -69,8 +69,10 @@ object RegressionLocks {
     fun matchingSpec(model: ProductModel): ProductLockSpec? {
         val blob = (model.productIdentity + " " + model.productCategory + " " +
             model.visualSignature.joinToString(" ")).lowercase()
-        return all.firstOrNull { spec ->
-            spec.identityHints.any { blob.contains(it.lowercase()) }
+        return all.maxByOrNull { spec ->
+            spec.identityHints.count { hint -> blob.contains(hint.lowercase()) }
+        }?.takeIf { spec ->
+            spec.identityHints.any { hint -> blob.contains(hint.lowercase()) }
         }
     }
 

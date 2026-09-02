@@ -52,7 +52,7 @@ class RegressionLocksTest {
 
     @Test
     fun fishingChairKeepsFrameTrayAndFeet() {
-        val model = fishingChairModel()
+        val model = Fixtures.fishingChairModel()
         val prompt = Fixtures.validVeoPrompt(model)
         assertTrue(RegressionLocks.violations(prompt, model).isEmpty())
         val lock = prompt.substringAfter("PRODUCT LOCK").substringBefore("SETTING")
@@ -65,7 +65,7 @@ class RegressionLocksTest {
 
     @Test
     fun fishingChairMissingTrayIsFlagged() {
-        val model = fishingChairModel()
+        val model = Fixtures.fishingChairModel()
         val thin = Fixtures.validVeoPrompt(
             model.copy(visualSignature = listOf("metal frame", "padded backrest", "rubber feet"))
         )
@@ -75,7 +75,7 @@ class RegressionLocksTest {
 
     @Test
     fun phBitsKeepTipAndCollar() {
-        val model = phBitsModel()
+        val model = Fixtures.phBitsModel()
         val prompt = Fixtures.validVeoPrompt(model)
         assertTrue(RegressionLocks.violations(prompt, model).isEmpty())
         assertTrue(prompt.contains("PH tip") || prompt.contains("PH"))
@@ -84,7 +84,7 @@ class RegressionLocksTest {
 
     @Test
     fun riceWasherKeepsBowlLidDrain() {
-        val model = riceWasherModel()
+        val model = Fixtures.riceWasherModel()
         val prompt = Fixtures.validVeoPrompt(model)
         assertTrue(RegressionLocks.violations(prompt, model).isEmpty())
         assertTrue(prompt.contains("bowl"))
@@ -94,11 +94,11 @@ class RegressionLocksTest {
 
     @Test
     fun closedStoveCaseDoesNotInventBurner() {
-        val model = stoveCaseModel()
+        val model = Fixtures.stoveCaseModel()
         val prompt = Fixtures.validVeoPrompt(model)
         assertTrue(RegressionLocks.violations(prompt, model).isEmpty())
         val lock = prompt.substringAfter("PRODUCT LOCK").substringBefore("SETTING")
-        assertTrue(lock.contains("closed case") || (lock.contains("closed") && lock.contains("case")))
+        assertTrue(lock.contains("closed") && lock.contains("case"))
         val invented = prompt.replace(Regex("(?is)NEGATIVE PROMPT.*"), "")
         assertTrue(!invented.contains("open burner"))
         assertTrue(!invented.contains("flame"))
@@ -107,7 +107,7 @@ class RegressionLocksTest {
 
     @Test
     fun contactGrillKeepsPlatesAndRejectsInventedCoils() {
-        val model = contactGrillModel()
+        val model = Fixtures.contactGrillModel()
         val prompt = Fixtures.validVeoPrompt(model)
         assertTrue(RegressionLocks.violations(prompt, model).isEmpty())
         assertTrue(prompt.contains("plates"))
@@ -117,49 +117,19 @@ class RegressionLocksTest {
 
     @Test
     fun everyRegressionProductMatchesItsSpec() {
-        val pairs = listOf(
-            fishingChairModel() to "fishing_chair",
-            phBitsModel() to "ph_screwdriver_bits",
-            riceWasherModel() to "rice_washing_container",
-            stoveCaseModel() to "closed_portable_stove_case",
-            contactGrillModel() to "contact_grill",
-            ProductModel(
-                productIdentity = "Deep black pan with wooden lid",
-                visualSignature = listOf("deep rounded bowl")
-            ) to "deep_black_pan_wooden_lid"
+        assertEquals("fishing_chair", RegressionLocks.matchingSpec(Fixtures.fishingChairModel())?.id)
+        assertEquals("ph_screwdriver_bits", RegressionLocks.matchingSpec(Fixtures.phBitsModel())?.id)
+        assertEquals("rice_washing_container", RegressionLocks.matchingSpec(Fixtures.riceWasherModel())?.id)
+        assertEquals("closed_portable_stove_case", RegressionLocks.matchingSpec(Fixtures.stoveCaseModel())?.id)
+        assertEquals("contact_grill", RegressionLocks.matchingSpec(Fixtures.contactGrillModel())?.id)
+        assertEquals(
+            "deep_black_pan_wooden_lid",
+            RegressionLocks.matchingSpec(
+                ProductModel(
+                    productIdentity = "Deep black pan with wooden lid",
+                    visualSignature = listOf("deep rounded bowl")
+                )
+            )?.id
         )
-        pairs.forEach { (model, id) ->
-            assertEquals(id, RegressionLocks.matchingSpec(model)?.id)
-        }
-    }
-
-    private fun fishingChairModel() = ProductModel(
-        productCategory = "outdoor seating",
-        productIdentity = "folding fishing chair",
-        visualSignature = listOf("metal frame", "padded backrest", "side tray", "rubber feet")
-    )
-
-    private fun phBitsModel() = ProductModel(
-        productCategory = "tools",
-        productIdentity = "PH screwdriver bits",
-        visualSignature = listOf("PH tip", "hex collar", "length markings")
-    )
-
-    private fun riceWasherModel() = ProductModel(
-        productCategory = "kitchen",
-        productIdentity = "rice washing container",
-        visualSignature = listOf("clear bowl", "fitted lid", "side drain")
-    )
-
-    private fun stoveCaseModel() = ProductModel(
-        productCategory = "camping stove",
-        productIdentity = "closed portable stove case",
-        visualSignature = listOf("closed case", "latches", "carry handle")
-    )
-
-    private fun contactGrillModel() = ProductModel(
-        productCategory = "cookware",
-        productIdentity = "contact grill",
-        visualSignature = listOf("ridged plates", "hinge", "lid handle")
     }
 }

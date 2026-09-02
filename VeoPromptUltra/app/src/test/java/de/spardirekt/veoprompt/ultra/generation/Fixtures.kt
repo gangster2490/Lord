@@ -4,6 +4,36 @@ import de.spardirekt.veoprompt.ultra.model.ProductModel
 
 object Fixtures {
 
+    fun fishingChairModel() = ProductModel(
+        productCategory = "outdoor seating",
+        productIdentity = "folding fishing chair",
+        visualSignature = listOf("metal frame", "padded backrest", "side tray", "rubber feet")
+    )
+
+    fun phBitsModel() = ProductModel(
+        productCategory = "tools",
+        productIdentity = "PH screwdriver bits",
+        visualSignature = listOf("PH tip", "hex collar", "length markings")
+    )
+
+    fun riceWasherModel() = ProductModel(
+        productCategory = "kitchen",
+        productIdentity = "rice washing container",
+        visualSignature = listOf("clear bowl", "fitted lid", "side drain")
+    )
+
+    fun stoveCaseModel() = ProductModel(
+        productCategory = "camping stove",
+        productIdentity = "closed portable stove case",
+        visualSignature = listOf("closed case", "latches", "carry handle")
+    )
+
+    fun contactGrillModel() = ProductModel(
+        productCategory = "cookware",
+        productIdentity = "contact grill",
+        visualSignature = listOf("ridged plates", "hinge", "lid handle")
+    )
+
     fun validVeoPrompt(model: ProductModel = ProductModel()): String {
         val details = model.visualSignature.ifEmpty {
             listOf("deep rounded bowl", "high sides", "wooden handle", "ferrule", "rivets", "hanging ring", "wooden lid")
