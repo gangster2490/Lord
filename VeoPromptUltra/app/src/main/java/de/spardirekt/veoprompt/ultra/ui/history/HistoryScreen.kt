@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import de.spardirekt.veoprompt.ultra.compliance.SevenDayPromotionalRiskAnalyzer
 import de.spardirekt.veoprompt.ultra.data.db.ProjectEntity
 import de.spardirekt.veoprompt.ultra.model.CreativeMode
 import de.spardirekt.veoprompt.ultra.ui.components.PearlCard
@@ -56,6 +57,7 @@ fun HistoryScreen(
     onOpenCreate: (String) -> Unit
 ) {
     val projects by viewModel.projects.collectAsStateWithLifecycle()
+    val risk by viewModel.sevenDayRisk.collectAsStateWithLifecycle()
     val bottom = LocalBottomBarInset.current
     val fmt = remember { SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()) }
 
@@ -70,6 +72,9 @@ fun HistoryScreen(
         item(key = "header") {
             Text("История", fontWeight = FontWeight.SemiBold, fontSize = 26.sp, color = UltraColors.textOnLight)
             Text("Проекты сохраняются на устройстве", color = UltraColors.textMuted, fontSize = 13.sp)
+        }
+        item(key = "seven-day-risk") {
+            SevenDayRiskCard(risk)
         }
         if (projects.isEmpty()) {
             item(key = "empty") {
@@ -95,6 +100,44 @@ fun HistoryScreen(
                 onNewVersion = { viewModel.newVersion(project) { onOpenCreate(it) } }
             )
         }
+    }
+}
+
+@Composable
+private fun SevenDayRiskCard(risk: SevenDayPromotionalRiskAnalyzer.Report) {
+    val tone = when (risk.riskLevel) {
+        "CRITICAL", "HIGH" -> UltraColors.danger
+        "MEDIUM" -> UltraColors.warning
+        else -> UltraColors.violet
+    }
+    PearlCard {
+        Text("7-дневный риск промо-контента", fontWeight = FontWeight.SemiBold)
+        Text(
+            SevenDayPromotionalRiskAnalyzer.TITLE,
+            color = UltraColors.violet,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Text("Policy ${risk.policyVersion}", color = UltraColors.textMuted, fontSize = 12.sp)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Уровень: ${risk.riskLevel} · score ${risk.score}/100",
+            color = tone,
+            fontWeight = FontWeight.Medium,
+            fontSize = 14.sp
+        )
+        if (risk.projectedRestrictionDays > 0) {
+            Text(
+                "Оценка ограничения shoppable: ${risk.projectedRestrictionDays} дней",
+                color = tone,
+                fontSize = 13.sp
+            )
+        }
+        risk.items.forEach { row ->
+            Text("• $row", fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(risk.recommendation, color = UltraColors.textOnLight, fontSize = 13.sp)
     }
 }
 

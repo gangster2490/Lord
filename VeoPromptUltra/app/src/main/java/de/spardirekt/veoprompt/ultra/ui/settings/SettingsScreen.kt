@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.spardirekt.veoprompt.ultra.compliance.AigcHardRules
+import de.spardirekt.veoprompt.ultra.compliance.SevenDayPromotionalRiskAnalyzer
 import de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy
 import de.spardirekt.veoprompt.ultra.config.ModelConfig
 import de.spardirekt.veoprompt.ultra.model.CreativeMode
@@ -160,6 +161,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 DiagLine("database", diagnostics.databaseStatus)
                 DiagLine("compliance policy", diagnostics.compliancePolicy)
                 DiagLine("AIGC hard rules", diagnostics.aigcPolicy)
+                DiagLine("7-day promo risk", diagnostics.promoRiskPolicy)
             }
         }
         item(key = "about") {
@@ -177,6 +179,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     "${AigcHardRules.TITLE} ${AigcHardRules.VERSION}. ${AigcHardRules.SOURCE}.",
+                    color = UltraColors.textMuted,
+                    fontSize = 12.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "${SevenDayPromotionalRiskAnalyzer.TITLE} ${SevenDayPromotionalRiskAnalyzer.VERSION}. Локальное окно ${SevenDayPromotionalRiskAnalyzer.WINDOW_DAYS} дней по сохранённым пакетам.",
                     color = UltraColors.textMuted,
                     fontSize = 12.sp
                 )
