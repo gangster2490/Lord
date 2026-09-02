@@ -12,7 +12,7 @@ package de.spardirekt.veoprompt.ultra.compliance
  */
 object SevenDayPromotionalRiskAnalyzer {
 
-    const val VERSION = "2026.06-v1"
+    const val VERSION = "2026.06-v2"
     const val TITLE = "7-Day TikTok Shop Promotional Content Risk Analyzer"
     const val WINDOW_DAYS = 7
     const val WINDOW_MS = WINDOW_DAYS * 24L * 60L * 60L * 1000L
@@ -56,7 +56,7 @@ object SevenDayPromotionalRiskAnalyzer {
         val scoped = snapshots.filter { snap ->
             snap.hasPackage &&
                 snap.updatedAt in cutoff..nowMs &&
-                (snap.status.equals("Ready", true) || snap.status.equals("Failed", true))
+                snap.status.equals("Ready", true)
         }
 
         val codeHits = mutableMapOf<String, Int>()
@@ -64,7 +64,7 @@ object SevenDayPromotionalRiskAnalyzer {
         var mediumHits = 0
         var blocked = 0
         scoped.forEach { snap ->
-            if (snap.aigcVerdict.equals("BLOCKED", true) || !snap.aigcShopPublishSafe) {
+            if (snap.aigcVerdict.equals("BLOCKED", true)) {
                 blocked += 1
             }
             extractCodes(snap.auditItems).forEach { (code, severity) ->
@@ -127,12 +127,12 @@ object SevenDayPromotionalRiskAnalyzer {
             val parts = raw.split(" · ").map { it.trim() }
             val code = parts.firstOrNull().orEmpty()
             if (code.isBlank()) return@mapNotNull null
-            val severity = parts.getOrNull(1)?.uppercase()?.let { token ->
-                when {
-                    token == "HIGH" || token == "MEDIUM" || token == "INFO" || token == "LOW" -> token
-                    else -> "HIGH"
-                }
-            } ?: "HIGH"
+            val mark = parts.getOrNull(1).orEmpty()
+            if (mark.contains("исправ", ignoreCase = true)) return@mapNotNull null
+            val severity = when (mark.uppercase()) {
+                "HIGH", "MEDIUM" -> mark.uppercase()
+                else -> return@mapNotNull null
+            }
             code to severity
         }
     }

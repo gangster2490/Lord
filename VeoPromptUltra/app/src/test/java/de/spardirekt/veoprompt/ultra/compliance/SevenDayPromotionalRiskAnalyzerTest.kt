@@ -17,7 +17,7 @@ class SevenDayPromotionalRiskAnalyzerTest {
         assertEquals(0, report.score)
         assertEquals(0, report.projectedRestrictionDays)
         assertEquals(7, report.windowDays)
-        assertEquals("2026.06-v1", report.policyVersion)
+        assertEquals("2026.06-v2", report.policyVersion)
     }
 
     @Test
@@ -29,6 +29,32 @@ class SevenDayPromotionalRiskAnalyzerTest {
         val report = SevenDayPromotionalRiskAnalyzer.analyze(snaps, now)
         assertEquals(0, report.analyzedCount)
         assertEquals("LOW", report.riskLevel)
+    }
+
+    @Test
+    fun repairedAndFailedPackagesDoNotInflateLivePromoRisk() {
+        val snaps = listOf(
+            snap(
+                "cleaned",
+                now - day,
+                "Ready",
+                items = listOf("CL_SUPERLATIVE · исправлено · cheapest", "AIGC_DISCLOSE · INFO · label")
+            ),
+            snap(
+                "failed",
+                now - 1000,
+                "Failed",
+                items = listOf("PR_URGENCY · HIGH · last chance"),
+                verdict = "BLOCKED",
+                publishSafe = false
+            )
+        )
+        val report = SevenDayPromotionalRiskAnalyzer.analyze(snaps, now)
+        assertEquals(1, report.analyzedCount)
+        assertEquals(0, report.highHits)
+        assertEquals(0, report.blockedPackages)
+        assertEquals("LOW", report.riskLevel)
+        assertEquals(0, report.projectedRestrictionDays)
     }
 
     @Test
