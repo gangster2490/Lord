@@ -1,15 +1,12 @@
-# local.properties is machine-specific
-local.properties
-.gradle/
-build/
-app/build/
 *.iml
-.idea/
+.gradle
+/local.properties
+/.idea
 .DS_Store
-captures/
-.externalNativeBuild/
-.cxx/
+/build
+/app/build
+/domain/build
+.kotlin
 *.apk
 *.ap_
-*.dex
-!apk/*.apk
+*.aab
