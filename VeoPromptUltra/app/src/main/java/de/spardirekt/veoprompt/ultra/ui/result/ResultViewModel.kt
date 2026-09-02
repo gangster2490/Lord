@@ -64,10 +64,16 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
     fun copyVeoPrompt() {
         val text = _state.value.veoPrompt
         clipboard().setPrimaryClip(ClipData.newPlainText("veoPrompt", text))
+        _state.update { it.copy(copyNotice = "VEO Prompt скопирован") }
     }
 
     fun copyPackage() {
         clipboard().setPrimaryClip(ClipData.newPlainText("package", _state.value.packageText()))
+        _state.update { it.copy(copyNotice = "Пакет скопирован") }
+    }
+
+    fun consumeCopyNotice() {
+        _state.update { it.copy(copyNotice = null) }
     }
 
     fun share() {

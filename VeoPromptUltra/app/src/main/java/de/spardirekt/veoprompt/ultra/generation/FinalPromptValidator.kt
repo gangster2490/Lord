@@ -119,7 +119,8 @@ object FinalPromptValidator {
 
     /**
      * Local, non-destructive field repair: move leaked TITLE/HASHTAGS out of veoPrompt,
-     * fill voiceover OFF, normalize hashtag # prefixes. Never shortens veoPrompt.
+     * fill voiceover OFF, normalize hashtag # prefixes, and append missing PRODUCT LOCK
+     * / NEGATIVE PROMPT identity lines. Never shortens veoPrompt.
      */
     fun localRepair(
         response: StructuredResponse,
@@ -141,7 +142,54 @@ object FinalPromptValidator {
         if (current.title.isBlank()) {
             current = current.copy(title = productModel.productIdentity.ifBlank { "Product Ad" })
         }
+        current = enrichProductLock(current, productModel)
+        current = enrichNegativePrompt(current, productModel)
         return current
+    }
+
+    internal fun enrichProductLock(
+        response: StructuredResponse,
+        productModel: ProductModel
+    ): StructuredResponse {
+        if (response.veoPrompt.isBlank()) return response
+        val lock = sectionBody(response.veoPrompt, "PRODUCT LOCK")
+        val additions = mutableListOf<String>()
+        productModel.visualSignature.forEach { detail ->
+            val token = detail.trim()
+            if (token.isNotBlank() && !containsDetail(lock, token)) {
+                additions += "Preserve $token."
+            }
+        }
+        val hasSameObject = lock.contains("unchanged", ignoreCase = true) ||
+            lock.contains("same single physical product", ignoreCase = true)
+        if (!hasSameObject) {
+            additions += SAME_OBJECT_SENTENCE
+            additions += DO_NOT_REGENERATE_SENTENCE
+        }
+        if (additions.isEmpty()) return response
+        return appendToSection(response, "PRODUCT LOCK", additions)
+    }
+
+    internal fun enrichNegativePrompt(
+        response: StructuredResponse,
+        productModel: ProductModel
+    ): StructuredResponse {
+        if (response.veoPrompt.isBlank()) return response
+        val negative = sectionBody(response.veoPrompt, "NEGATIVE PROMPT")
+        val additions = mutableListOf<String>()
+        productModel.visualSignature.forEach { detail ->
+            val token = detail.trim()
+            if (token.isNotBlank() && !containsDetail(negative, token)) {
+                additions += "- no missing or redesigned $token"
+            }
+        }
+        RegressionLocks.matchingSpec(productModel)?.forbidden?.forEach { banned ->
+            if (!containsDetail(negative, banned)) {
+                additions += "- no $banned"
+            }
+        }
+        if (additions.isEmpty()) return response
+        return appendToSection(response, "NEGATIVE PROMPT", additions)
     }
 
     fun failedFields(report: Report): List<String> = report.issues.map { it.field }.distinct()
@@ -212,6 +260,39 @@ object FinalPromptValidator {
         }.trim()
         return response.copy(veoPrompt = rebuilt)
     }
+
+    private val SAME_OBJECT_SENTENCE =
+        "The same single physical product shown in the uploaded photos must remain unchanged across all four shots."
+    private val DO_NOT_REGENERATE_SENTENCE =
+        "Do not regenerate a slightly different version of the product for each shot."
+
+    private fun appendToSection(
+        response: StructuredResponse,
+        header: String,
+        extraLines: List<String>
+    ): StructuredResponse {
+        if (extraLines.isEmpty()) return response
+        val existing = sectionBody(response.veoPrompt, header).trimEnd()
+        val suffix = extraLines.joinToString("\n")
+        val merged = if (existing.isBlank()) suffix else existing + "\n" + suffix
+        return if (headerPresent(response.veoPrompt, header)) {
+            replaceSection(response, header, merged)
+        } else {
+            appendSection(response, header, merged)
+        }
+    }
+
+    private fun containsDetail(text: String, detail: String): Boolean {
+        val blob = text.lowercase()
+        val needle = detail.trim().lowercase()
+        if (needle.isBlank()) return true
+        if (blob.contains(needle)) return true
+        val tokens = significantTokens(needle)
+        return tokens.isNotEmpty() && tokens.all { blob.contains(it) }
+    }
+
+    private fun significantTokens(text: String): List<String> =
+        text.split(Regex("[^a-zA-Zа-яА-Я0-9]+")).filter { it.length >= 4 }
 
     private fun appendSection(
         response: StructuredResponse,

@@ -30,4 +30,13 @@ class ResultViewStateTest {
         assertTrue(pack.contains("Title"))
         assertTrue(pack.contains("#a"))
     }
+
+    @Test
+    fun copyNoticeDoesNotChangeStoredPrompt() {
+        val full = "FORMAT\nVertical 9:16.\n" + "X".repeat(300)
+        val state = ResultViewState(veoPrompt = full, copyNotice = "VEO Prompt скопирован")
+        assertEquals(full, state.veoPrompt)
+        assertEquals("VEO Prompt скопирован", state.copyNotice)
+        assertTrue(state.preview().length < full.length)
+    }
 }

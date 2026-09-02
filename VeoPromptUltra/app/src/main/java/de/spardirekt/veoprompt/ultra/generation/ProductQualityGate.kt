@@ -17,13 +17,22 @@ object ProductQualityGate {
                 model.confirmedColors
             ).distinct()
         val materials = MaterialSafety.filterUnverifiedMaterials(model.confirmedMaterials, highFacts)
-        val signature = model.visualSignature
+        val base = model.visualSignature
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()
-            .let { list ->
-                if (list.size <= 12) list else list.subList(0, 12)
+        val extras = (model.confirmedParts + model.confirmedColors + highFacts)
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filter { extra ->
+                base.none { existing ->
+                    existing.equals(extra, ignoreCase = true) ||
+                        existing.contains(extra, ignoreCase = true)
+                }
             }
+        val signature = (base + extras)
+            .distinct()
+            .let { list -> if (list.size <= 12) list else list.take(12) }
         return model.copy(
             confirmedMaterials = materials,
             visualSignature = signature,

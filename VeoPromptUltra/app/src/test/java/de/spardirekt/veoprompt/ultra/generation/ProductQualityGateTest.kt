@@ -23,4 +23,19 @@ class ProductQualityGateTest {
         assertTrue(locked.confirmedMaterials.contains("matte black"))
         assertEquals(12, locked.visualSignature.size)
     }
+
+    @Test
+    fun fillsSignatureFromConfirmedPartsWhenShort() {
+        val model = ProductModel(
+            visualSignature = listOf("ridged plates"),
+            confirmedParts = listOf("hinge", "handle"),
+            confirmedColors = listOf("black")
+        )
+        val locked = ProductQualityGate.lockAppearance(model, null)
+        assertTrue(locked.visualSignature.contains("ridged plates"))
+        assertTrue(locked.visualSignature.contains("hinge"))
+        assertTrue(locked.visualSignature.contains("handle"))
+        assertTrue(locked.visualSignature.contains("black"))
+        assertTrue(locked.visualSignature.size in 4..12)
+    }
 }

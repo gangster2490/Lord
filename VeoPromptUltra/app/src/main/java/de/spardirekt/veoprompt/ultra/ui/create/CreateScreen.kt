@@ -10,6 +10,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -61,6 +63,7 @@ import de.spardirekt.veoprompt.ultra.ui.theme.LocalBottomBarInset
 import de.spardirekt.veoprompt.ultra.ui.theme.UltraColors
 import de.spardirekt.veoprompt.ultra.ui.theme.UltraGradients
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CreateScreen(
     viewModel: CreateViewModel,
@@ -196,14 +199,12 @@ fun CreateScreen(
             PearlCard {
                 Text("Creative", fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(8.dp))
-                val modes = CreativeMode.entries
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    modes.chunked(4).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            row.forEach { mode ->
-                                Chip(mode.uiLabel(), state.creative == mode, onClick = { viewModel.setCreative(mode) })
-                            }
-                        }
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CreativeMode.entries.forEach { mode ->
+                        Chip(mode.uiLabel(), state.creative == mode, onClick = { viewModel.setCreative(mode) })
                     }
                 }
             }

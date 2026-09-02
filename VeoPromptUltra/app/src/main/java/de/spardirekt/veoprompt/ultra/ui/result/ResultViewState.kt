@@ -17,7 +17,8 @@ data class ResultViewState(
     val productIdentity: String = "",
     val visualSignature: List<String> = emptyList(),
     val appMode: String = "Simple",
-    val loaded: Boolean = false
+    val loaded: Boolean = false,
+    val copyNotice: String? = null
 ) {
     fun preview(): String {
         val text = veoPrompt

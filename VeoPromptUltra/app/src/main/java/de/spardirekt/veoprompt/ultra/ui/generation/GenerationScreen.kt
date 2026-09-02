@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -81,6 +83,7 @@ fun GenerationScreen(
             .fillMaxSize()
             .background(UltraColors.pearl)
             .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
         Text("Генерация", fontWeight = FontWeight.SemiBold, fontSize = 24.sp, color = UltraColors.textOnLight)

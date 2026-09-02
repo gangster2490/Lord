@@ -116,4 +116,59 @@ class FinalPromptValidatorTest {
         )
         assertTrue(report.issues.any { it.reason.contains("product_lock") || it.reason.contains("same_object") })
     }
+
+    @Test
+    fun localRepairAppendsMissingSignatureAndSameObjectWithoutTruncating() {
+        val genericLock = Fixtures.validVeoPrompt(panModel).replace(
+            Regex("(?is)PRODUCT LOCK\\n.*?\\n\\nSETTING"),
+            "PRODUCT LOCK\nKeep the product the same.\n\nSETTING"
+        )
+        val originalLength = genericLock.length
+        val repaired = FinalPromptValidator.localRepair(
+            StructuredResponse(
+                veoPrompt = genericLock,
+                voiceover = "Ein Satz über die Pfanne mit Holzdeckel.",
+                title = "Pfanne",
+                hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop")
+            ),
+            panModel,
+            VoiceLanguage.DE,
+            true
+        )
+        assertTrue(repaired.veoPrompt.length >= originalLength)
+        assertTrue(repaired.veoPrompt.contains("Keep the product the same."))
+        assertTrue(repaired.veoPrompt.contains("deep rounded bowl"))
+        assertTrue(repaired.veoPrompt.contains("same single physical product"))
+        assertTrue(repaired.veoPrompt.contains("unchanged"))
+        assertFalse(repaired.veoPrompt.endsWith("..."))
+        val report = FinalPromptValidator.validate(repaired, panModel, VoiceLanguage.DE, true)
+        assertTrue(report.issues.joinToString(), report.ok)
+    }
+
+    @Test
+    fun localRepairAppendsMissingNegativeBulletsOnly() {
+        val prompt = Fixtures.validVeoPrompt(panModel).replace(
+            Regex("(?is)NEGATIVE PROMPT\\n.*"),
+            "NEGATIVE PROMPT\n- no marketplace UI\n- no malformed hands"
+        )
+        val before = prompt
+        val repaired = FinalPromptValidator.localRepair(
+            StructuredResponse(
+                veoPrompt = prompt,
+                voiceover = "Ein Satz über die Pfanne mit Holzdeckel.",
+                title = "Pfanne",
+                hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop")
+            ),
+            panModel,
+            VoiceLanguage.DE,
+            true
+        )
+        assertTrue(repaired.veoPrompt.contains("- no marketplace UI"))
+        assertTrue(repaired.veoPrompt.contains("- no malformed hands"))
+        assertTrue(repaired.veoPrompt.contains("wooden crossbar lid") || repaired.veoPrompt.contains("wooden"))
+        assertTrue(repaired.veoPrompt.contains("- no wok") || repaired.veoPrompt.contains("wok"))
+        assertTrue(repaired.veoPrompt.length > before.length)
+        val negative = FinalPromptValidator.sectionBody(repaired.veoPrompt, "NEGATIVE PROMPT")
+        assertTrue(negative.startsWith("- no marketplace UI"))
+    }
 }

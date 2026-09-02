@@ -78,8 +78,7 @@ object RegressionLocks {
         val spec = matchingSpec(model) ?: return emptyList()
         val lower = prompt.lowercase()
         val missing = spec.requiredDetails.filter { detail ->
-            val tokens = detail.lowercase().split(" ")
-            tokens.none { token -> lower.contains(token) }
+            !containsAllTokens(lower, detail)
         }
         val positive = prompt.lineSequence()
             .map { it.trim().lowercase() }
@@ -87,5 +86,13 @@ object RegressionLocks {
             .joinToString("\n")
         val forbiddenHits = spec.forbidden.filter { positive.contains(it.lowercase()) }
         return missing.map { "missing:$it" } + forbiddenHits.map { "forbidden:$it" }
+    }
+
+    private fun containsAllTokens(haystack: String, detail: String): Boolean {
+        val tokens = detail.lowercase()
+            .split(Regex("[^a-zA-Zа-яА-Я0-9]+"))
+            .filter { it.length >= 2 }
+        if (tokens.isEmpty()) return haystack.contains(detail.lowercase())
+        return tokens.all { haystack.contains(it) }
     }
 }
