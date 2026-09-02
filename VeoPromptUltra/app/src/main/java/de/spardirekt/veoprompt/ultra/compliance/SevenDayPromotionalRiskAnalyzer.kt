@@ -3,9 +3,9 @@ package de.spardirekt.veoprompt.ultra.compliance
 /**
  * 7-day TikTok Shop promotional-content risk analyzer.
  *
- * Local rolling window over generated packages. Estimates repeat-promo pressure
- * that Seller Center treats as high-risk (urgency, prices, medical, forced CTA,
- * AIGC deception). Not official CHR/AHR and not written into veoPrompt.
+ * Local rolling window over **Ready** packages. Counts only unrepaired HIGH/MEDIUM
+ * promo findings. Failed jobs, INFO, and cleaned (“исправлено”) lines do not
+ * inflate live Shop risk. Not official CHR/AHR and not written into veoPrompt.
  *
  * Restriction-day projection follows the public milestone shape
  * (3 / 7 / 14 day shoppable limits) as an owner warning only.
