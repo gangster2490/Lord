@@ -212,6 +212,7 @@ object TikTokShopComplianceAuditor {
 
     private fun markRepaired(findings: MutableList<Finding>, field: String) {
         for (i in findings.indices) {
+            if (findings[i].code.startsWith("AIGC_")) continue
             if (findings[i].field == field || findings[i].field == "voiceover" && field == "voiceover") {
                 findings[i] = findings[i].copy(repaired = true)
             }
