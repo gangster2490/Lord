@@ -38,7 +38,6 @@ import de.spardirekt.svoe.SvoeViewModel
 import de.spardirekt.svoe.ui.habits.HabitsScreen
 import de.spardirekt.svoe.ui.home.HomeScreen
 import de.spardirekt.svoe.ui.journal.JournalScreen
-import de.spardirekt.svoe.ui.onboarding.OnboardingScreen
 import de.spardirekt.svoe.ui.settings.SettingsScreen
 import de.spardirekt.svoe.ui.tasks.TasksScreen
 import de.spardirekt.svoe.ui.wallet.WalletScreen
@@ -61,15 +60,10 @@ private val Tabs = listOf(
 @Composable
 fun SvoeApp(vm: SvoeViewModel) {
     val ready by vm.ready.collectAsStateWithLifecycle()
-    val state by vm.state.collectAsStateWithLifecycle()
     if (!ready) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
-        return
-    }
-    if (!state.prefs.onboardingDone) {
-        OnboardingScreen(onDone = vm::completeOnboarding)
         return
     }
 

@@ -67,7 +67,13 @@ class LifeStore(
 
     suspend fun hydrate() {
         mutex.withLock {
-            _state.value = persist.read() ?: LifeState.Empty
+            val loaded = persist.read()
+            val next = if (loaded == null) {
+                SeedData.populated(clock, Prefs(onboardingDone = true, currencyCode = "EUR")).also { persist.write(it) }
+            } else {
+                loaded
+            }
+            _state.value = next
             _ready.value = true
         }
     }

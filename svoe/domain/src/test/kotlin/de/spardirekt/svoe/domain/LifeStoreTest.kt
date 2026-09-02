@@ -14,22 +14,38 @@ class LifeStoreTest {
         val clock = FixedAppClock(LocalDate.of(2026, 9, 2), 42L)
         val store = LifeStore(FileLifePersist(file), clock)
         store.hydrate()
-        store.update { it.completeOnboarding("Роберт", "EUR") }
-        store.update { it.addTask("Купить хлеб", clock = clock) }
+        store.update { it.updatePrefs(name = "Роберт") }
 
         val reloaded = LifeStore(FileLifePersist(file), clock)
         reloaded.hydrate()
         assertThat(reloaded.state.value.prefs.displayName).isEqualTo("Роберт")
-        assertThat(reloaded.state.value.tasks.single().title).isEqualTo("Купить хлеб")
+        assertThat(reloaded.state.value.habits).isNotEmpty()
         assertThat(reloaded.ready.value).isTrue()
     }
 
     @Test
-    fun missingFileStartsEmpty() = runTest {
+    fun missingFileStartsWithReadyHomeData() = runTest {
         val store = LifeStore(MemoryPersist(), FixedAppClock(LocalDate.of(2026, 9, 2)))
         store.hydrate()
-        assertThat(store.state.value).isEqualTo(LifeState.Empty)
+        assertThat(store.state.value.prefs.onboardingDone).isTrue()
+        assertThat(store.state.value.habits).hasSize(3)
+        assertThat(store.state.value.tasks).isNotEmpty()
         assertThat(store.ready.value).isTrue()
+    }
+
+    @Test
+    fun wipeIsNotReseededOnNextHydrate() = runTest {
+        val persist = MemoryPersist()
+        val clock = FixedAppClock(LocalDate.of(2026, 9, 2))
+        val store = LifeStore(persist, clock)
+        store.hydrate()
+        store.update { it.wipePersonalData() }
+
+        val reloaded = LifeStore(persist, clock)
+        reloaded.hydrate()
+        assertThat(reloaded.state.value.tasks).isEmpty()
+        assertThat(reloaded.state.value.habits).isEmpty()
+        assertThat(reloaded.state.value.prefs.onboardingDone).isTrue()
     }
 }
 
