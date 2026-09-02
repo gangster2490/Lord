@@ -1,0 +1,31 @@
+name: recipe-veo-studio
+
+on:
+  push:
+    paths:
+      - "recipe-veo-studio/**"
+      - ".github/workflows/recipe-veo-studio.yml"
+  pull_request:
+    paths:
+      - "recipe-veo-studio/**"
+      - ".github/workflows/recipe-veo-studio.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: recipe-veo-studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - run: ./gradlew :domain:test assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recipe-veo-studio-debug
+          path: recipe-veo-studio/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
