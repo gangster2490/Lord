@@ -3,76 +3,109 @@ package de.spardirekt.recipeveo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import de.spardirekt.recipeveo.domain.AppClock
-import de.spardirekt.recipeveo.domain.Recipe
-import de.spardirekt.recipeveo.domain.RecipeKind
-import de.spardirekt.recipeveo.domain.SeedLibrary
+import de.spardirekt.recipeveo.domain.CreativeMode
+import de.spardirekt.recipeveo.domain.Project
+import de.spardirekt.recipeveo.domain.SeedProjects
+import de.spardirekt.recipeveo.domain.StudioRules
 import de.spardirekt.recipeveo.domain.StudioState
 import de.spardirekt.recipeveo.domain.StudioStore
 import de.spardirekt.recipeveo.domain.ThemeMode
 import de.spardirekt.recipeveo.domain.VoiceLang
+import de.spardirekt.recipeveo.domain.ensureDraft
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 class StudioViewModel(
     private val store: StudioStore,
+    private val photos: PhotoStore,
 ) : ViewModel() {
-    val clock: AppClock = store.clock
     val ready: StateFlow<Boolean> = store.ready
     val state: StateFlow<StudioState> = store.state
-    private val _openedId = MutableStateFlow<String?>(null)
-    val openedId: StateFlow<String?> = _openedId
+    private val _openResultId = MutableStateFlow<String?>(null)
+    val openResultId: StateFlow<String?> = _openResultId
 
     init {
-        viewModelScope.launch { store.hydrate() }
-    }
-
-    fun open(id: String?) {
-        _openedId.value = id
-    }
-
-    fun createAndOpen() {
         viewModelScope.launch {
-            var id = ""
-            store.update { current ->
-                val (next, recipe) = current.createBlank(clock)
-                id = recipe.id
-                next
-            }
-            _openedId.value = id
+            store.hydrate()
+            store.update { it.ensureDraft(store.clock) }
         }
     }
 
-    fun save(recipe: Recipe) = update { it.upsert(recipe.copy(updatedAt = clock.nowMillis())) }
-
-    fun saveAndCompile(recipe: Recipe) = update {
-        it.upsert(recipe.copy(updatedAt = clock.nowMillis())).compile(recipe.id, clock)
+    fun consumeResultNav() {
+        _openResultId.value = null
     }
 
-    fun delete(id: String) {
-        if (_openedId.value == id) _openedId.value = null
-        update { it.delete(id) }
+    fun newProject() = update { it.ensureDraft(store.clock) }
+
+    fun open(id: String) = update { it.open(id) }
+
+    fun addPhotos(uris: List<String>) = update { state ->
+        val project = state.active() ?: return@update state
+        val existing = project.photos.map { it.uri }.toSet()
+        val incoming = uris.filterNot { it in existing }
+        if (incoming.isEmpty()) return@update state
+        val added = photos.persist(project.id, incoming)
+        val nextPhotos = (project.photos + added).take(StudioRules.MAX_PHOTOS)
+        state.upsert(project.copy(photos = nextPhotos, updatedAt = store.clock.nowMillis()))
     }
 
-    fun setTheme(mode: ThemeMode) = update { it.updatePrefs(theme = mode) }
+    fun addDemoPhoto() = addPhotos(listOf(SeedProjects.DEMO_PHOTO))
 
-    fun setDefaultVoice(voice: VoiceLang) = update { it.updatePrefs(defaultVoice = voice) }
+    fun removePhoto(id: String) = update { state ->
+        val project = state.active() ?: return@update state
+        photos.deletePhoto(project.id, id)
+        state.upsert(project.copy(photos = project.photos.filterNot { it.id == id }, updatedAt = store.clock.nowMillis()))
+    }
 
-    fun restoreLibrary() = update { SeedLibrary.populated(clock).copy(prefs = it.prefs) }
+    fun setWish(wish: String) = patch { it.copy(wish = wish) }
 
-    fun clearLibrary() = update { StudioState(prefs = it.prefs) }
+    fun setVoice(voice: VoiceLang) = patch { it.copy(voice = voice) }
 
-    fun recipe(id: String?): Recipe? = id?.let { state.value.recipe(it) }
+    fun setCreative(mode: CreativeMode) = patch { it.copy(creative = mode) }
 
-    fun visible(query: String, kind: RecipeKind?): List<Recipe> = state.value.visible(query, kind)
+    fun setTiktok(enabled: Boolean) = patch { it.copy(tiktokShop = enabled) }
+
+    fun generate() {
+        viewModelScope.launch {
+            val result = store.generateActive(stageHoldMs = 280)
+            result.onSuccess { _openResultId.value = it.id }
+        }
+    }
+
+    fun delete(id: String) = update { state ->
+        photos.deleteProject(id)
+        state.delete(id)
+    }
+
+    fun setTheme(mode: ThemeMode) = update { it.prefs(theme = mode) }
+
+    fun setDefaultVoice(voice: VoiceLang) = update { it.prefs(defaultVoice = voice) }
+
+    fun restoreDemo() = update { state ->
+        photos.deleteAll()
+        SeedProjects.populated(store.clock).copy(prefs = state.prefs)
+    }
+
+    fun clearLibrary() = update { state ->
+        photos.deleteAll()
+        StudioState(prefs = state.prefs).ensureDraft(store.clock)
+    }
+
+    private fun patch(transform: (Project) -> Project) = update { state ->
+        val project = state.active() ?: return@update state
+        state.upsert(transform(project).copy(updatedAt = store.clock.nowMillis()))
+    }
 
     private fun update(transform: (StudioState) -> StudioState) {
         viewModelScope.launch { store.update(transform) }
     }
 
-    class Factory(private val store: StudioStore) : ViewModelProvider.Factory {
+    class Factory(
+        private val store: StudioStore,
+        private val photos: PhotoStore,
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T = StudioViewModel(store) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T = StudioViewModel(store, photos) as T
     }
 }

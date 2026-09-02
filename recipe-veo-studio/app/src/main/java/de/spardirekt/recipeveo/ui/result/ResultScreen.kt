@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -36,7 +37,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.spardirekt.recipeveo.StudioViewModel
-import de.spardirekt.recipeveo.domain.RecipeCompiler
+import de.spardirekt.recipeveo.domain.VeoRecipe
 import de.spardirekt.recipeveo.ui.components.EmptyHint
 import de.spardirekt.recipeveo.ui.components.PrimaryButton
 import de.spardirekt.recipeveo.ui.components.StudioCard
@@ -45,9 +46,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ResultScreen(vm: StudioViewModel, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val openedId by vm.openedId.collectAsStateWithLifecycle()
-    val recipe = openedId?.let { state.recipe(it) }
-    val compiled = recipe?.compiled
+    val compiled = state.active()?.result
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -58,21 +57,24 @@ fun ResultScreen(vm: StudioViewModel, onBack: () -> Unit) {
         scope.launch { snackbar.showSnackbar("Скопировано: $label") }
     }
 
-    androidx.compose.material3.Scaffold(
+    Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            ) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Назад")
                 }
-                Text("Промпт", style = MaterialTheme.typography.headlineMedium)
+                Text("Промпт Veo 3.1", style = MaterialTheme.typography.headlineMedium)
             }
         },
     ) { padding ->
         if (compiled == null) {
             Column(Modifier.fillMaxSize().padding(padding).padding(20.dp), verticalArrangement = Arrangement.Center) {
-                EmptyHint("Промпт ещё не собран", "Откройте рецепт и нажмите «Собрать промпт».")
+                EmptyHint("Промпт ещё не собран", "Добавьте фото товара и нажмите «Собрать промпт».")
             }
             return@Scaffold
         }
@@ -87,24 +89,24 @@ fun ResultScreen(vm: StudioViewModel, onBack: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
                 Text(compiled.hashtags.joinToString("  "), color = MaterialTheme.colorScheme.primary)
             }
-            item {
-                CopyBlock("VEO 3.1", compiled.veoPrompt, fontMono = true) { copy("VEO", compiled.veoPrompt) }
-            }
+            item { CopyBlock("VEO 3.1", compiled.veoPrompt, fontMono = true) { copy("VEO", compiled.veoPrompt) } }
             if (compiled.voiceover.isNotBlank()) {
                 item { CopyBlock("Voiceover", compiled.voiceover) { copy("Voiceover", compiled.voiceover) } }
             }
             item { CopyBlock("Title", compiled.title) { copy("Title", compiled.title) } }
-            item { CopyBlock("Hashtags", compiled.hashtags.joinToString(" ")) { copy("Hashtags", compiled.hashtags.joinToString(" ")) } }
             item {
-                PrimaryButton("Копировать пакет", onClick = {
-                    copy("Package", RecipeCompiler.sharePackage(compiled))
-                })
+                CopyBlock("Hashtags", compiled.hashtags.joinToString(" ")) {
+                    copy("Hashtags", compiled.hashtags.joinToString(" "))
+                }
+            }
+            item {
+                PrimaryButton("Копировать пакет", onClick = { copy("Package", VeoRecipe.sharePackage(compiled)) })
                 Spacer(Modifier.height(8.dp))
                 TextButton(
                     onClick = {
                         val send = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, RecipeCompiler.sharePackage(compiled))
+                            putExtra(Intent.EXTRA_TEXT, VeoRecipe.sharePackage(compiled))
                             putExtra(Intent.EXTRA_SUBJECT, compiled.title)
                         }
                         context.startActivity(Intent.createChooser(send, compiled.title))

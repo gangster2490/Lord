@@ -1,5 +1,6 @@
 package de.spardirekt.recipeveo.domain
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,7 +66,7 @@ class StudioStore(
         mutex.withLock {
             val loaded = persist.read()
             val next = if (loaded == null) {
-                SeedLibrary.populated(clock).also { persist.write(it) }
+                SeedProjects.populated(clock).also { persist.write(it) }
             } else {
                 loaded
             }
@@ -83,5 +84,67 @@ class StudioStore(
             }
             return _state.value
         }
+    }
+
+    suspend fun generateActive(stageHoldMs: Long = 0): Result<Project> {
+        mutex.withLock {
+            val current = _state.value
+            val project = current.active() ?: return Result.failure(IllegalStateException("Нет активного проекта."))
+            if (!StudioRules.canGenerate(project)) {
+                return Result.failure(IllegalStateException("Добавьте фото товара."))
+            }
+            val started = project.copy(
+                status = ProjectStatus.Generating,
+                stage = GenerationStage.PHOTO_ANALYSIS,
+                error = "",
+                updatedAt = clock.nowMillis(),
+            )
+            write(current.upsert(started))
+            listOf(
+                GenerationStage.PRODUCT_MODEL,
+                GenerationStage.CREATIVE_DIRECTOR,
+                GenerationStage.FINAL_PROMPT,
+            ).forEach { stage ->
+                if (stageHoldMs > 0) delay(stageHoldMs)
+                write(_state.value.upsert(started.copy(stage = stage, updatedAt = clock.nowMillis())))
+            }
+            if (stageHoldMs > 0) delay(stageHoldMs)
+            val pkg = runCatching {
+                VeoRecipe.compile(
+                    VeoRecipe.GenerateInput(
+                        photoCount = started.photos.size,
+                        wish = started.wish,
+                        voice = started.voice,
+                        creative = started.creative,
+                        tiktokShop = started.tiktokShop,
+                        demoProduct = started.photos.any { it.uri == SeedProjects.DEMO_PHOTO },
+                    ),
+                    clock.nowMillis(),
+                )
+            }.getOrElse { err ->
+                val failed = started.copy(
+                    status = ProjectStatus.Error,
+                    stage = GenerationStage.FAILED,
+                    error = err.message ?: "Не удалось собрать промпт.",
+                    updatedAt = clock.nowMillis(),
+                )
+                write(_state.value.upsert(failed))
+                return Result.failure(err)
+            }
+            val ready = started.copy(
+                title = pkg.title,
+                status = ProjectStatus.Ready,
+                stage = GenerationStage.DONE,
+                result = pkg,
+                updatedAt = clock.nowMillis(),
+            )
+            write(_state.value.upsert(ready))
+            return Result.success(ready)
+        }
+    }
+
+    private suspend fun write(next: StudioState) {
+        persist.write(next)
+        _state.value = next
     }
 }

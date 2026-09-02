@@ -7,33 +7,34 @@ import java.util.UUID
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 @Serializable
-enum class RecipeKind { FOOD, DRINK, PRODUCT, BEAUTY, LIFESTYLE }
-
-@Serializable
-enum class VisualStyle { STUDIO, MACRO, SATISFYING, LIFESTYLE, CINEMATIC, STREET }
-
-@Serializable
 enum class VoiceLang { DE, RU, OFF }
 
 @Serializable
-enum class BeatRole { HOOK, IDENTITY, FEATURE, HERO }
+enum class CreativeMode { Auto, Showcase, Demo, Lifestyle, Macro, Satisfying, Unboxing }
+
+@Serializable
+enum class ProjectStatus { Draft, Generating, Ready, Error }
+
+@Serializable
+enum class GenerationStage {
+    IDLE, PHOTO_ANALYSIS, PRODUCT_MODEL, CREATIVE_DIRECTOR, FINAL_PROMPT, DONE, FAILED
+}
 
 @Serializable
 data class Prefs(
-    val defaultVoice: VoiceLang = VoiceLang.RU,
     val theme: ThemeMode = ThemeMode.DARK,
+    val defaultVoice: VoiceLang = VoiceLang.DE,
+    val tiktokShop: Boolean = true,
 )
 
 @Serializable
-data class ShotBeat(
-    val role: BeatRole,
-    val startSec: Double,
-    val endSec: Double,
-    val action: String,
+data class PhotoRef(
+    val id: String,
+    val uri: String,
 )
 
 @Serializable
-data class CompiledPrompt(
+data class PromptPackage(
     val veoPrompt: String,
     val voiceover: String,
     val title: String,
@@ -42,58 +43,70 @@ data class CompiledPrompt(
 )
 
 @Serializable
-data class Recipe(
+data class Project(
     val id: String,
-    val title: String,
-    val subject: String,
-    val kind: RecipeKind,
-    val style: VisualStyle,
-    val setting: String,
-    val lockNotes: List<String>,
-    val beats: List<ShotBeat>,
-    val voice: VoiceLang,
+    val title: String = "",
+    val photos: List<PhotoRef> = emptyList(),
     val wish: String = "",
-    val onScreenText: String = "",
+    val voice: VoiceLang = VoiceLang.DE,
+    val creative: CreativeMode = CreativeMode.Auto,
+    val tiktokShop: Boolean = true,
+    val status: ProjectStatus = ProjectStatus.Draft,
+    val stage: GenerationStage = GenerationStage.IDLE,
+    val error: String = "",
+    val result: PromptPackage? = null,
     val createdAt: Long,
     val updatedAt: Long,
-    val compiled: CompiledPrompt? = null,
 )
 
 fun newId(): String = UUID.randomUUID().toString()
 
-fun defaultBeats(): List<ShotBeat> = listOf(
-    ShotBeat(BeatRole.HOOK, 0.0, 2.0, ""),
-    ShotBeat(BeatRole.IDENTITY, 2.0, 4.0, ""),
-    ShotBeat(BeatRole.FEATURE, 4.0, 6.0, ""),
-    ShotBeat(BeatRole.HERO, 6.0, 8.0, ""),
-)
-
-fun RecipeKind.label(): String = when (this) {
-    RecipeKind.FOOD -> "Еда"
-    RecipeKind.DRINK -> "Напиток"
-    RecipeKind.PRODUCT -> "Продукт"
-    RecipeKind.BEAUTY -> "Бьюти"
-    RecipeKind.LIFESTYLE -> "Лайфстайл"
-}
-
-fun VisualStyle.label(): String = when (this) {
-    VisualStyle.STUDIO -> "Студия"
-    VisualStyle.MACRO -> "Макро"
-    VisualStyle.SATISFYING -> "Satisfying"
-    VisualStyle.LIFESTYLE -> "Lifestyle"
-    VisualStyle.CINEMATIC -> "Кино"
-    VisualStyle.STREET -> "Улица"
-}
-
 fun VoiceLang.label(): String = when (this) {
-    VoiceLang.RU -> "Русский"
     VoiceLang.DE -> "Deutsch"
+    VoiceLang.RU -> "Русский"
     VoiceLang.OFF -> "Без голоса"
 }
 
-fun BeatRole.label(): String = when (this) {
-    BeatRole.HOOK -> "Хук"
-    BeatRole.IDENTITY -> "Объект"
-    BeatRole.FEATURE -> "Демо"
-    BeatRole.HERO -> "Герой"
+fun CreativeMode.label(): String = when (this) {
+    CreativeMode.Auto -> "Auto"
+    CreativeMode.Showcase -> "Showcase"
+    CreativeMode.Demo -> "Demo"
+    CreativeMode.Lifestyle -> "Lifestyle"
+    CreativeMode.Macro -> "Macro"
+    CreativeMode.Satisfying -> "Satisfying"
+    CreativeMode.Unboxing -> "Unboxing"
+}
+
+fun ProjectStatus.label(): String = when (this) {
+    ProjectStatus.Draft -> "Черновик"
+    ProjectStatus.Generating -> "Сборка"
+    ProjectStatus.Ready -> "Готово"
+    ProjectStatus.Error -> "Ошибка"
+}
+
+fun GenerationStage.label(): String = when (this) {
+    GenerationStage.IDLE -> ""
+    GenerationStage.PHOTO_ANALYSIS -> "Разбор фото"
+    GenerationStage.PRODUCT_MODEL -> "Модель продукта"
+    GenerationStage.CREATIVE_DIRECTOR -> "Режиссура"
+    GenerationStage.FINAL_PROMPT -> "Финальный промпт"
+    GenerationStage.DONE -> "Готово"
+    GenerationStage.FAILED -> "Ошибка"
+}
+
+object StudioRules {
+    const val MAX_PHOTOS = 15
+
+    fun canGenerate(project: Project): Boolean = project.photos.isNotEmpty() && project.status != ProjectStatus.Generating
+
+    val sectionOrder = listOf(
+        "FORMAT", "REFERENCES", "PRODUCT LOCK", "SETTING", "SHOT SEQUENCE",
+        "ON-SCREEN TEXT", "VOICEOVER", "AUDIO", "CRITICAL", "NEGATIVE PROMPT",
+        "TITLE", "HASHTAGS",
+    )
+
+    fun looksComplete(prompt: String, hashtags: List<String>): Boolean =
+        sectionOrder.all { heading ->
+            Regex("^${Regex.escape(heading)}$", RegexOption.MULTILINE).containsMatchIn(prompt)
+        } && prompt.contains("Exactly 8.0s") && hashtags.size == 5
 }

@@ -6,56 +6,50 @@ import kotlinx.serialization.Serializable
 data class StudioState(
     val version: Int = 1,
     val prefs: Prefs = Prefs(),
-    val recipes: List<Recipe> = emptyList(),
+    val projects: List<Project> = emptyList(),
+    val activeId: String? = null,
 ) {
-    fun updatePrefs(theme: ThemeMode = prefs.theme, defaultVoice: VoiceLang = prefs.defaultVoice): StudioState =
-        copy(prefs = prefs.copy(theme = theme, defaultVoice = defaultVoice))
+    fun prefs(theme: ThemeMode = prefs.theme, defaultVoice: VoiceLang = prefs.defaultVoice, tiktokShop: Boolean = prefs.tiktokShop) =
+        copy(prefs = prefs.copy(theme = theme, defaultVoice = defaultVoice, tiktokShop = tiktokShop))
 
-    fun upsert(recipe: Recipe): StudioState {
-        val without = recipes.filterNot { it.id == recipe.id }
-        return copy(recipes = listOf(recipe) + without)
+    fun project(id: String?): Project? = id?.let { id0 -> projects.firstOrNull { it.id == id0 } }
+
+    fun active(): Project? = project(activeId) ?: projects.firstOrNull()
+
+    fun upsert(project: Project): StudioState {
+        val without = projects.filterNot { it.id == project.id }
+        return copy(projects = listOf(project) + without)
     }
 
-    fun delete(id: String): StudioState = copy(recipes = recipes.filterNot { it.id == id })
-
-    fun compile(id: String, clock: AppClock): StudioState {
-        val recipe = recipes.firstOrNull { it.id == id } ?: return this
-        val compiled = RecipeCompiler.compile(recipe, clock)
-        return upsert(recipe.copy(compiled = compiled, updatedAt = clock.nowMillis()))
-    }
-
-    fun createBlank(clock: AppClock): Pair<StudioState, Recipe> {
-        val now = clock.nowMillis()
-        val recipe = Recipe(
-            id = newId(),
-            title = "",
-            subject = "",
-            kind = RecipeKind.FOOD,
-            style = VisualStyle.STUDIO,
-            setting = "",
-            lockNotes = emptyList(),
-            beats = defaultBeats(),
-            voice = prefs.defaultVoice,
-            createdAt = now,
-            updatedAt = now,
+    fun delete(id: String): StudioState {
+        val next = projects.filterNot { it.id == id }
+        return copy(
+            projects = next,
+            activeId = if (activeId == id) next.firstOrNull()?.id else activeId,
         )
-        return upsert(recipe) to recipe
     }
 
-    fun recipe(id: String): Recipe? = recipes.firstOrNull { it.id == id }
+    fun open(id: String): StudioState = copy(activeId = id)
 
-    fun visible(query: String, kind: RecipeKind?): List<Recipe> {
-        val needle = query.trim().lowercase()
-        return recipes.filter { recipe ->
-            (kind == null || recipe.kind == kind) &&
-                (needle.isEmpty() ||
-                    recipe.title.lowercase().contains(needle) ||
-                    recipe.subject.lowercase().contains(needle) ||
-                    recipe.setting.lowercase().contains(needle))
-        }
-    }
+    fun history(): List<Project> = projects.filter { it.status != ProjectStatus.Draft || it.photos.isNotEmpty() || it.result != null }
 
     companion object {
         val Empty = StudioState()
     }
+}
+
+fun StudioState.ensureDraft(clock: AppClock): StudioState {
+    val reusable = projects.firstOrNull {
+        it.status == ProjectStatus.Draft && it.photos.isEmpty() && it.result == null
+    }
+    if (reusable != null) return copy(activeId = reusable.id)
+    val now = clock.nowMillis()
+    val draft = Project(
+        id = newId(),
+        voice = prefs.defaultVoice,
+        tiktokShop = prefs.tiktokShop,
+        createdAt = now,
+        updatedAt = now,
+    )
+    return upsert(draft).copy(activeId = draft.id)
 }

@@ -18,9 +18,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val store = (application as RecipeVeoApplication).store
+        val app = application as RecipeVeoApplication
         setContent {
-            val vm: StudioViewModel = viewModel(factory = StudioViewModel.Factory(store))
+            val vm: StudioViewModel = viewModel(factory = StudioViewModel.Factory(app.store, app.photos))
             val state = vm.state.collectAsStateWithLifecycle().value
             RecipeVeoTheme(mode = state.prefs.theme) {
                 val dark = when (state.prefs.theme) {

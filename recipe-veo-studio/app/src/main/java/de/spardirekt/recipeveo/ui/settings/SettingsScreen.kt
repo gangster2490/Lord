@@ -45,7 +45,10 @@ fun SettingsScreen(vm: StudioViewModel) {
     ) {
         Text("Студия", style = MaterialTheme.typography.displayLarge)
         Spacer(Modifier.height(4.dp))
-        Text("Всё локально. Ролик собирает Veo, не это приложение.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            "Промпт собирается на телефоне. API-ключ не нужен. Вставьте текст в Gemini / Veo.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.height(16.dp))
         StudioCard {
             Text("Тема", style = MaterialTheme.typography.titleLarge)
@@ -58,7 +61,7 @@ fun SettingsScreen(vm: StudioViewModel) {
         }
         Spacer(Modifier.height(12.dp))
         StudioCard {
-            Text("Голос по умолчанию", style = MaterialTheme.typography.titleLarge)
+            Text("Голос новых проектов", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(10.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 VoiceLang.entries.forEach {
@@ -71,12 +74,12 @@ fun SettingsScreen(vm: StudioViewModel) {
             Text("Библиотека", style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Стартовые рецепты можно вернуть. Очистка не трогает тему и голос.",
+                "Демо-проект Velvet Gold можно вернуть. Очистка не трогает тему.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(14.dp))
-            PrimaryButton("Вернуть примеры", onClick = vm::restoreLibrary)
+            PrimaryButton("Вернуть демо", onClick = vm::restoreDemo)
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = { confirmClear = true }) {
                 Text("Очистить студию", color = MaterialTheme.colorScheme.error)
@@ -95,7 +98,7 @@ fun SettingsScreen(vm: StudioViewModel) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("Очистить студию?") },
-            text = { Text("Все рецепты и промпты будут удалены с этого телефона.") },
+            text = { Text("Все проекты и промпты будут удалены с этого телефона.") },
             confirmButton = {
                 TextButton(onClick = { vm.clearLibrary(); confirmClear = false }) {
                     Text("Удалить", color = MaterialTheme.colorScheme.error)

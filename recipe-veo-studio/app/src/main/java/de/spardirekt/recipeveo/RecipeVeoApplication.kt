@@ -9,6 +9,8 @@ import java.io.File
 class RecipeVeoApplication : Application() {
     lateinit var store: StudioStore
         private set
+    lateinit var photos: PhotoStore
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -16,5 +18,6 @@ class RecipeVeoApplication : Application() {
             persist = FileStudioPersist(File(filesDir, "studio.json")),
             clock = SystemAppClock(),
         )
+        photos = PhotoStore(this)
     }
 }
