@@ -182,6 +182,21 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 )
             }
         }
+        item(key = "aigc-rules") {
+            PearlCard {
+                Text("AIGC Hard Rules", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                AigcHardRules.RULES.forEach { rule ->
+                    Text(
+                        "${rule.code} · ${rule.title}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                    Text(rule.summary, color = UltraColors.textMuted, fontSize = 12.sp)
+                }
+            }
+        }
     }
 }
 

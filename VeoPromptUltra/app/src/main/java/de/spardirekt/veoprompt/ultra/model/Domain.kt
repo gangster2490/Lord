@@ -184,11 +184,23 @@ data class CreativeDirection(
 )
 
 @Serializable
+data class AigcReport(
+    val policyVersion: String = "",
+    val verdict: String = "",
+    val disclosureRequired: Boolean = true,
+    val shopPublishSafe: Boolean = true,
+    val findings: List<String> = emptyList(),
+    val checklist: List<String> = emptyList(),
+    val publishSteps: List<String> = emptyList()
+)
+
+@Serializable
 data class SafetyAudit(
     val riskLevel: String = "LOW",
     val items: List<String> = emptyList(),
     val policyVersion: String = "",
-    val aigcPolicyVersion: String = ""
+    val aigcPolicyVersion: String = "",
+    val aigc: AigcReport = AigcReport()
 )
 
 @Serializable

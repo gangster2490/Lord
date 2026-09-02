@@ -65,6 +65,12 @@ class GenerationPipelineTest {
         assertTrue(bundle.safetyAudit.policyVersion.isNotBlank())
         assertEquals(de.spardirekt.veoprompt.ultra.compliance.AigcHardRules.VERSION, bundle.safetyAudit.aigcPolicyVersion)
         assertTrue(bundle.safetyAudit.items.any { it.contains("AIGC_DISCLOSE") })
+        assertEquals(
+            de.spardirekt.veoprompt.ultra.compliance.AigcComplianceSystem.VERDICT_DISCLOSE,
+            bundle.safetyAudit.aigc.verdict
+        )
+        assertTrue(bundle.safetyAudit.aigc.shopPublishSafe)
+        assertTrue(bundle.safetyAudit.aigc.checklist.isNotEmpty())
         assertFalse(bundle.veoPrompt.contains("AIGC AUDIT"))
         assertFalse(bundle.veoPrompt.contains("SAFETY AUDIT"))
     }

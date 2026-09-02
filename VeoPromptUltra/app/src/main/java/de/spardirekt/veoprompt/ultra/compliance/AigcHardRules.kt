@@ -35,7 +35,7 @@ object AigcHardRules {
         Rule(
             "AIGC_NO_DECEIVE",
             "No deception",
-            "AI must not mislead, deceive, or create a false impression about the product, people, or facts.",
+            "AI must not mislead, deceive, or create a false impression about the product, people, or facts. Do not present VEO output as live footage.",
             Severity.HIGH
         ),
         Rule(
@@ -86,6 +86,13 @@ object AigcHardRules {
             "The product in the video must match the uploaded physical product being sold.",
             Severity.HIGH
         )
+    )
+
+    val BANNED_DECEIVE = listOf(
+        "this is real footage", "not ai generated", "not ai-generated",
+        "actually filmed", "real customer filmed", "hidden camera real",
+        "это реальная съёмка", "это не нейросеть",
+        "echt gefilmt", "keine ki", "kein ki-video"
     )
 
     val BANNED_IMPERSONATION = listOf(

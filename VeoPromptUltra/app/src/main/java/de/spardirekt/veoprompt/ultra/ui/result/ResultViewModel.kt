@@ -44,7 +44,11 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
                 safetyRisk = audit.riskLevel,
                 safetyItems = audit.items,
                 safetyPolicyVersion = audit.policyVersion,
-                aigcPolicyVersion = audit.aigcPolicyVersion,
+                aigcPolicyVersion = audit.aigcPolicyVersion.ifBlank { audit.aigc.policyVersion },
+                aigcVerdict = audit.aigc.verdict,
+                aigcShopPublishSafe = audit.aigc.shopPublishSafe,
+                aigcChecklist = audit.aigc.checklist,
+                aigcPublishSteps = audit.aigc.publishSteps,
                 tiktokShopMode = entity.tiktokShopMode,
                 language = entity.voiceLanguage,
                 creativeMode = entity.creativeMode,
@@ -71,6 +75,11 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
     fun copyPackage() {
         clipboard().setPrimaryClip(ClipData.newPlainText("package", _state.value.packageText()))
         _state.update { it.copy(copyNotice = "Пакет скопирован") }
+    }
+
+    fun copyAigcChecklist() {
+        clipboard().setPrimaryClip(ClipData.newPlainText("aigcChecklist", _state.value.aigcChecklistText()))
+        _state.update { it.copy(copyNotice = "AIGC чеклист скопирован") }
     }
 
     fun consumeCopyNotice() {

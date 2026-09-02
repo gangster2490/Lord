@@ -4,6 +4,7 @@ import de.spardirekt.veoprompt.ultra.diagnostics.DebugLog
 import de.spardirekt.veoprompt.ultra.model.CreativeDirection
 import de.spardirekt.veoprompt.ultra.model.ImageAnalysisBlock
 import de.spardirekt.veoprompt.ultra.model.ImageClassification
+import de.spardirekt.veoprompt.ultra.model.AigcReport
 import de.spardirekt.veoprompt.ultra.model.SafetyAudit
 import de.spardirekt.veoprompt.ultra.model.StructuredResponse
 import kotlinx.serialization.json.Json
@@ -131,11 +132,34 @@ object StructuredResponseParser {
             is JsonPrimitive -> listOfNotNull(raw.contentOrNull?.trim()?.takeIf { it.isNotEmpty() })
             else -> emptyList()
         }
+        val aigcObj = obj["aigc"] as? JsonObject
+        val aigc = if (aigcObj == null) {
+            AigcReport(policyVersion = readString(obj, "aigcPolicyVersion"))
+        } else {
+            AigcReport(
+                policyVersion = readString(aigcObj, "policyVersion").ifBlank { readString(obj, "aigcPolicyVersion") },
+                verdict = readString(aigcObj, "verdict"),
+                disclosureRequired = (aigcObj["disclosureRequired"] as? JsonPrimitive)?.contentOrNull != "false",
+                shopPublishSafe = (aigcObj["shopPublishSafe"] as? JsonPrimitive)?.contentOrNull != "false",
+                findings = stringList(aigcObj["findings"]),
+                checklist = stringList(aigcObj["checklist"]),
+                publishSteps = stringList(aigcObj["publishSteps"])
+            )
+        }
         return SafetyAudit(
             riskLevel = readString(obj, "riskLevel").ifBlank { "LOW" },
             items = items,
             policyVersion = readString(obj, "policyVersion"),
-            aigcPolicyVersion = readString(obj, "aigcPolicyVersion")
+            aigcPolicyVersion = readString(obj, "aigcPolicyVersion").ifBlank { aigc.policyVersion },
+            aigc = aigc
         )
+    }
+
+    private fun stringList(raw: JsonElement?): List<String> {
+        return when (raw) {
+            is JsonArray -> readStringArray(raw)
+            is JsonPrimitive -> listOfNotNull(raw.contentOrNull?.trim()?.takeIf { it.isNotEmpty() })
+            else -> emptyList()
+        }
     }
 }

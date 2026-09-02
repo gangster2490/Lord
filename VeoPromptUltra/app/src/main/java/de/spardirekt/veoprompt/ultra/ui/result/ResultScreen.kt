@@ -124,22 +124,47 @@ fun ResultScreen(
                 if (state.safetyPolicyVersion.isNotBlank()) {
                     Text("Policy ${state.safetyPolicyVersion}", color = UltraColors.textMuted, fontSize = 12.sp)
                 }
-                Text(
-                    "TikTok Shop AIGC Hard Rules",
-                    color = UltraColors.violet,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-                if (state.aigcPolicyVersion.isNotBlank()) {
-                    Text("AIGC ${state.aigcPolicyVersion}", color = UltraColors.textMuted, fontSize = 12.sp)
-                }
                 state.safetyItems.forEach { item ->
                     Text("• $item", fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
                 }
                 if (state.safetyItems.isEmpty()) {
                     Text("Замечаний нет", color = UltraColors.textMuted, fontSize = 13.sp)
                 }
+            }
+        }
+        item(key = "aigc-$projectId") {
+            PearlCard {
+                Text("AIGC Compliance", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "TikTok Shop AIGC Hard Rules",
+                    color = UltraColors.violet,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                if (state.aigcPolicyVersion.isNotBlank()) {
+                    Text("Policy ${state.aigcPolicyVersion}", color = UltraColors.textMuted, fontSize = 12.sp)
+                }
+                val verdict = state.aigcVerdict.ifBlank { "—" }
+                Text(
+                    if (state.aigcShopPublishSafe) "Вердикт: $verdict" else "Вердикт: $verdict · не публиковать",
+                    color = if (state.aigcShopPublishSafe) UltraColors.textOnLight else UltraColors.danger,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+                state.aigcChecklist.forEach { row ->
+                    Text("• $row", fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+                if (state.aigcPublishSteps.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Публикация", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                    state.aigcPublishSteps.forEachIndexed { index, step ->
+                        Text("${index + 1}. $step", fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                SecondaryButton("Копировать AIGC чеклист", onClick = viewModel::copyAigcChecklist)
             }
         }
         item(key = "summary-$projectId") {

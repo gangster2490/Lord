@@ -10,6 +10,10 @@ data class ResultViewState(
     val safetyItems: List<String> = emptyList(),
     val safetyPolicyVersion: String = "",
     val aigcPolicyVersion: String = "",
+    val aigcVerdict: String = "",
+    val aigcShopPublishSafe: Boolean = true,
+    val aigcChecklist: List<String> = emptyList(),
+    val aigcPublishSteps: List<String> = emptyList(),
     val tiktokShopMode: Boolean = true,
     val language: String = "DE",
     val creativeMode: String = "AUTO",
@@ -37,4 +41,17 @@ data class ResultViewState(
         append("\n\n")
         append(hashtags.joinToString(" "))
     }
+
+    fun aigcChecklistText(): String = buildString {
+        append("TikTok Shop AIGC · ${aigcVerdict.ifBlank { "—" }}")
+        if (aigcPolicyVersion.isNotBlank()) append(" · $aigcPolicyVersion")
+        append('\n')
+        aigcChecklist.forEach { append(it).append('\n') }
+        if (aigcPublishSteps.isNotEmpty()) {
+            append('\n')
+            aigcPublishSteps.forEachIndexed { i, step ->
+                append("${i + 1}. ").append(step).append('\n')
+            }
+        }
+    }.trim()
 }

@@ -27,8 +27,8 @@ object AigcHardRulesAuditor {
         voiceover: String,
         title: String,
         overlay: String,
-        @Suppress("UNUSED_PARAMETER") productModel: ProductModel,
-        tiktokShopMode: Boolean
+        productModel: ProductModel,
+        @Suppress("UNUSED_PARAMETER") tiktokShopMode: Boolean
     ): Result {
         val spoken = listOf(voiceover, title, overlay).joinToString("\n")
         val positivePrompt = prompt.lineSequence()
@@ -38,15 +38,14 @@ object AigcHardRulesAuditor {
         val packageText = "$spoken\n$positivePrompt"
         val findings = mutableListOf<Finding>()
 
-        if (tiktokShopMode) {
-            findings += Finding(
-                code = "AIGC_DISCLOSE",
-                severity = "INFO",
-                field = "package",
-                message = "VEO-ролик полностью AI-generated. При публикации включите переключатель TikTok «AI-generated content»."
-            )
-        }
+        findings += Finding(
+            code = "AIGC_DISCLOSE",
+            severity = "INFO",
+            field = "package",
+            message = "VEO-ролик полностью AI-generated. При публикации включите переключатель TikTok «AI-generated content»."
+        )
 
+        findings += scan(spoken, "voiceover", AigcHardRules.BANNED_DECEIVE, "AIGC_NO_DECEIVE")
         findings += scan(spoken, "voiceover", AigcHardRules.BANNED_IMPERSONATION, "AIGC_NO_IMPERSONATE")
         findings += scan(spoken, "voiceover", AigcHardRules.BANNED_FALSE_ENDORSE, "AIGC_NO_FALSE_ENDORSE")
         findings += scan(spoken, "voiceover", AigcHardRules.BANNED_UNREALISTIC, "AIGC_NO_UNREALISTIC")
@@ -56,6 +55,17 @@ object AigcHardRulesAuditor {
         findings += scan(packageText, "package", AigcHardRules.BANNED_IP, "AIGC_NO_IP")
 
         val enriched = enrichPrompt(prompt)
+        val lock = FinalPromptValidator.sectionBody(enriched, "PRODUCT LOCK")
+        if (productModel.visualSignature.isNotEmpty() &&
+            !FinalPromptValidator.isProductSpecificLock(lock, productModel)
+        ) {
+            findings += Finding(
+                "AIGC_PRODUCT_MATCH",
+                "HIGH",
+                "veoPrompt",
+                "PRODUCT LOCK не фиксирует visual signature сфотографированного товара."
+            )
+        }
         return Result(prompt = enriched, findings = findings.distinctBy { it.code + it.message })
     }
 

@@ -132,11 +132,17 @@ object TikTokShopComplianceAuditor {
             val mark = if (finding.repaired) "исправлено" else finding.severity
             "${finding.code} · $mark · ${finding.message}"
         }
+        val aigcReport = AigcComplianceSystem.evaluate(
+            findings = unique.map { AigcComplianceSystem.InputFinding(it.code, it.severity, it.message) },
+            prompt = prompt,
+            productModel = productModel
+        )
         val audit = SafetyAudit(
             riskLevel = risk,
             items = items,
             policyVersion = TikTokShopPolicy.VERSION,
-            aigcPolicyVersion = AigcHardRules.VERSION
+            aigcPolicyVersion = AigcHardRules.VERSION,
+            aigc = aigcReport
         )
         return Result(
             response = response.copy(
@@ -175,6 +181,7 @@ object TikTokShopComplianceAuditor {
             TikTokShopPolicy.BANNED_SYMPATHY +
             TikTokShopPolicy.BANNED_HARD_CTA +
             TikTokShopPolicy.BANNED_OFF_PLATFORM +
+            AigcHardRules.BANNED_DECEIVE +
             AigcHardRules.BANNED_IMPERSONATION +
             AigcHardRules.BANNED_FALSE_ENDORSE +
             AigcHardRules.BANNED_UNREALISTIC +

@@ -39,4 +39,22 @@ class ResultViewStateTest {
         assertEquals("VEO Prompt скопирован", state.copyNotice)
         assertTrue(state.preview().length < full.length)
     }
+
+    @Test
+    fun aigcChecklistCopyStaysOutsideVeoPrompt() {
+        val prompt = "FORMAT\nVertical 9:16.\nPRODUCT LOCK\nKeep the pan."
+        val state = ResultViewState(
+            veoPrompt = prompt,
+            aigcVerdict = "DISCLOSE_REQUIRED",
+            aigcPolicyVersion = "2026.05-v1",
+            aigcChecklist = listOf("OK · AIGC_DISCLOSE · Label"),
+            aigcPublishSteps = listOf("Enable TikTok AI-generated content toggle")
+        )
+        val text = state.aigcChecklistText()
+        assertTrue(text.contains("DISCLOSE_REQUIRED"))
+        assertTrue(text.contains("AIGC_DISCLOSE"))
+        assertTrue(text.contains("Enable TikTok"))
+        assertEquals(prompt, state.veoPrompt)
+        assertFalse(state.packageText().contains("AIGC_DISCLOSE"))
+    }
 }

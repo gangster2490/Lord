@@ -23,6 +23,7 @@ class AigcHardRulesAuditorTest {
             codes.containsAll(
                 listOf(
                     "AIGC_DISCLOSE",
+                    "AIGC_NO_DECEIVE",
                     "AIGC_NO_IMPERSONATE",
                     "AIGC_NO_FALSE_ENDORSE",
                     "AIGC_NO_PRODUCT_ALTER",
