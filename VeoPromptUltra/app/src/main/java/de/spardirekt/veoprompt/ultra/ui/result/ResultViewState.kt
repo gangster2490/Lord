@@ -8,6 +8,8 @@ data class ResultViewState(
     val hashtags: List<String> = emptyList(),
     val safetyRisk: String = "LOW",
     val safetyItems: List<String> = emptyList(),
+    val safetyPolicyVersion: String = "",
+    val tiktokShopMode: Boolean = true,
     val language: String = "DE",
     val creativeMode: String = "AUTO",
     val status: String = "",

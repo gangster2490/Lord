@@ -1,6 +1,7 @@
 package de.spardirekt.veoprompt.ultra.generation
 
 import android.content.Context
+import de.spardirekt.veoprompt.ultra.compliance.TikTokShopComplianceAuditor
 import de.spardirekt.veoprompt.ultra.config.ModelConfig
 import de.spardirekt.veoprompt.ultra.diagnostics.AppError
 import de.spardirekt.veoprompt.ultra.diagnostics.DebugLog
@@ -216,7 +217,13 @@ class GenerationPipeline(
                 )
             }
 
-            val finalResponse = report.response
+            val compliant = TikTokShopComplianceAuditor.audit(
+                response = report.response,
+                productModel = model,
+                voice = input.voiceLanguage,
+                tiktokShopMode = input.tiktokShopMode
+            )
+            val finalResponse = compliant.response
             if (finalResponse.veoPrompt.isBlank()) {
                 return Result.failure(AppError.Unknown("Пустой veoPrompt."))
             }
@@ -230,7 +237,7 @@ class GenerationPipeline(
                 productModelJson = productModelJson,
                 creativePlanJson = creativePlanJson,
                 analysisJson = analysisJson,
-                safetyAudit = finalResponse.safetyAudit.ifEmptyDefault()
+                safetyAudit = compliant.audit.ifEmptyDefault()
             )
             onStage(StageUpdate(GenerationStage.DONE, analysis, productModel, creativePlan, bundle))
             Result.success(bundle)

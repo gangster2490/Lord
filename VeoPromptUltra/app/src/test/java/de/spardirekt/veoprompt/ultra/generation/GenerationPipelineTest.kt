@@ -61,6 +61,8 @@ class GenerationPipelineTest {
         assertTrue(stages.contains(GenerationStage.DONE))
         assertFalse(bundle.veoPrompt.endsWith("..."))
         assertTrue(bundle.veoPrompt.contains("deep rounded bowl"))
+        assertFalse(bundle.veoPrompt.contains("SAFETY AUDIT"))
+        assertTrue(bundle.safetyAudit.policyVersion.isNotBlank())
     }
 
     @Test

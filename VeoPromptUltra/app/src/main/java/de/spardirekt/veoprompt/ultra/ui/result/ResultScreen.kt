@@ -100,8 +100,17 @@ fun ResultScreen(
         item(key = "audit-$projectId") {
             PearlCard {
                 Text("Safety Audit", fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "TikTok Shop Content Quality & Compliance",
+                    color = UltraColors.violet,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
                 Text("Риск: ${state.safetyRisk}", color = UltraColors.textMuted, fontSize = 13.sp)
+                if (state.safetyPolicyVersion.isNotBlank()) {
+                    Text("Policy ${state.safetyPolicyVersion}", color = UltraColors.textMuted, fontSize = 12.sp)
+                }
                 state.safetyItems.forEach { item ->
                     Text("• $item", fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
                 }

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy
 import de.spardirekt.veoprompt.ultra.config.ModelConfig
 import de.spardirekt.veoprompt.ultra.model.CreativeMode
 import de.spardirekt.veoprompt.ultra.model.VoiceLanguage
@@ -164,6 +165,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 Spacer(Modifier.height(6.dp))
                 Text("Veo Prompt Ultra", fontWeight = FontWeight.Medium)
                 Text("Приватное приложение для точных VEO 3.1 промптов. Видео не генерируется.", color = UltraColors.textMuted, fontSize = 13.sp)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "TikTok Shop Content Quality & Compliance Policy ${TikTokShopPolicy.VERSION}. Аудит хранится отдельно от veoPrompt.",
+                    color = UltraColors.textMuted,
+                    fontSize = 12.sp
+                )
             }
         }
     }

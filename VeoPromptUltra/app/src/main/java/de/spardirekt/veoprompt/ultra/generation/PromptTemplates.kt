@@ -1,5 +1,6 @@
 package de.spardirekt.veoprompt.ultra.generation
 
+import de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy
 import de.spardirekt.veoprompt.ultra.model.CreativeMode
 import de.spardirekt.veoprompt.ultra.model.VoiceLanguage
 
@@ -113,6 +114,36 @@ One benefit + one verified feature.
 No catalogue tone. No announcer tone. No fake urgency. No unsupported claims.
 No forced TikTok Shop CTA if unnatural.
 Voice should finish around 7.0–7.4s.
+
+==================================================
+TIKTOK SHOP CONTENT QUALITY & COMPLIANCE POLICY
+==================================================
+Internal policy ${TikTokShopPolicy.VERSION}.
+Applies to veoPrompt, voiceover, title, overlays and hashtags.
+The safetyAudit JSON field stores the audit. NEVER put SAFETY AUDIT inside veoPrompt.
+
+Quality:
+- Content must be accurate and consistent with the photographed product.
+- Product readable from the first second.
+- Do not replace or redesign the product.
+
+Claims:
+- No unsupported performance, material, certification or origin claims.
+- No medical, clinical, cure or extreme-transformation claims.
+- No cheapest / lowest price / best ever / #1 / guaranteed.
+
+Promotion:
+- No prices, discounts, coupons, marketplace UI or phone UI.
+- No fake urgency or scarcity.
+- No sympathy selling.
+- No command CTAs (Закажите, Купите, Jetzt kaufen).
+- No off-platform redirects (WhatsApp, Telegram, QR checkout, link in bio).
+- No political or election-fundraising language.
+- No gambling, shocking or fraudulent promotional behavior.
+
+AI:
+- AI must not alter the product.
+- The owner should label the published VEO video as AI-generated when required.
 
 ==================================================
 ON-SCREEN TEXT

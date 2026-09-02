@@ -43,6 +43,8 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
                 hashtags = repo.parseHashtags(entity),
                 safetyRisk = audit.riskLevel,
                 safetyItems = audit.items,
+                safetyPolicyVersion = audit.policyVersion,
+                tiktokShopMode = entity.tiktokShopMode,
                 language = entity.voiceLanguage,
                 creativeMode = entity.creativeMode,
                 status = entity.status,
