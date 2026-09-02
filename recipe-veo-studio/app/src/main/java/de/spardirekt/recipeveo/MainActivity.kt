@@ -4,37 +4,34 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.runtime.SideEffect
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import de.spardirekt.recipeveo.domain.ThemeMode
-import de.spardirekt.recipeveo.ui.RecipeVeoApp
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import de.spardirekt.recipeveo.ui.navigation.RecipeVeoNav
 import de.spardirekt.recipeveo.ui.theme.RecipeVeoTheme
+import de.spardirekt.recipeveo.ui.theme.VppColors
 
 class MainActivity : ComponentActivity() {
+    @OptIn(ExperimentalComposeUiApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val app = application as RecipeVeoApplication
         setContent {
-            val vm: StudioViewModel = viewModel(factory = StudioViewModel.Factory(app.store, app.photos))
-            val state = vm.state.collectAsStateWithLifecycle().value
-            RecipeVeoTheme(mode = state.prefs.theme) {
-                val dark = when (state.prefs.theme) {
-                    ThemeMode.DARK -> true
-                    ThemeMode.LIGHT -> false
-                    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            RecipeVeoTheme {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Publishes Compose test tags as resource ids so device
+                        // automation can address controls without matching
+                        // translated labels or tapping coordinates.
+                        .semantics { testTagsAsResourceId = true },
+                    color = VppColors.backgroundLight
+                ) {
+                    RecipeVeoNav()
                 }
-                val view = LocalView.current
-                SideEffect {
-                    val window = (view.context as ComponentActivity).window
-                    WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !dark
-                    WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !dark
-                }
-                RecipeVeoApp(vm)
             }
         }
     }

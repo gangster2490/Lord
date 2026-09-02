@@ -5,226 +5,179 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import de.spardirekt.recipeveo.R
-import de.spardirekt.recipeveo.StudioViewModel
-import de.spardirekt.recipeveo.domain.Catalog
-import de.spardirekt.recipeveo.domain.PhotoRef
-import de.spardirekt.recipeveo.domain.ProjectStatus
-import de.spardirekt.recipeveo.domain.ShotStyle
-import de.spardirekt.recipeveo.domain.StudioRules
-import de.spardirekt.recipeveo.domain.VoiceLang
-import de.spardirekt.recipeveo.domain.label
-import de.spardirekt.recipeveo.ui.components.ChoiceChip
-import de.spardirekt.recipeveo.ui.components.PrimaryButton
-import de.spardirekt.recipeveo.ui.components.SectionHeader
-import de.spardirekt.recipeveo.ui.components.StudioCard
-import de.spardirekt.recipeveo.ui.components.StudioField
+import de.spardirekt.recipeveo.model.ProjectStatus
+import de.spardirekt.recipeveo.ui.components.ApiKeyDialog
+import de.spardirekt.recipeveo.ui.components.AppHeader
+import de.spardirekt.recipeveo.ui.components.GradientHeading
+import de.spardirekt.recipeveo.ui.components.VppTags
+import de.spardirekt.recipeveo.ui.theme.LocalBottomBarInset
+import de.spardirekt.recipeveo.ui.theme.LocalVppType
+import de.spardirekt.recipeveo.ui.theme.VppColors
+import de.spardirekt.recipeveo.ui.theme.VppDimens
+import de.spardirekt.recipeveo.ui.theme.VppLayout
 
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * History and Settings are reachable from the bottom navigation, so the header
+ * here carries only the "new project" action instead of repeating both tabs.
+ */
 @Composable
-fun CreateScreen(vm: StudioViewModel) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val project = state.active()
-    val picker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(StudioRules.MAX_PHOTOS),
-    ) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) vm.addPhotos(uris.map { it.toString() })
-    }
-
-    if (project == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
-        }
-        return
-    }
-
-    val generating = project.status == ProjectStatus.Generating
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 28.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            Text("Собрать рецепт", style = MaterialTheme.typography.displayLarge)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Фото товара становятся 8-секундным промптом Veo 3.1.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick = vm::newProject) { Text("Новый проект") }
-        }
-        item {
-            StudioCard {
-                Text("Фото товара", style = MaterialTheme.typography.titleLarge)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Упаковка, детали, скриншоты описания. До ${StudioRules.MAX_PHOTOS} кадров.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Spacer(Modifier.height(12.dp))
-                PhotoGrid(
-                    photos = project.photos,
-                    onAdd = {
-                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    },
-                    onRemove = vm::removePhoto,
-                )
-                Spacer(Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Catalog.all.forEach { profile ->
-                        ChoiceChip(profile.title.substringBefore(' '), project.photos.any { it.uri == profile.demoUri }) {
-                            vm.addDemo(profile.demoUri)
-                        }
-                    }
-                }
-            }
-        }
-        item {
-            StudioField(project.wish, vm::setWish, "Пожелание (необязательно)", singleLine = false, minLines = 2)
-        }
-        item {
-            SectionHeader("Голос")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                VoiceLang.entries.forEach { ChoiceChip(it.label(), project.voice == it) { vm.setVoice(it) } }
-            }
-        }
-        item {
-            SectionHeader("Стиль")
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ShotStyle.entries.forEach { ChoiceChip(it.label(), project.style == it) { vm.setStyle(it) } }
-            }
-        }
-        item {
-            StudioCard {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.weight(1f)) {
-                        Text("TikTok Shop", style = MaterialTheme.typography.titleMedium)
-                        Text("CTA и хэштеги под витрину", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Switch(checked = project.tiktokShop, onCheckedChange = vm::setTiktok)
-                }
-            }
-        }
-        item {
-            val enabled = StudioRules.canGenerate(project)
-            PrimaryButton(
-                text = if (generating) project.stage.label().ifBlank { "Сборка…" } else "Собрать промпт",
-                onClick = vm::generate,
-                enabled = enabled,
-            )
-            if (generating) {
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.size(10.dp))
-                    Text(project.stage.label(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            if (project.status == ProjectStatus.Error && project.error.isNotBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(project.error, color = MaterialTheme.colorScheme.error)
-            }
-            if (!enabled && !generating) {
-                Spacer(Modifier.height(8.dp))
-                Text("Добавьте хотя бы одно фото.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PhotoGrid(
-    photos: List<PhotoRef>,
-    onAdd: () -> Unit,
-    onRemove: (String) -> Unit,
+fun CreateScreen(
+    viewModel: CreateViewModel,
+    onOpenResult: (String) -> Unit
 ) {
-    val cells = photos + listOf(null)
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        cells.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                row.forEach { photo ->
-                    if (photo == null) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .clickable(onClick = onAdd),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Outlined.Add, contentDescription = "Добавить фото")
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(16.dp)),
-                        ) {
-                            AsyncImage(
-                                model = demoModel(photo.uri),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                            IconButton(onClick = { onRemove(photo.id) }, modifier = Modifier.align(Alignment.TopEnd)) {
-                                Icon(Icons.Outlined.Close, contentDescription = "Убрать")
-                            }
-                        }
-                    }
-                }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f).aspectRatio(1f)) }
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val type = LocalVppType.current
+    val density = LocalDensity.current
+    val bottomBarInset = LocalBottomBarInset.current
+    var actionBarHeight by remember { mutableStateOf(0.dp) }
+
+    LaunchedEffect(Unit) { viewModel.bootstrap() }
+    LaunchedEffect(state.navigateToResultId) {
+        state.navigateToResultId?.let {
+            viewModel.consumeNavigation()
+            onOpenResult(it)
+        }
+    }
+
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_PHOTOS)
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) viewModel.addImages(uris)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        VppColors.backgroundLight,
+                        VppColors.backgroundGlow.copy(alpha = 0.55f),
+                        VppColors.backgroundLight
+                    )
+                )
+            )
+            .testTag(VppTags.CREATE_SCREEN)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = VppDimens.screenPadding)
+                .padding(
+                    top = VppLayout.screenTopPadding,
+                    bottom = bottomBarInset + actionBarHeight + VppLayout.floatingContentGap
+                )
+        ) {
+            AppHeader(onNewProject = { viewModel.newProject() })
+            Spacer(Modifier.height(18.dp))
+            GradientHeading("Генератор промптов для видео")
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Загружайте фото товара, выбирайте настройки\nи получайте готовый промпт для VEO 3.1.",
+                style = type.secondary.copy(color = VppColors.textMutedDark, lineHeight = 20.sp)
+            )
+            Spacer(Modifier.height(20.dp))
+
+            PhotosSection(
+                images = state.images,
+                onAddPhotos = {
+                    picker.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                onRemovePhoto = viewModel::removeImage
+            )
+
+            Spacer(Modifier.height(VppLayout.sectionGap))
+            OptionalWishSection(
+                expanded = state.wishExpanded,
+                text = state.optionalWish,
+                onToggle = viewModel::toggleWish,
+                onTextChange = viewModel::setWish
+            )
+
+            Spacer(Modifier.height(VppLayout.sectionGap))
+            VoiceSection(voice = state.voice, onVoiceChange = viewModel::setVoice)
+
+            Spacer(Modifier.height(VppLayout.sectionGap))
+            ModeSection(
+                mode = state.mode,
+                creative = state.creative,
+                tiktokShopMode = state.tiktokShopMode,
+                onModeChange = viewModel::setMode,
+                onCreativeChange = viewModel::setCreative,
+                onTiktokChange = viewModel::setTiktok
+            )
+
+            if (GenerationProgress.showsRail(state.stage, state.isGenerating)) {
+                Spacer(Modifier.height(VppLayout.sectionGap))
+                GenerationProgressCard(state.stage)
+            }
+
+            if (state.errorMessage.isNotBlank() &&
+                state.project?.status == ProjectStatus.Error.name
+            ) {
+                Spacer(Modifier.height(VppLayout.sectionGap))
+                GenerationErrorCard(
+                    message = state.errorMessage,
+                    detail = state.errorDetail,
+                    showDetail = state.showErrorDetail,
+                    onContinue = viewModel::continueGeneration,
+                    onDetails = viewModel::toggleErrorDetail
+                )
+            } else if (state.errorMessage.isNotBlank() && !state.isGenerating) {
+                Spacer(Modifier.height(12.dp))
+                Text(state.errorMessage, color = VppColors.error, style = type.secondary)
             }
         }
+
+        CreateActionBar(
+            isGenerating = state.isGenerating,
+            stage = state.stage,
+            photoCount = state.images.size,
+            onGenerate = viewModel::onGenerate,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = bottomBarInset)
+                .onSizeChanged { actionBarHeight = with(density) { it.height.toDp() } }
+        )
+    }
+
+    if (state.showApiKeyDialog) {
+        ApiKeyDialog(
+            value = state.apiKeyInput,
+            onValueChange = viewModel::setApiKeyInput,
+            onSave = viewModel::saveApiKeyAndContinue,
+            onCancel = viewModel::dismissApiDialog
+        )
     }
 }
 
-@Composable
-internal fun demoModel(uri: String): Any = when (uri) {
-    Catalog.DEMO_CREAM -> R.drawable.demo_cream
-    Catalog.DEMO_BUDS -> R.drawable.demo_buds
-    Catalog.DEMO_KETTLE -> R.drawable.demo_kettle
-    else -> uri
-}
+private const val MAX_PHOTOS = 15

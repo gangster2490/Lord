@@ -1,144 +1,405 @@
 package de.spardirekt.recipeveo.ui.result
 
+import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import de.spardirekt.recipeveo.StudioViewModel
-import de.spardirekt.recipeveo.domain.VeoRecipe
-import de.spardirekt.recipeveo.ui.components.EmptyHint
-import de.spardirekt.recipeveo.ui.components.PrimaryButton
-import de.spardirekt.recipeveo.ui.components.StudioCard
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewModelScope
+import de.spardirekt.recipeveo.RecipeVeoApp
+import de.spardirekt.recipeveo.data.db.ProjectEntity
+import de.spardirekt.recipeveo.ui.components.AppHeader
+import de.spardirekt.recipeveo.ui.components.GradientButton
+import de.spardirekt.recipeveo.ui.components.GradientHeading
+import de.spardirekt.recipeveo.ui.components.NavyCard
+import de.spardirekt.recipeveo.ui.components.OutlinedActionButton
+import de.spardirekt.recipeveo.ui.components.VppTags
+import de.spardirekt.recipeveo.ui.theme.LocalVppType
+import de.spardirekt.recipeveo.ui.theme.VppColors
+import de.spardirekt.recipeveo.ui.theme.VppDimens
+import de.spardirekt.recipeveo.ui.theme.VppShapes
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 
-@Composable
-fun ResultScreen(vm: StudioViewModel, onBack: () -> Unit) {
-    val state by vm.state.collectAsStateWithLifecycle()
-    val compiled = state.active()?.result
-    val context = LocalContext.current
-    val snackbar = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
+class ResultViewModel(app: Application) : AndroidViewModel(app) {
+    private val repo = RecipeVeoApp.instance.projectRepository
+    private val streams = mutableMapOf<String, StateFlow<ProjectEntity?>>()
 
-    fun copy(label: String, text: String) {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-        scope.launch { snackbar.showSnackbar("Скопировано: $label") }
-    }
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Назад")
-                }
-                Text("Промпт Veo 3.1", style = MaterialTheme.typography.headlineMedium)
-            }
-        },
-    ) { padding ->
-        if (compiled == null) {
-            Column(Modifier.fillMaxSize().padding(padding).padding(20.dp), verticalArrangement = Arrangement.Center) {
-                EmptyHint("Промпт ещё не собран", "Добавьте фото товара и нажмите «Собрать промпт».")
-            }
-            return@Scaffold
+    /**
+     * Cached per project id.
+     *
+     * This used to build a fresh StateFlow on every call. Because the screen
+     * calls it straight from composition, each recomposition produced a new flow
+     * that started at null, which reset the just-delivered project and triggered
+     * another recomposition — the body stayed blank forever and the loop kept
+     * restarting the Room query until the app hit an ANR.
+     */
+    fun observe(projectId: String): StateFlow<ProjectEntity?> =
+        streams.getOrPut(projectId) {
+            repo.observe(projectId).stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                initialValue = null
+            )
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 28.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    fun hashtags(entity: ProjectEntity): List<String> =
+        ResultComposition.hashtags(entity, repo.parseHashtags(entity))
+
+    fun veoPrompt(entity: ProjectEntity): String =
+        ResultComposition.veoPrompt(entity, repo.parseHashtags(entity))
+
+    fun voiceover(entity: ProjectEntity): String = ResultComposition.voiceover(entity)
+
+    fun title(entity: ProjectEntity): String = ResultComposition.title(entity)
+
+    fun fullPackage(entity: ProjectEntity): String =
+        ResultComposition.fullPackage(entity, repo.parseHashtags(entity))
+}
+
+@Composable
+fun ResultScreen(
+    projectId: String,
+    viewModel: ResultViewModel,
+    onBackToCreate: () -> Unit
+) {
+    val project by viewModel.observe(projectId).collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val entity = project
+
+    val veoPrompt = remember(entity?.id, entity?.veoPrompt, entity?.voiceover, entity?.title, entity?.hashtagsJson) {
+        entity?.let { viewModel.veoPrompt(it) }.orEmpty()
+    }
+    val voiceover = remember(entity?.id, entity?.voiceover, entity?.veoPrompt) {
+        entity?.let { viewModel.voiceover(it) }.orEmpty()
+    }
+    val title = remember(entity?.id, entity?.title, entity?.veoPrompt) {
+        entity?.let { viewModel.title(it) }.orEmpty()
+    }
+    val hashtags = remember(entity?.id, entity?.hashtagsJson, entity?.veoPrompt) {
+        entity?.let { viewModel.hashtags(it) }.orEmpty()
+    }
+    val voiceLabel = remember(entity?.voiceLanguage) {
+        entity?.let { ResultComposition.voiceLabel(it) }.orEmpty()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        VppColors.backgroundLight,
+                        VppColors.backgroundGlow.copy(alpha = 0.5f),
+                        VppColors.backgroundLight
+                    )
+                )
+            )
+            .testTag(VppTags.RESULT_SCREEN)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = VppDimens.screenPadding)
+                .padding(top = 12.dp, bottom = 40.dp)
         ) {
-            item {
-                Text(compiled.title, style = MaterialTheme.typography.displayLarge)
-                Spacer(Modifier.height(4.dp))
-                Text(compiled.hashtags.joinToString("  "), color = MaterialTheme.colorScheme.primary)
-            }
-            item { CopyBlock("VEO 3.1", compiled.veoPrompt, fontMono = true) { copy("VEO", compiled.veoPrompt) } }
-            if (compiled.voiceover.isNotBlank()) {
-                item { CopyBlock("Voiceover", compiled.voiceover) { copy("Voiceover", compiled.voiceover) } }
-            }
-            item { CopyBlock("Title", compiled.title) { copy("Title", compiled.title) } }
-            item {
-                CopyBlock("Hashtags", compiled.hashtags.joinToString(" ")) {
-                    copy("Hashtags", compiled.hashtags.joinToString(" "))
-                }
-            }
-            item {
-                PrimaryButton("Копировать пакет", onClick = { copy("Package", VeoRecipe.sharePackage(compiled)) })
-                Spacer(Modifier.height(8.dp))
-                TextButton(
-                    onClick = {
-                        val send = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, VeoRecipe.sharePackage(compiled))
-                            putExtra(Intent.EXTRA_SUBJECT, compiled.title)
-                        }
-                        context.startActivity(Intent.createChooser(send, compiled.title))
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Outlined.Share, contentDescription = null)
-                    Spacer(Modifier.padding(6.dp))
-                    Text("Поделиться")
-                }
+            // Copy and share live under the prompt card. Repeating them here
+            // squeezed the brand block until it truncated to "Veo P…".
+            AppHeader(onNewProject = onBackToCreate)
+            Spacer(Modifier.height(18.dp))
+            // No enter animation — AnimatedVisibility(visible=false) caused a blank/white flash.
+            GradientHeading("Результат")
+            Spacer(Modifier.height(16.dp))
+            if (entity != null) {
+                ResultBody(
+                    entity = entity,
+                    veoPrompt = veoPrompt,
+                    voiceover = voiceover,
+                    title = title,
+                    voiceLabel = voiceLabel,
+                    hashtags = hashtags,
+                    onCopyPrompt = { copyText(context, veoPrompt) },
+                    onSharePrompt = { shareText(context, veoPrompt) },
+                    onCopyPackage = { copyText(context, viewModel.fullPackage(entity)) },
+                    onSharePackage = { shareText(context, viewModel.fullPackage(entity)) },
+                    onCopyVo = { copyText(context, voiceover) },
+                    onCopyTitle = { copyText(context, title) },
+                    onCopyTags = { copyText(context, hashtags.joinToString(" ")) }
+                )
+            } else {
+                // Keep layout stable while Room emits — no loading-card pop-in flash.
+                Spacer(Modifier.height(240.dp))
             }
         }
     }
 }
 
 @Composable
-private fun CopyBlock(label: String, body: String, fontMono: Boolean = false, onCopy: () -> Unit) {
-    StudioCard {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            IconButton(onClick = onCopy) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = "Копировать")
+private fun ResultBody(
+    entity: ProjectEntity,
+    veoPrompt: String,
+    voiceover: String,
+    title: String,
+    voiceLabel: String,
+    hashtags: List<String>,
+    onCopyPrompt: () -> Unit,
+    onSharePrompt: () -> Unit,
+    onCopyPackage: () -> Unit,
+    onSharePackage: () -> Unit,
+    onCopyVo: () -> Unit,
+    onCopyTitle: () -> Unit,
+    onCopyTags: () -> Unit
+) {
+    val type = LocalVppType.current
+    var promptExpanded by remember(entity.id) { mutableStateOf(false) }
+
+    NavyCard {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Badge("Ready for Gemini")
+            Badge("VEO 3.1 PROMPT")
+        }
+        Spacer(Modifier.height(14.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(VppShapes.insetShape)
+                .background(VppColors.cardInset)
+                .padding(16.dp)
+        ) {
+            Text(
+                veoPrompt.ifBlank { "Промпт ещё не готов." },
+                style = type.body.copy(
+                    color = VppColors.textLight.copy(alpha = 0.92f),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp,
+                    lineHeight = 19.sp
+                ),
+                // The full 12-section prompt is hundreds of lines. Collapsed by
+                // default so the copy actions and the rest of the package stay
+                // one screen away instead of a long scroll.
+                maxLines = if (promptExpanded) Int.MAX_VALUE else COLLAPSED_PROMPT_LINES,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag(VppTags.RESULT_PROMPT)
+            )
+        }
+        if (veoPrompt.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedActionButton(
+                text = if (promptExpanded) "Свернуть промпт" else "Показать промпт полностью",
+                onClick = { promptExpanded = !promptExpanded },
+                height = 44.dp,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+
+    Spacer(Modifier.height(14.dp))
+    GradientButton(
+        text = "✦ Копировать VEO Prompt",
+        onClick = onCopyPrompt,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag(VppTags.RESULT_COPY_PROMPT)
+    )
+    Spacer(Modifier.height(10.dp))
+    // Four stacked full-width buttons pushed the rest of the package off-screen.
+    // Two rows keep every label spelled out; these sit on the light page, not
+    // inside a card, so they take the dark label colour.
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedActionButton(
+            text = "Поделиться",
+            onClick = onSharePrompt,
+            height = 46.dp,
+            contentColor = VppColors.textDark,
+            modifier = Modifier.weight(1f)
+        )
+        OutlinedActionButton(
+            text = "Копировать пакет",
+            onClick = onCopyPackage,
+            height = 46.dp,
+            contentColor = VppColors.textDark,
+            modifier = Modifier.weight(1f)
+        )
+    }
+    Spacer(Modifier.height(8.dp))
+    OutlinedActionButton(
+        text = "Поделиться всем пакетом",
+        onClick = onSharePackage,
+        height = 46.dp,
+        contentColor = VppColors.textDark,
+        modifier = Modifier.fillMaxWidth()
+    )
+
+    Spacer(Modifier.height(14.dp))
+    NavyCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.GraphicEq, null, tint = VppColors.accentPurple)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                voiceLabel,
+                style = type.cardTitle.copy(color = VppColors.textLight),
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onCopyVo) {
+                Icon(Icons.Outlined.ContentCopy, null, tint = VppColors.textMuted)
             }
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            body,
-            style = if (fontMono) {
-                MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)
-            } else {
-                MaterialTheme.typography.bodyLarge
-            },
+            voiceover.ifBlank { "OFF" },
+            style = type.body.copy(color = VppColors.textLight)
         )
     }
+
+    Spacer(Modifier.height(14.dp))
+    NavyCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Edit, null, tint = VppColors.accentPurple)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "Название",
+                style = type.cardTitle.copy(color = VppColors.textLight),
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onCopyTitle) {
+                Icon(Icons.Outlined.ContentCopy, null, tint = VppColors.textMuted)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(title.ifBlank { "—" }, style = type.body.copy(color = VppColors.textLight))
+    }
+
+    Spacer(Modifier.height(14.dp))
+    NavyCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Tag, null, tint = VppColors.accentPurple)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                "Хештеги",
+                style = type.cardTitle.copy(color = VppColors.textLight),
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = onCopyTags) {
+                Icon(Icons.Outlined.ContentCopy, null, tint = VppColors.textMuted)
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            hashtags.take(5).forEach { tag ->
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(VppColors.cardInset)
+                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                ) {
+                    Text(tag, color = VppColors.textLight, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(14.dp))
+    NavyCard {
+        Text("Кратко о проекте", style = type.cardTitle.copy(color = VppColors.textLight))
+        Spacer(Modifier.height(14.dp))
+        SummaryRow("Язык озвучки", entity.voiceLanguage)
+        Spacer(Modifier.height(10.dp))
+        SummaryRow("Режим", entity.mode)
+        Spacer(Modifier.height(10.dp))
+        SummaryRow("TikTok Shop Mode", if (entity.tiktokShopMode) "ON" else "OFF")
+    }
+}
+
+@Composable
+private fun Badge(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(VppColors.cardInset)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    ) {
+        Text(text, color = VppColors.accentPurple, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun SummaryRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            label,
+            style = LocalVppType.current.secondary.copy(color = VppColors.textMuted),
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            value,
+            style = LocalVppType.current.body.copy(
+                color = VppColors.textLight,
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+    }
+}
+
+private const val COLLAPSED_PROMPT_LINES = 14
+
+private fun copyText(context: Context, text: String) {
+    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    cm.setPrimaryClip(ClipData.newPlainText("Recipe VEO Studio", text))
+    Toast.makeText(context, "Скопировано", Toast.LENGTH_SHORT).show()
+}
+
+private fun shareText(context: Context, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, "Поделиться"))
 }
