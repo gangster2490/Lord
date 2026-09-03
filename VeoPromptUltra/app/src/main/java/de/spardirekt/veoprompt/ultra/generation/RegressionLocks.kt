@@ -148,14 +148,13 @@ object RegressionLocks {
 
     fun violations(prompt: String, model: ProductModel): List<String> {
         val spec = matchingSpec(model) ?: return emptyList()
-        val lower = prompt.lowercase()
-        val missing = spec.requiredDetails.filter { detail ->
-            !containsAllTokens(lower, detail)
-        }
         val positive = prompt.lineSequence()
             .map { it.trim().lowercase() }
             .filterNot { it.startsWith("- no") || it.startsWith("no ") || it.startsWith("-no") }
             .joinToString("\n")
+        val missing = spec.requiredDetails.filter { detail ->
+            !containsAllTokens(positive, detail)
+        }
         val forbiddenHits = spec.forbidden.filter { positive.contains(it.lowercase()) }
         return missing.map { "missing:$it" } + forbiddenHits.map { "forbidden:$it" }
     }
