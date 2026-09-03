@@ -169,6 +169,81 @@ class FinalPromptValidatorTest {
         assertTrue(repaired.veoPrompt.contains("- no wok") || repaired.veoPrompt.contains("wok"))
         assertTrue(repaired.veoPrompt.length > before.length)
         val negative = FinalPromptValidator.sectionBody(repaired.veoPrompt, "NEGATIVE PROMPT")
-        assertTrue(negative.startsWith("- no marketplace UI"))
+        assertTrue(
+            "product-specific bullets must come first so Gemini take(6) keeps them:\n$negative",
+            negative.startsWith("- no generic replacement pan") ||
+                negative.startsWith("- no missing") ||
+                negative.startsWith("- no redesigned")
+        )
+        assertFalse(negative.startsWith("- no marketplace UI"))
+    }
+
+    @Test
+    fun localRepairFlattensTwoLineShotsAndKeepsIdentityFirst() {
+        val twoLine = Fixtures.validVeoPrompt(panModel).replace(
+            Regex("(?is)SHOT SEQUENCE\\n.*?\\n\\nON-SCREEN TEXT"),
+            """
+SHOT SEQUENCE
+0.0–2.0s — HOOK
+Product visible immediately with strongest verified visual detail: deep rounded bowl, wooden crossbar lid.
+2.0–4.0s — IDENTITY
+Clear framing of the same exact physical product.
+4.0–6.0s — FEATURE / DEMO
+Exactly one verified hero feature or physically plausible action with one hand.
+6.0–8.0s — HERO / CTA
+Stable desirable hero shot of the same unchanged product. End exactly at 8.0s.
+
+ON-SCREEN TEXT
+""".trimIndent()
+        )
+        val repaired = FinalPromptValidator.localRepair(
+            StructuredResponse(
+                veoPrompt = twoLine,
+                voiceover = "Ein Satz über die Pfanne mit Holzdeckel.",
+                title = "Pfanne",
+                hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop")
+            ),
+            panModel,
+            VoiceLanguage.DE,
+            true
+        )
+        val shots = FinalPromptValidator.sectionBody(repaired.veoPrompt, "SHOT SEQUENCE")
+        val hook = shots.lineSequence().first { it.contains("0.0") }
+        assertTrue(hook.contains("0.0–2.0s — HOOK:"))
+        val afterLabel = hook.substringAfter("HOOK:").trim()
+        assertTrue(
+            "identity must lead the timed line:\n$hook",
+            afterLabel.startsWith("deep rounded bowl") || afterLabel.contains("wooden crossbar lid")
+        )
+        assertEquals(4, shots.lineSequence().count { it.isNotBlank() })
+    }
+
+    @Test
+    fun localRepairStripsLeakedPanOverlaysForChair() {
+        val chair = Fixtures.fishingChairModel()
+        val leaked = Fixtures.validVeoPrompt(chair).replace(
+            "Rahmen\nTablett",
+            "Holzdeckel\nTiefe Form"
+        )
+        val repaired = FinalPromptValidator.localRepair(
+            StructuredResponse(
+                veoPrompt = leaked,
+                voiceover = "Tiefer Topf, fester Holzdeckel, einfach kochen.",
+                title = "Chair",
+                hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop")
+            ),
+            chair,
+            VoiceLanguage.DE,
+            true
+        )
+        val overlays = FinalPromptValidator.sectionBody(repaired.veoPrompt, "ON-SCREEN TEXT")
+        assertFalse(overlays.contains("Holzdeckel"))
+        assertFalse(overlays.contains("Tiefe Form"))
+        assertTrue(overlays.contains("Rahmen") || overlays.contains("Tablett"))
+        assertFalse(repaired.voiceover.contains("Holzdeckel", ignoreCase = true))
+        assertFalse(
+            FinalPromptValidator.sectionBody(repaired.veoPrompt, "SETTING")
+                .contains("premium kitchen", ignoreCase = true)
+        )
     }
 }

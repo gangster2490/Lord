@@ -119,8 +119,9 @@ object FinalPromptValidator {
 
     /**
      * Local, non-destructive field repair: move leaked TITLE/HASHTAGS out of veoPrompt,
-     * fill voiceover OFF, normalize hashtag # prefixes, and append missing PRODUCT LOCK
-     * / NEGATIVE PROMPT identity lines. Never shortens veoPrompt.
+     * fill voiceover OFF, normalize hashtag # prefixes, flatten two-line shot blocks,
+     * prepend product-specific NEGATIVE bullets, and strip leaked pan overlays / kitchen
+     * setting / Holzdeckel voiceover on non-pan products. Never mechanically cuts veoPrompt.
      */
     fun localRepair(
         response: StructuredResponse,
@@ -142,8 +143,12 @@ object FinalPromptValidator {
         if (current.title.isBlank()) {
             current = current.copy(title = productModel.productIdentity.ifBlank { "Product Ad" })
         }
+        current = flattenShotSequence(current, productModel)
         current = enrichProductLock(current, productModel)
         current = enrichNegativePrompt(current, productModel)
+        current = repairOnScreenText(current, productModel)
+        current = repairSetting(current, productModel)
+        current = repairVoiceover(current, productModel, voice)
         return current
     }
 
@@ -177,19 +182,185 @@ object FinalPromptValidator {
         if (response.veoPrompt.isBlank()) return response
         val negative = sectionBody(response.veoPrompt, "NEGATIVE PROMPT")
         val additions = mutableListOf<String>()
+        val spec = RegressionLocks.matchingSpec(productModel)
+        spec?.negativePrefix?.forEach { bullet ->
+            val token = bullet.removePrefix("-").trim()
+            if (token.isNotBlank() && !containsDetail(negative, token)) {
+                additions += if (bullet.startsWith("-")) bullet else "- $bullet"
+            }
+        }
         productModel.visualSignature.forEach { detail ->
             val token = detail.trim()
-            if (token.isNotBlank() && !containsDetail(negative, token)) {
+            if (token.isNotBlank() &&
+                !containsDetail(negative, token) &&
+                !containsDetail(additions.joinToString("\n"), token)
+            ) {
                 additions += "- no missing or redesigned $token"
             }
         }
-        RegressionLocks.matchingSpec(productModel)?.forbidden?.forEach { banned ->
-            if (!containsDetail(negative, banned)) {
+        spec?.forbidden?.forEach { banned ->
+            if (!containsDetail(negative, banned) &&
+                !containsDetail(additions.joinToString("\n"), banned)
+            ) {
                 additions += "- no $banned"
             }
         }
         if (additions.isEmpty()) return response
-        return appendToSection(response, "NEGATIVE PROMPT", additions)
+        return prependToSection(response, "NEGATIVE PROMPT", additions)
+    }
+
+    /**
+     * Gemini copy keeps only timed header lines. Merge a following identity
+     * sentence onto that line and put product detail first so the 68-char clip
+     * still keeps the photographed object.
+     */
+    internal fun flattenShotSequence(
+        response: StructuredResponse,
+        productModel: ProductModel
+    ): StructuredResponse {
+        if (response.veoPrompt.isBlank()) return response
+        val shots = sectionBody(response.veoPrompt, "SHOT SEQUENCE")
+        if (shots.isBlank()) return response
+        val flattened = flattenShotLines(shots, productModel)
+        if (flattened == shots.trim()) return response
+        return replaceSection(response, "SHOT SEQUENCE", flattened)
+    }
+
+    internal fun flattenShotLines(raw: String, productModel: ProductModel): String {
+        val headerRe = Regex(
+            """(?m)^\s*((?:0\.0|2\.0|4\.0|6\.0)\s*[–\-]\s*(?:2\.0|4\.0|6\.0|8\.0)s[^\n]*)"""
+        )
+        val matches = headerRe.findAll(raw).toList()
+        if (matches.size < 4) return raw.trim()
+        val fallback = productModel.visualSignature
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .take(3)
+            .joinToString(", ")
+        return matches.mapIndexed { index, match ->
+            val header = match.groupValues[1].trim()
+            val start = match.range.last + 1
+            val end = matches.getOrNull(index + 1)?.range?.first ?: raw.length
+            val body = raw.substring(start, end).trim()
+            flattenOneShot(header, body, fallback, index)
+        }.joinToString("\n")
+    }
+
+    private fun flattenOneShot(
+        header: String,
+        body: String,
+        fallback: String,
+        index: Int
+    ): String {
+        val colon = header.indexOf(':')
+        val label = if (colon >= 0) header.substring(0, colon).trim() else header
+        val existing = if (colon >= 0) header.substring(colon + 1).trim() else ""
+        val bodyText = body.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
+        val combined = listOf(existing, bodyText).filter { it.isNotBlank() }.joinToString(" ")
+        val detail = promoteIdentity(combined, fallback, index)
+        return "$label: $detail"
+    }
+
+    private val GENERIC_SHOT_PREFIX = Regex(
+        """(?i)^(?:Product visible immediately with strongest verified visual detail:\s*|""" +
+            """Clear framing of the same exact physical product\.?\s*|""" +
+            """Exactly one verified hero feature or physically plausible action with one hand\.?\s*|""" +
+            """Stable desirable hero shot of the same unchanged product\.?\s*(?:End exactly at 8\.0s\.?)?\s*)"""
+    )
+
+    private fun promoteIdentity(combined: String, fallback: String, index: Int): String {
+        if (combined.isBlank()) return defaultShotDetail(fallback, index)
+        val prefixMatch = GENERIC_SHOT_PREFIX.find(combined)
+        if (prefixMatch != null) {
+            val tail = combined.substring(prefixMatch.range.last + 1).trim().trimEnd('.')
+            val head = if (tail.length >= 8) tail else fallback
+            val identity = head.ifBlank { defaultShotDetail(fallback, index) }
+            val rest = combined.trim()
+            return if (rest.contains(identity)) {
+                identityFirst(identity, rest)
+            } else {
+                "$identity. $rest"
+            }
+        }
+        if (combined.length < 12 && fallback.isNotBlank()) return fallback
+        return combined
+    }
+
+    private fun identityFirst(identity: String, original: String): String {
+        val stripped = original
+            .replace(identity, "", ignoreCase = false)
+            .replace(Regex("""(?i)Product visible immediately with strongest verified visual detail:\s*"""), "")
+            .replace(Regex("""\s{2,}"""), " ")
+            .trim()
+            .trim(':', '.', ',', '—', '-')
+            .trim()
+        return if (stripped.isBlank() || stripped.equals(identity, ignoreCase = true)) {
+            identity
+        } else {
+            "$identity. $stripped"
+        }
+    }
+
+    private fun defaultShotDetail(fallback: String, index: Int): String = when (index) {
+        0 -> fallback.ifBlank { "product visible with strongest verified detail" }
+        1 -> listOf("same unchanged product, full framing", fallback).first { it.isNotBlank() }
+        2 -> "one hand, one verified action"
+        else -> "stable hero of the same product. End 8.0s"
+    }
+
+    private val PAN_OVERLAY_LEAKS = setOf("holzdeckel", "tiefe form")
+    private val PAN_VOICEOVER_LEAKS = listOf("holzdeckel", "tiefe form", "tiefer topf")
+
+    internal fun repairOnScreenText(
+        response: StructuredResponse,
+        productModel: ProductModel
+    ): StructuredResponse {
+        val spec = RegressionLocks.matchingSpec(productModel) ?: return response
+        if (spec.id == RegressionLocks.PAN.id) return response
+        val overlays = sectionBody(response.veoPrompt, "ON-SCREEN TEXT")
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toList()
+        if (overlays.none { it.lowercase() in PAN_OVERLAY_LEAKS }) return response
+        val kept = overlays.filterNot { it.lowercase() in PAN_OVERLAY_LEAKS }
+        val replacement = if (kept.size >= 2) {
+            kept.take(3).joinToString("\n")
+        } else {
+            spec.overlayLines.joinToString("\n")
+        }
+        return replaceSection(response, "ON-SCREEN TEXT", replacement)
+    }
+
+    internal fun repairSetting(
+        response: StructuredResponse,
+        productModel: ProductModel
+    ): StructuredResponse {
+        val spec = RegressionLocks.matchingSpec(productModel) ?: return response
+        if (spec.id == RegressionLocks.PAN.id) return response
+        val setting = sectionBody(response.veoPrompt, "SETTING")
+        val leakedKitchen = setting.contains("premium kitchen", ignoreCase = true)
+        if (!leakedKitchen) return response
+        return replaceSection(response, "SETTING", spec.setting)
+    }
+
+    internal fun repairVoiceover(
+        response: StructuredResponse,
+        productModel: ProductModel,
+        voice: VoiceLanguage
+    ): StructuredResponse {
+        if (voice == VoiceLanguage.OFF) return response
+        val spec = RegressionLocks.matchingSpec(productModel) ?: return response
+        if (spec.id == RegressionLocks.PAN.id) return response
+        var current = response
+        val section = sectionBody(current.veoPrompt, "VOICEOVER")
+        if (PAN_VOICEOVER_LEAKS.any { section.contains(it, ignoreCase = true) }) {
+            current = replaceSection(current, "VOICEOVER", spec.voiceover)
+        }
+        if (PAN_VOICEOVER_LEAKS.any { current.voiceover.contains(it, ignoreCase = true) }) {
+            current = current.copy(voiceover = spec.voiceover)
+        }
+        return current
     }
 
     fun failedFields(report: Report): List<String> = report.issues.map { it.field }.distinct()
@@ -265,6 +436,22 @@ object FinalPromptValidator {
         "The same single physical product shown in the uploaded photos must remain unchanged across all four shots."
     private val DO_NOT_REGENERATE_SENTENCE =
         "Do not regenerate a slightly different version of the product for each shot."
+
+    private fun prependToSection(
+        response: StructuredResponse,
+        header: String,
+        extraLines: List<String>
+    ): StructuredResponse {
+        if (extraLines.isEmpty()) return response
+        val existing = sectionBody(response.veoPrompt, header).trim()
+        val prefix = extraLines.joinToString("\n")
+        val merged = if (existing.isBlank()) prefix else prefix + "\n" + existing
+        return if (headerPresent(response.veoPrompt, header)) {
+            replaceSection(response, header, merged)
+        } else {
+            appendSection(response, header, merged)
+        }
+    }
 
     private fun appendToSection(
         response: StructuredResponse,

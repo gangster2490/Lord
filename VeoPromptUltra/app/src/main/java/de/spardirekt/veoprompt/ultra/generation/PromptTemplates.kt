@@ -87,11 +87,11 @@ Vertical 9:16.
 Photorealistic commercial TikTok Shop product ad.
 Exactly 8.0 seconds total.
 Timeline ends at exactly 8.0s.
-Exactly four blocks:
-0.0–2.0s — HOOK
-2.0–4.0s — IDENTITY
-4.0–6.0s — FEATURE / DEMO
-6.0–8.0s — HERO / CTA
+Exactly four SINGLE-LINE blocks. Put the product-specific visual detail on the SAME line as each timed header. Never put identity on a following line.
+0.0–2.0s — HOOK: <strongest verified product detail visible now>
+2.0–4.0s — IDENTITY: <same product, full framing of verified parts>
+4.0–6.0s — FEATURE / DEMO: <one hand, one verified action>
+6.0–8.0s — HERO / CTA: <stable hero of the same product. End 8.0s>
 No intro. No marketplace frame. No reference frame. No extra outro. No continuation after 8.0s.
 
 Product must be readable from the first second.
@@ -160,7 +160,8 @@ ${GeminiVeoPolicy.systemPromptBlock()}
 ==================================================
 ON-SCREEN TEXT
 ==================================================
-Maximum 2–3 short overlays.
+Maximum 2–3 short overlays from THIS photographed product only.
+Never reuse Holzdeckel or Tiefe Form unless those words are on the photographed product.
 Only show exact phrases listed under ON-SCREEN TEXT.
 Never render: HOOK, IDENTITY, FEATURE, DEMO, HERO, CTA, PRODUCT LOCK, SHOT SEQUENCE, NEGATIVE PROMPT, CRITICAL, REFERENCES.
 No prices. No fake urgency.
@@ -185,8 +186,10 @@ TITLE and HASHTAGS are separate JSON fields. They must NOT be inside veoPrompt.
 
 REFERENCES: short marketplace/reference handling rules only.
 PRODUCT LOCK: must include actual product-specific visualSignature details.
+SETTING: match the photographed product category. Do not default to a kitchen for chairs, tools, or outdoor gear.
+SHOT SEQUENCE: exactly four SINGLE lines. Product identity MUST be on the timed line. Gemini copy keeps only lines matching 0.0 / 2.0 / 4.0 / 6.0.
 CRITICAL: short global fidelity/timing rules only.
-NEGATIVE PROMPT: normally 6–12 product-specific bullets.
+NEGATIVE PROMPT: normally 6–12 bullets. Put the 6 most product-specific bullets FIRST. Do not default to pan, wok, wooden lid, ferrule or non-stick bullets unless that is the photographed product.
 
 ==================================================
 REGRESSION LOCKS
