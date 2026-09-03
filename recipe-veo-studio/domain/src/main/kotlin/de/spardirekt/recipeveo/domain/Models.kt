@@ -1,60 +1,44 @@
 package de.spardirekt.recipeveo.domain
 
-import kotlinx.serialization.Serializable
-import java.util.UUID
-
-@Serializable
-data class PhotoRef(val id: String, val uri: String)
-
-@Serializable
-data class Prompt(
-    val text: String,
-    val title: String,
-    val compiledAt: Long,
-)
-
-@Serializable
-data class Project(
-    val id: String,
-    val photos: List<PhotoRef> = emptyList(),
-    val wish: String = "",
-    val prompt: Prompt? = null,
-    val createdAt: Long,
-    val updatedAt: Long,
-)
-
-@Serializable
-data class StudioState(
-    val version: Int = 1,
-    val projects: List<Project> = emptyList(),
-    val activeId: String? = null,
+data class Recipe(
+    val dish: String,
+    val servings: String,
+    val time: String,
+    val ingredients: List<String>,
+    val steps: List<String>,
 ) {
-    fun active(): Project? = activeId?.let { id -> projects.firstOrNull { it.id == id } }
-        ?: projects.firstOrNull()
-
-    fun upsert(project: Project) = copy(projects = listOf(project) + projects.filterNot { it.id == project.id })
-
-    fun delete(id: String): StudioState {
-        val next = projects.filterNot { it.id == id }
-        return copy(projects = next, activeId = if (activeId == id) next.firstOrNull()?.id else activeId)
-    }
-
-    fun ready(): List<Project> = projects.filter { it.prompt != null }.sortedByDescending { it.updatedAt }
-
-    companion object { val Empty = StudioState() }
+    fun asText(): String = buildString {
+        appendLine(dish.replaceFirstChar { it.uppercase() })
+        appendLine("Порции: $servings")
+        appendLine("Время: $time")
+        appendLine()
+        appendLine("Ингредиенты")
+        ingredients.forEach { appendLine("• $it") }
+        appendLine()
+        appendLine("Приготовление")
+        steps.forEachIndexed { i, step -> appendLine("${i + 1}. $step") }
+    }.trim()
 }
 
-fun newId(): String = UUID.randomUUID().toString()
+data class CulinaryPackage(
+    val dish: String,
+    val recipe: Recipe,
+    val veoPrompt: String,
+    val negativePrompt: String,
+    val voiceover: String,
+    val tiktokTitle: String,
+    val hashtags: List<String>,
+    val createdAt: Long,
+) {
+    init {
+        require(hashtags.size == 5) { "Нужно ровно 5 хештегов." }
+    }
+
+    fun copyPrompt(): String = veoPrompt
+}
 
 object StudioRules {
-    const val MAX_PHOTOS = 15
-    val sections = listOf(
-        "FORMAT", "REFERENCES", "PRODUCT LOCK", "SETTING", "SHOT SEQUENCE",
-        "ON-SCREEN TEXT", "VOICEOVER", "AUDIO", "CRITICAL", "NEGATIVE PROMPT",
-        "TITLE", "HASHTAGS",
-    )
-    fun canGenerate(project: Project) = project.photos.isNotEmpty()
-    fun looksComplete(text: String) = sections.all { heading ->
-        Regex("^${Regex.escape(heading)}$", RegexOption.MULTILINE).containsMatchIn(text)
-    } && text.contains("Exactly 8.0s")
+    const val MIN_DISH = 2
+    const val MAX_DISH = 48
+    fun canCreate(name: String) = name.trim().length in MIN_DISH..MAX_DISH
 }

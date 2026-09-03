@@ -1,108 +1,57 @@
 package de.spardirekt.recipeveo
 
-import android.net.Uri
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.spardirekt.recipeveo.domain.PhotoRef
+import de.spardirekt.recipeveo.domain.CulinaryAgent
+import de.spardirekt.recipeveo.domain.CulinaryPackage
 import de.spardirekt.recipeveo.domain.StudioRules
-import de.spardirekt.recipeveo.domain.StudioStore
-import de.spardirekt.recipeveo.domain.newId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class StudioViewModel(app: RecipeVeoApp) : AndroidViewModel(app) {
-    private val store: StudioStore = app.store
-    private val photos: PhotoStore = app.photos
+class StudioViewModel : ViewModel() {
+    private val _dish = MutableStateFlow("")
+    val dish: StateFlow<String> = _dish.asStateFlow()
 
-    val state = store.state
+    private val _working = MutableStateFlow(false)
+    val working: StateFlow<Boolean> = _working.asStateFlow()
 
-    private val _screen = MutableStateFlow<Screen>(Screen.Create)
-    val screen: StateFlow<Screen> = _screen.asStateFlow()
+    private val _result = MutableStateFlow<CulinaryPackage?>(null)
+    val result: StateFlow<CulinaryPackage?> = _result.asStateFlow()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    init {
-        viewModelScope.launch { store.hydrate() }
+    fun setDish(value: String) {
+        if (value.length <= StudioRules.MAX_DISH) _dish.value = value
     }
 
-    fun go(screen: Screen) {
-        _screen.value = screen
-    }
-
-    fun setWish(value: String) {
+    fun create() {
+        if (_working.value) return
         viewModelScope.launch {
-            store.update { state ->
-                val project = state.active() ?: return@update state
-                state.upsert(project.copy(wish = value, updatedAt = System.currentTimeMillis()))
+            _working.value = true
+            _error.value = null
+            delay(700)
+            val outcome = withContext(Dispatchers.Default) {
+                runCatching { CulinaryAgent.create(_dish.value) }
             }
-        }
-    }
-
-    fun addPhoto(uri: Uri) {
-        viewModelScope.launch {
-            runCatching {
-                val path = photos.import(uri)
-                store.update { state ->
-                    val project = state.active() ?: return@update state
-                    if (project.photos.size >= StudioRules.MAX_PHOTOS) return@update state
-                    state.upsert(
-                        project.copy(
-                            photos = project.photos + PhotoRef(newId(), path),
-                            updatedAt = System.currentTimeMillis(),
-                        ),
-                    )
-                }
-            }.onFailure { _error.value = it.message ?: "Не удалось добавить фото." }
-        }
-    }
-
-    fun removePhoto(id: String) {
-        viewModelScope.launch {
-            store.update { state ->
-                val project = state.active() ?: return@update state
-                val removed = project.photos.firstOrNull { it.id == id }
-                if (removed != null) photos.delete(removed.uri)
-                state.upsert(
-                    project.copy(
-                        photos = project.photos.filterNot { it.id == id },
-                        updatedAt = System.currentTimeMillis(),
-                    ),
-                )
-            }
-        }
-    }
-
-    fun generate() {
-        viewModelScope.launch {
-            val result = store.generateActive()
-            result.fold(
-                onSuccess = { project ->
-                    store.newDraft()
-                    _screen.value = Screen.Result(project.id)
-                },
-                onFailure = { _error.value = it.message ?: "Не удалось собрать промпт." },
+            _working.value = false
+            outcome.fold(
+                onSuccess = { _result.value = it },
+                onFailure = { _error.value = it.message ?: "Не получилось создать." },
             )
         }
     }
 
-    fun openProject(id: String) {
-        _screen.value = Screen.Result(id)
-    }
-
-    fun backFromResult() {
-        _screen.value = Screen.Create
+    fun backToInput() {
+        _result.value = null
     }
 
     fun consumeError() {
         _error.value = null
-    }
-
-    sealed class Screen {
-        data object Create : Screen()
-        data object History : Screen()
-        data class Result(val id: String) : Screen()
     }
 }

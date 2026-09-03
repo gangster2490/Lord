@@ -5,9 +5,9 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val Cream = Color(0xFFFAF6F0)
-private val Ink = Color(0xFF1C1917)
-private val Accent = Color(0xFF0F766E)
+private val Cream = Color(0xFFFFF8F1)
+private val Ink = Color(0xFF2B2118)
+private val Tomato = Color(0xFFB42318)
 
 @Composable
 fun RecipeTheme(content: @Composable () -> Unit) {
@@ -15,7 +15,7 @@ fun RecipeTheme(content: @Composable () -> Unit) {
         colorScheme = lightColorScheme(
             background = Cream,
             surface = Color.White,
-            primary = Accent,
+            primary = Tomato,
             onBackground = Ink,
             onSurface = Ink,
             onPrimary = Color.White,
