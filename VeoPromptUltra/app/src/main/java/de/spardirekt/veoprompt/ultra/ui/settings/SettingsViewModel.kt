@@ -32,7 +32,8 @@ data class DiagnosticsState(
     val hasApiKey: Boolean = false,
     val compliancePolicy: String = de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy.VERSION,
     val aigcPolicy: String = de.spardirekt.veoprompt.ultra.compliance.AigcHardRules.VERSION,
-    val promoRiskPolicy: String = de.spardirekt.veoprompt.ultra.compliance.SevenDayPromotionalRiskAnalyzer.VERSION
+    val promoRiskPolicy: String = de.spardirekt.veoprompt.ultra.compliance.SevenDayPromotionalRiskAnalyzer.VERSION,
+    val geminiPolicy: String = de.spardirekt.veoprompt.ultra.compliance.GeminiVeoPolicy.VERSION
 )
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
@@ -129,7 +130,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                     hasApiKey = apiKeys.hasKey(),
                     compliancePolicy = de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy.VERSION,
                     aigcPolicy = de.spardirekt.veoprompt.ultra.compliance.AigcHardRules.VERSION,
-                    promoRiskPolicy = de.spardirekt.veoprompt.ultra.compliance.SevenDayPromotionalRiskAnalyzer.VERSION
+                    promoRiskPolicy = de.spardirekt.veoprompt.ultra.compliance.SevenDayPromotionalRiskAnalyzer.VERSION,
+                    geminiPolicy = de.spardirekt.veoprompt.ultra.compliance.GeminiVeoPolicy.VERSION
                 )
             }
         }

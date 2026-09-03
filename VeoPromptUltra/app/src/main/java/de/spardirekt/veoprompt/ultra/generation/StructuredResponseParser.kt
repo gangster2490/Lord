@@ -5,6 +5,7 @@ import de.spardirekt.veoprompt.ultra.model.CreativeDirection
 import de.spardirekt.veoprompt.ultra.model.ImageAnalysisBlock
 import de.spardirekt.veoprompt.ultra.model.ImageClassification
 import de.spardirekt.veoprompt.ultra.model.AigcReport
+import de.spardirekt.veoprompt.ultra.model.GeminiVeoReport
 import de.spardirekt.veoprompt.ultra.model.SafetyAudit
 import de.spardirekt.veoprompt.ultra.model.StructuredResponse
 import kotlinx.serialization.json.Json
@@ -146,12 +147,27 @@ object StructuredResponseParser {
                 publishSteps = stringList(aigcObj["publishSteps"])
             )
         }
+        val geminiObj = obj["gemini"] as? JsonObject
+        val gemini = if (geminiObj == null) {
+            GeminiVeoReport(policyVersion = readString(obj, "geminiPolicyVersion"))
+        } else {
+            GeminiVeoReport(
+                policyVersion = readString(geminiObj, "policyVersion").ifBlank { readString(obj, "geminiPolicyVersion") },
+                verdict = readString(geminiObj, "verdict"),
+                submissionSafe = (geminiObj["submissionSafe"] as? JsonPrimitive)?.contentOrNull != "false",
+                findings = stringList(geminiObj["findings"]),
+                checklist = stringList(geminiObj["checklist"]),
+                publishSteps = stringList(geminiObj["publishSteps"])
+            )
+        }
         return SafetyAudit(
             riskLevel = readString(obj, "riskLevel").ifBlank { "LOW" },
             items = items,
             policyVersion = readString(obj, "policyVersion"),
             aigcPolicyVersion = readString(obj, "aigcPolicyVersion").ifBlank { aigc.policyVersion },
-            aigc = aigc
+            aigc = aigc,
+            geminiPolicyVersion = readString(obj, "geminiPolicyVersion").ifBlank { gemini.policyVersion },
+            gemini = gemini
         )
     }
 

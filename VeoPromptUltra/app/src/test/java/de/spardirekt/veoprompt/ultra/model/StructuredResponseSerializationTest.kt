@@ -30,4 +30,27 @@ class StructuredResponseSerializationTest {
         assertEquals("Detail", ImageType.PRODUCT_DETAIL.badgeLabel())
         assertEquals("Listing", ImageType.MARKETPLACE_LISTING.badgeLabel())
     }
+
+    @Test
+    fun safetyAuditKeepsNestedGeminiReport() {
+        val encoded = json.encodeToString(
+            SafetyAudit.serializer(),
+            SafetyAudit(
+                riskLevel = "LOW",
+                geminiPolicyVersion = "2026.09-v1",
+                gemini = GeminiVeoReport(
+                    policyVersion = "2026.09-v1",
+                    verdict = "READY",
+                    submissionSafe = true,
+                    checklist = listOf("OK · GV_SUBMIT · Paste")
+                )
+            )
+        )
+        assertTrue(encoded.contains("\"gemini\""))
+        assertTrue(encoded.contains("\"geminiPolicyVersion\""))
+        val decoded = json.decodeFromString(SafetyAudit.serializer(), encoded)
+        assertEquals("READY", decoded.gemini.verdict)
+        assertEquals("2026.09-v1", decoded.geminiPolicyVersion)
+        assertTrue(decoded.gemini.submissionSafe)
+    }
 }

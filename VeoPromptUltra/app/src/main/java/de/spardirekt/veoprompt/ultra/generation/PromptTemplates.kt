@@ -1,6 +1,7 @@
 package de.spardirekt.veoprompt.ultra.generation
 
 import de.spardirekt.veoprompt.ultra.compliance.AigcHardRules
+import de.spardirekt.veoprompt.ultra.compliance.GeminiVeoPolicy
 import de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy
 import de.spardirekt.veoprompt.ultra.model.CreativeMode
 import de.spardirekt.veoprompt.ultra.model.VoiceLanguage
@@ -150,6 +151,11 @@ AI:
 ${AigcHardRules.TITLE.uppercase()}
 ==================================================
 ${AigcHardRules.systemPromptBlock()}
+
+==================================================
+${GeminiVeoPolicy.TITLE.uppercase()}
+==================================================
+${GeminiVeoPolicy.systemPromptBlock()}
 
 ==================================================
 ON-SCREEN TEXT

@@ -195,12 +195,24 @@ data class AigcReport(
 )
 
 @Serializable
+data class GeminiVeoReport(
+    val policyVersion: String = "",
+    val verdict: String = "",
+    val submissionSafe: Boolean = true,
+    val findings: List<String> = emptyList(),
+    val checklist: List<String> = emptyList(),
+    val publishSteps: List<String> = emptyList()
+)
+
+@Serializable
 data class SafetyAudit(
     val riskLevel: String = "LOW",
     val items: List<String> = emptyList(),
     val policyVersion: String = "",
     val aigcPolicyVersion: String = "",
-    val aigc: AigcReport = AigcReport()
+    val aigc: AigcReport = AigcReport(),
+    val geminiPolicyVersion: String = "",
+    val gemini: GeminiVeoReport = GeminiVeoReport()
 )
 
 @Serializable

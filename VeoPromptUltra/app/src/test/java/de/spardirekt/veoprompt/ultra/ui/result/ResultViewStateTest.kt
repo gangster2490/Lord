@@ -57,4 +57,23 @@ class ResultViewStateTest {
         assertEquals(prompt, state.veoPrompt)
         assertFalse(state.packageText().contains("AIGC_DISCLOSE"))
     }
+
+    @Test
+    fun geminiChecklistCopyStaysOutsideVeoPrompt() {
+        val prompt = "FORMAT\nVertical 9:16.\nPRODUCT LOCK\nKeep the pan."
+        val state = ResultViewState(
+            veoPrompt = prompt,
+            geminiVerdict = "READY",
+            geminiPolicyVersion = "2026.09-v1",
+            geminiChecklist = listOf("OK · GV_SUBMIT · Paste full prompt"),
+            geminiPublishSteps = listOf("Copy the full veoPrompt into Gemini / VEO")
+        )
+        val text = state.geminiChecklistText()
+        assertTrue(text.contains("READY"))
+        assertTrue(text.contains("GV_SUBMIT"))
+        assertTrue(text.contains("Copy the full veoPrompt"))
+        assertEquals(prompt, state.veoPrompt)
+        assertFalse(state.packageText().contains("GV_SUBMIT"))
+        assertFalse(state.packageText().contains("GEMINI AUDIT"))
+    }
 }

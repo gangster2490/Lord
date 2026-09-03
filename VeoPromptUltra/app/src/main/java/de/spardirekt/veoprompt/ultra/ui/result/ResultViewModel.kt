@@ -49,6 +49,11 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
                 aigcShopPublishSafe = audit.aigc.shopPublishSafe,
                 aigcChecklist = audit.aigc.checklist,
                 aigcPublishSteps = audit.aigc.publishSteps,
+                geminiPolicyVersion = audit.geminiPolicyVersion.ifBlank { audit.gemini.policyVersion },
+                geminiVerdict = audit.gemini.verdict,
+                geminiSubmissionSafe = audit.gemini.submissionSafe,
+                geminiChecklist = audit.gemini.checklist,
+                geminiPublishSteps = audit.gemini.publishSteps,
                 tiktokShopMode = entity.tiktokShopMode,
                 language = entity.voiceLanguage,
                 creativeMode = entity.creativeMode,
@@ -80,6 +85,11 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
     fun copyAigcChecklist() {
         clipboard().setPrimaryClip(ClipData.newPlainText("aigcChecklist", _state.value.aigcChecklistText()))
         _state.update { it.copy(copyNotice = "AIGC чеклист скопирован") }
+    }
+
+    fun copyGeminiChecklist() {
+        clipboard().setPrimaryClip(ClipData.newPlainText("geminiChecklist", _state.value.geminiChecklistText()))
+        _state.update { it.copy(copyNotice = "Gemini / VEO чеклист скопирован") }
     }
 
     fun consumeCopyNotice() {

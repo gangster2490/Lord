@@ -14,6 +14,11 @@ data class ResultViewState(
     val aigcShopPublishSafe: Boolean = true,
     val aigcChecklist: List<String> = emptyList(),
     val aigcPublishSteps: List<String> = emptyList(),
+    val geminiPolicyVersion: String = "",
+    val geminiVerdict: String = "",
+    val geminiSubmissionSafe: Boolean = true,
+    val geminiChecklist: List<String> = emptyList(),
+    val geminiPublishSteps: List<String> = emptyList(),
     val tiktokShopMode: Boolean = true,
     val language: String = "DE",
     val creativeMode: String = "AUTO",
@@ -50,6 +55,19 @@ data class ResultViewState(
         if (aigcPublishSteps.isNotEmpty()) {
             append('\n')
             aigcPublishSteps.forEachIndexed { i, step ->
+                append("${i + 1}. ").append(step).append('\n')
+            }
+        }
+    }.trim()
+
+    fun geminiChecklistText(): String = buildString {
+        append("Gemini / VEO · ${geminiVerdict.ifBlank { "—" }}")
+        if (geminiPolicyVersion.isNotBlank()) append(" · $geminiPolicyVersion")
+        append('\n')
+        geminiChecklist.forEach { append(it).append('\n') }
+        if (geminiPublishSteps.isNotEmpty()) {
+            append('\n')
+            geminiPublishSteps.forEachIndexed { i, step ->
                 append("${i + 1}. ").append(step).append('\n')
             }
         }

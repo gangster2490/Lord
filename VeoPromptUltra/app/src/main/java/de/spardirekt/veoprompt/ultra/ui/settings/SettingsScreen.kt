@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.spardirekt.veoprompt.ultra.compliance.AigcHardRules
+import de.spardirekt.veoprompt.ultra.compliance.GeminiVeoPolicy
 import de.spardirekt.veoprompt.ultra.compliance.SevenDayPromotionalRiskAnalyzer
 import de.spardirekt.veoprompt.ultra.compliance.TikTokShopPolicy
 import de.spardirekt.veoprompt.ultra.config.ModelConfig
@@ -162,6 +163,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 DiagLine("compliance policy", diagnostics.compliancePolicy)
                 DiagLine("AIGC hard rules", diagnostics.aigcPolicy)
                 DiagLine("7-day promo risk", diagnostics.promoRiskPolicy)
+                DiagLine("Gemini / VEO sanitizer", diagnostics.geminiPolicy)
             }
         }
         item(key = "about") {
@@ -188,6 +190,12 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     color = UltraColors.textMuted,
                     fontSize = 12.sp
                 )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "${GeminiVeoPolicy.TITLE} ${GeminiVeoPolicy.VERSION}. ${GeminiVeoPolicy.SOURCE}.",
+                    color = UltraColors.textMuted,
+                    fontSize = 12.sp
+                )
             }
         }
         item(key = "aigc-rules") {
@@ -195,6 +203,21 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                 Text("AIGC Hard Rules", fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(6.dp))
                 AigcHardRules.RULES.forEach { rule ->
+                    Text(
+                        "${rule.code} · ${rule.title}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                    Text(rule.summary, color = UltraColors.textMuted, fontSize = 12.sp)
+                }
+            }
+        }
+        item(key = "gemini-rules") {
+            PearlCard {
+                Text("Gemini / VEO Sanitizer", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+                GeminiVeoPolicy.RULES.forEach { rule ->
                     Text(
                         "${rule.code} · ${rule.title}",
                         fontSize = 13.sp,

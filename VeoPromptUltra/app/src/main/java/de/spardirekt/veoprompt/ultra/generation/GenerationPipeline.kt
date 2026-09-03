@@ -1,6 +1,8 @@
 package de.spardirekt.veoprompt.ultra.generation
 
 import android.content.Context
+import de.spardirekt.veoprompt.ultra.compliance.GeminiVeoPolicy
+import de.spardirekt.veoprompt.ultra.compliance.GeminiVeoPromptSanitizer
 import de.spardirekt.veoprompt.ultra.compliance.TikTokShopComplianceAuditor
 import de.spardirekt.veoprompt.ultra.config.ModelConfig
 import de.spardirekt.veoprompt.ultra.diagnostics.AppError
@@ -221,13 +223,22 @@ class GenerationPipeline(
                 )
             }
 
-            val compliant = TikTokShopComplianceAuditor.audit(
+            val geminiPass = GeminiVeoPromptSanitizer.sanitize(
                 response = report.response,
+                productModel = model,
+                voice = input.voiceLanguage
+            )
+            val compliant = TikTokShopComplianceAuditor.audit(
+                response = geminiPass.response,
                 productModel = model,
                 voice = input.voiceLanguage,
                 tiktokShopMode = input.tiktokShopMode
             )
-            val finalResponse = compliant.response
+            val mergedAudit = compliant.audit.copy(
+                geminiPolicyVersion = GeminiVeoPolicy.VERSION,
+                gemini = geminiPass.report
+            ).ifEmptyDefault()
+            val finalResponse = compliant.response.copy(safetyAudit = mergedAudit)
             if (finalResponse.veoPrompt.isBlank()) {
                 return Result.failure(AppError.Unknown("Пустой veoPrompt."))
             }
@@ -241,7 +252,7 @@ class GenerationPipeline(
                 productModelJson = productModelJson,
                 creativePlanJson = creativePlanJson,
                 analysisJson = analysisJson,
-                safetyAudit = compliant.audit.ifEmptyDefault()
+                safetyAudit = mergedAudit
             )
             onStage(StageUpdate(GenerationStage.DONE, analysis, productModel, creativePlan, bundle))
             Result.success(bundle)

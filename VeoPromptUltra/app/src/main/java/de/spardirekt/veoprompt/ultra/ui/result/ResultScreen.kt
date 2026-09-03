@@ -62,7 +62,16 @@ fun ResultScreen(
     ) {
         item(key = "header-$projectId") {
             Text("Результат", fontWeight = FontWeight.SemiBold, fontSize = 26.sp, color = UltraColors.textOnLight)
-            Text("Ready for Gemini", color = UltraColors.violet, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Text(
+                when {
+                    state.geminiVerdict.equals("BLOCKED", true) -> "Not ready for Gemini"
+                    state.geminiVerdict.equals("SANITIZED", true) -> "Sanitized for Gemini"
+                    else -> "Ready for Gemini"
+                },
+                color = if (state.geminiSubmissionSafe) UltraColors.violet else UltraColors.danger,
+                fontWeight = FontWeight.Medium,
+                fontSize = 14.sp
+            )
             Text("VEO 3.1", color = UltraColors.textMuted, fontSize = 12.sp)
         }
         item(key = "prompt-$projectId") {
@@ -165,6 +174,41 @@ fun ResultScreen(
                 }
                 Spacer(Modifier.height(10.dp))
                 SecondaryButton("Копировать AIGC чеклист", onClick = viewModel::copyAigcChecklist)
+            }
+        }
+        item(key = "gemini-$projectId") {
+            PearlCard {
+                Text("Gemini / VEO Sanitizer", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Google Gemini / Veo submission safety",
+                    color = UltraColors.violet,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                if (state.geminiPolicyVersion.isNotBlank()) {
+                    Text("Policy ${state.geminiPolicyVersion}", color = UltraColors.textMuted, fontSize = 12.sp)
+                }
+                val verdict = state.geminiVerdict.ifBlank { "—" }
+                Text(
+                    if (state.geminiSubmissionSafe) "Вердикт: $verdict" else "Вердикт: $verdict · не вставлять в Gemini",
+                    color = if (state.geminiSubmissionSafe) UltraColors.textOnLight else UltraColors.danger,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+                state.geminiChecklist.forEach { row ->
+                    Text("• $row", fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                }
+                if (state.geminiPublishSteps.isNotEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Вставка в Gemini / VEO", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                    state.geminiPublishSteps.forEachIndexed { index, step ->
+                        Text("${index + 1}. $step", fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                SecondaryButton("Копировать Gemini чеклист", onClick = viewModel::copyGeminiChecklist)
             }
         }
         item(key = "summary-$projectId") {

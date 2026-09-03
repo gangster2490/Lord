@@ -73,6 +73,18 @@ class GenerationPipelineTest {
         assertTrue(bundle.safetyAudit.aigc.checklist.isNotEmpty())
         assertFalse(bundle.veoPrompt.contains("AIGC AUDIT"))
         assertFalse(bundle.veoPrompt.contains("SAFETY AUDIT"))
+        assertFalse(bundle.veoPrompt.contains("GEMINI AUDIT"))
+        assertEquals(
+            de.spardirekt.veoprompt.ultra.compliance.GeminiVeoPolicy.VERSION,
+            bundle.safetyAudit.geminiPolicyVersion
+        )
+        assertEquals(
+            de.spardirekt.veoprompt.ultra.compliance.GeminiVeoComplianceSystem.VERDICT_READY,
+            bundle.safetyAudit.gemini.verdict
+        )
+        assertTrue(bundle.safetyAudit.gemini.submissionSafe)
+        assertTrue(bundle.safetyAudit.gemini.checklist.isNotEmpty())
+        assertTrue(bundle.veoPrompt.contains("GEMINI / VEO HARD LOCK"))
     }
 
     @Test
