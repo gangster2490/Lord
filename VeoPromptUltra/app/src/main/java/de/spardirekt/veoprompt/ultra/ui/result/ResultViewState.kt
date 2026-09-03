@@ -2,6 +2,7 @@ package de.spardirekt.veoprompt.ultra.ui.result
 
 data class ResultViewState(
     val projectId: String = "",
+    val storedVeoPrompt: String = "",
     val veoPrompt: String = "",
     val voiceover: String = "",
     val title: String = "",
@@ -38,13 +39,15 @@ data class ResultViewState(
     }
 
     fun packageText(): String = buildString {
+        append("Озвучка ($language): ${voiceover.ifBlank { "OFF" }}")
+        append('\n')
+        append("Название: ${title.ifBlank { "—" }}")
+        append('\n')
+        append("Хештеги: ${hashtags.joinToString(" ").ifBlank { "—" }}")
+        append("\n\n")
+        append("────────────────\nVEO 3.1 PROMPT\n────────────────\n")
         append(veoPrompt.trim())
-        append("\n\n")
-        append(voiceover.trim())
-        append("\n\n")
-        append(title.trim())
-        append("\n\n")
-        append(hashtags.joinToString(" "))
+        append('\n')
     }
 
     fun aigcChecklistText(): String = buildString {

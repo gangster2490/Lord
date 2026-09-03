@@ -76,7 +76,7 @@ fun ResultScreen(
         }
         item(key = "prompt-$projectId") {
             NavyCard {
-                Text("VEO PROMPT", color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text("VEO PROMPT · Gemini copy", color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.height(10.dp))
                 Text(
                     text = if (state.expanded) state.veoPrompt else state.preview(),

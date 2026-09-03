@@ -35,12 +35,15 @@ class ResultViewModel(app: Application) : AndroidViewModel(app) {
                     entity.productModelJson
                 )
             }.getOrNull()
+            val tags = repo.parseHashtags(entity)
+            val geminiCopy = ResultComposition.geminiPrompt(entity, tags)
             _state.value = ResultViewState(
                 projectId = entity.id,
-                veoPrompt = entity.veoPrompt,
+                storedVeoPrompt = entity.veoPrompt,
+                veoPrompt = geminiCopy.ifBlank { entity.veoPrompt },
                 voiceover = entity.voiceover,
                 title = entity.title,
-                hashtags = repo.parseHashtags(entity),
+                hashtags = tags,
                 safetyRisk = audit.riskLevel,
                 safetyItems = audit.items,
                 safetyPolicyVersion = audit.policyVersion,
