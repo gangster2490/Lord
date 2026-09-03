@@ -2,10 +2,10 @@ package de.spardirekt.recipeveo
 
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import de.spardirekt.recipeveo.domain.CulinaryAgent
 import de.spardirekt.recipeveo.domain.CulinaryPackage
 import de.spardirekt.recipeveo.domain.StudioRules
 import de.spardirekt.recipeveo.network.OpenAiCulinaryAgent
+import de.spardirekt.recipeveo.network.OpenAiException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,11 +26,8 @@ class StudioViewModel(app: RecipeVeoApp) : AndroidViewModel(app) {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    /** Key stored in EncryptedSharedPreferences — observed by Settings screen. */
-    private val _apiKey = MutableStateFlow(keyStore.getKey() ?: "")
+    private val _apiKey = MutableStateFlow(keyStore.getKey().orEmpty())
     val apiKey: StateFlow<String> = _apiKey.asStateFlow()
-
-    val hasKey: Boolean get() = keyStore.hasKey()
 
     fun setDish(value: String) {
         if (value.length <= StudioRules.MAX_DISH) _dish.value = value
@@ -49,18 +46,18 @@ class StudioViewModel(app: RecipeVeoApp) : AndroidViewModel(app) {
     fun create() {
         if (_working.value) return
         viewModelScope.launch {
+            val key = keyStore.getKey()
+            if (key.isNullOrBlank() || !key.trim().startsWith("sk-")) {
+                _error.value = "Сначала вставьте ключ OpenAI в настройках."
+                return@launch
+            }
             _working.value = true
             _error.value = null
-            val key = keyStore.getKey()
-            val outcome = if (!key.isNullOrBlank()) {
-                runCatching { OpenAiCulinaryAgent.create(_dish.value, key) }
-            } else {
-                runCatching { CulinaryAgent.create(_dish.value) }
-            }
+            val outcome = runCatching { OpenAiCulinaryAgent.create(_dish.value, key) }
             _working.value = false
             outcome.fold(
                 onSuccess = { _result.value = it },
-                onFailure = { _error.value = it.message ?: "Не получилось создать." },
+                onFailure = { _error.value = human(it) },
             )
         }
     }
@@ -71,5 +68,14 @@ class StudioViewModel(app: RecipeVeoApp) : AndroidViewModel(app) {
 
     fun consumeError() {
         _error.value = null
+    }
+
+    private fun human(error: Throwable): String {
+        val cause = generateSequence(error) { it.cause }.firstOrNull { it is OpenAiException } ?: error
+        val message = cause.message?.trim().orEmpty()
+        return when {
+            message.isNotBlank() && !message.contains("JSONObject") && !message.contains("org.json") -> message
+            else -> "Не получилось создать. Проверьте ключ и сеть, затем нажмите «Создать» ещё раз."
+        }
     }
 }

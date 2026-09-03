@@ -1,5 +1,6 @@
 package de.spardirekt.recipeveo.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,11 +43,11 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text("Recipe VEO Studio", style = MaterialTheme.typography.headlineMedium)
-            OutlinedButton(onClick = onSettings) { Text("⚙") }
+            OutlinedButton(onClick = onSettings) { Text("Ключ") }
         }
         Text(
-            if (hasKey) "Агент: OpenAI · название блюда → рецепт + промпт Veo 8с"
-            else "Агент: офлайн · название блюда → рецепт + промпт Veo 8с",
+            if (hasKey) "Название блюда → OpenAI пишет рецепт и промпт Veo на 8 секунд."
+            else "Сначала вставьте ключ OpenAI — без него агент не запускается.",
             modifier = Modifier.padding(top = 8.dp, bottom = 28.dp),
         )
         OutlinedTextField(
@@ -58,21 +59,27 @@ fun HomeScreen(
             singleLine = true,
             enabled = !working,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { onCreate() }),
+            keyboardActions = KeyboardActions(onDone = { if (hasKey) onCreate() else onSettings() }),
         )
         Button(
             onClick = onCreate,
-            enabled = !working && StudioRules.canCreate(dish),
+            enabled = !working && hasKey && StudioRules.canCreate(dish),
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
         ) {
             Text("Создать")
         }
+        if (!hasKey) {
+            Text(
+                "Нажмите «Ключ», вставьте sk-… и сохраните.",
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .clickable(onClick = onSettings),
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         if (working) {
             CircularProgressIndicator(Modifier.padding(top = 28.dp))
-            Text(
-                if (hasKey) "OpenAI пишет рецепт и промпт…" else "Агент пишет рецепт и промпт…",
-                modifier = Modifier.padding(top = 12.dp),
-            )
+            Text("OpenAI пишет рецепт и промпт…", modifier = Modifier.padding(top = 12.dp))
         }
     }
 }

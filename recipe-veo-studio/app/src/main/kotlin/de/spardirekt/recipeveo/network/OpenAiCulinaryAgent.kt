@@ -1,87 +1,50 @@
 package de.spardirekt.recipeveo.network
 
 import de.spardirekt.recipeveo.domain.CulinaryPackage
-import de.spardirekt.recipeveo.domain.Recipe
+import de.spardirekt.recipeveo.domain.CulinaryPackageParser
+import de.spardirekt.recipeveo.domain.StudioRules
 
-/**
- * Calls GPT-4o-mini to generate a full Russian culinary package for the given dish.
- * Returns a CulinaryPackage. Throws on network or parse error.
- */
 object OpenAiCulinaryAgent {
 
     private val SYSTEM = """
-Ты — кулинарный AI-агент. На входе — название блюда на русском языке.
-Твоя задача: вернуть СТРОГО JSON следующей структуры (только JSON, никакого Markdown, никаких пояснений):
+Ты кулинарный AI-агент. Отвечай ТОЛЬКО JSON-объектом, без Markdown и без текста вокруг.
+Язык всех строк — русский.
+
+Схема:
 {
+  "dish": "название блюда",
   "recipe": {
-    "servings": "N порций",
-    "time": "X мин / X ч",
-    "ingredients": ["..."],
-    "steps": ["..."]
+    "servings": "например 4 порции",
+    "time": "например 1 ч 20 мин",
+    "ingredients": ["ингредиент с количеством", "..."],
+    "steps": ["шаг приготовления", "..."]
   },
-  "veoPrompt": "...",
-  "negativePrompt": "...",
-  "voiceover": "...",
-  "tiktokTitle": "...",
-  "hashtags": ["#...", "#...", "#...", "#...", "#..."]
+  "veoPrompt": "подробный промпт кулинарного видео",
+  "negativePrompt": "запреты для кадра, каждый с новой строки начиная с -",
+  "voiceover": "1–2 живые фразы озвучки",
+  "tiktokTitle": "заголовок до 70 символов",
+  "hashtags": ["#Один", "#Два", "#Три", "#Четыре", "#Пять"]
 }
-Правила:
-- Всё на русском.
-- recipe.ingredients — массив строк с количествами.
-- recipe.steps — массив строк, по одному шагу.
-- veoPrompt: подробный промпт кулинарного видео Veo 3.1 на РОВНО 8 секунд, вертикаль 9:16, фотореализм. Включает секции: FORMAT, БЛЮДО, РЕЦЕПТ В КАДРЕ, СРЕДА, ПЛАНЫ (0.0–2.0с HOOK, 2.0–4.0с IDENTITY, 4.0–6.0с CRAFT, 6.0–8.0с HERO), ТЕКСТ НА ЭКРАНЕ (Нет), ОЗВУЧКА, ЗВУК, КРИТИЧНО.
-- negativePrompt: список запретов, что не должно появиться в кадре.
-- voiceover: короткая 1–2 фразы живая озвучка на русском для ролика.
-- tiktokTitle: до 70 символов, цепляющий заголовок.
-- hashtags: РОВНО 5 элементов, каждый начинается с #.
+
+Правила veoPrompt:
+- вертикаль 9:16, фотореализм, РОВНО 8.0 секунд, 4 плана по 2.0с;
+- секции с новой строки заголовком: FORMAT, БЛЮДО, РЕЦЕПТ В КАДРЕ, СРЕДА, ПЛАНЫ, ТЕКСТ НА ЭКРАНЕ, ОЗВУЧКА, ЗВУК, КРИТИЧНО;
+- ПЛАНЫ: 0.0–2.0с HOOK, 2.0–4.0с IDENTITY, 4.0–6.0с CRAFT, 6.0–8.0с HERO;
+- ТЕКСТ НА ЭКРАНЕ: Нет. Только еда;
+- еда узнаваемая, без морфинга, без замены блюда.
+
+hashtags — ровно 5 элементов, каждый начинается с #.
+Рецепт полный и съедобный, не общий шаблон.
 """.trimIndent()
 
     suspend fun create(dish: String, apiKey: String, now: Long = System.currentTimeMillis()): CulinaryPackage {
-        val client = OpenAiClient(apiKey)
-        val raw = client.chat(SYSTEM, dish.trim())
-        return parse(dish.trim().replaceFirstChar { it.uppercase() }, raw, now)
-    }
-
-    private fun parse(dish: String, json: String, now: Long): CulinaryPackage {
-        val cleaned = json.trim()
-            .removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-        val root = try {
-            org.json.JSONObject(cleaned)
-        } catch (e: Exception) {
-            throw RuntimeException("Не удалось разобрать ответ AI. Попробуйте ещё раз.")
-        }
-
-        val rec = root.getJSONObject("recipe")
-        val ingredients = rec.getJSONArray("ingredients").let { arr ->
-            (0 until arr.length()).map { arr.getString(it) }
-        }
-        val steps = rec.getJSONArray("steps").let { arr ->
-            (0 until arr.length()).map { arr.getString(it) }
-        }
-        val recipe = Recipe(
-            dish = dish,
-            servings = rec.getString("servings"),
-            time = rec.getString("time"),
-            ingredients = ingredients,
-            steps = steps,
+        val name = dish.trim().replace(Regex("\\s+"), " ")
+        require(StudioRules.canCreate(name)) { "Введите название блюда." }
+        require(apiKey.trim().startsWith("sk-")) { "Вставьте ключ OpenAI в настройках." }
+        val raw = OpenAiClient(apiKey).chat(
+            SYSTEM,
+            "Блюдо: «$name». Сгенерируй полный JSON-пакет для этого блюда.",
         )
-
-        val tags = root.getJSONArray("hashtags").let { arr ->
-            (0 until arr.length()).map { arr.getString(it) }
-        }.take(5).let { list ->
-            // Ensure exactly 5 — pad if model returned fewer
-            if (list.size < 5) list + List(5 - list.size) { "#Рецепт" } else list
-        }
-
-        return CulinaryPackage(
-            dish = dish,
-            recipe = recipe,
-            veoPrompt = root.getString("veoPrompt"),
-            negativePrompt = root.getString("negativePrompt"),
-            voiceover = root.getString("voiceover"),
-            tiktokTitle = root.getString("tiktokTitle").take(70),
-            hashtags = tags,
-            createdAt = now,
-        )
+        return CulinaryPackageParser.parse(name, raw, now, fromOpenAi = true)
     }
 }

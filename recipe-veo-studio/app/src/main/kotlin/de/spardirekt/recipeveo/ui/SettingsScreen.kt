@@ -1,5 +1,6 @@
 package de.spardirekt.recipeveo.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,13 +34,14 @@ fun SettingsScreen(
 ) {
     var draft by rememberSaveable { mutableStateOf(savedKey) }
     var visible by rememberSaveable { mutableStateOf(false) }
+    val looksLikeKey = draft.trim().startsWith("sk-") && draft.trim().length > 20
 
     Column(
         modifier.padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Настройки", style = MaterialTheme.typography.headlineSmall)
-        Text("Вставьте OpenAI API key. Без ключа приложение работает в офлайн-режиме.")
+        Text("Ключ OpenAI", style = MaterialTheme.typography.headlineSmall)
+        Text("Ключ хранится только на этом телефоне. Агент вызывает GPT и возвращает рецепт, промпт Veo, негатив, озвучку, название и 5 хештегов.")
         OutlinedTextField(
             value = draft,
             onValueChange = { draft = it },
@@ -53,12 +55,8 @@ fun SettingsScreen(
                 Text(
                     if (visible) "скрыть" else "показать",
                     modifier = Modifier
-                        .padding(end = 12.dp)
-                        .let { m ->
-                            m.then(
-                                Modifier.padding(0.dp)
-                            )
-                        },
+                        .padding(end = 8.dp)
+                        .clickable { visible = !visible },
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -66,8 +64,8 @@ fun SettingsScreen(
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
-                onClick = { onSave(draft) },
-                enabled = draft.startsWith("sk-") && draft.length > 10,
+                onClick = { onSave(draft.trim()) },
+                enabled = looksLikeKey,
                 modifier = Modifier.weight(1f),
             ) { Text("Сохранить") }
             OutlinedButton(
@@ -77,20 +75,13 @@ fun SettingsScreen(
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.error,
                 ),
-            ) { Text("Удалить ключ") }
+            ) { Text("Удалить") }
         }
-        if (savedKey.isNotBlank()) {
-            Text(
-                "Ключ сохранён. Агент будет использовать OpenAI.",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        } else {
-            Text(
-                "Ключ не задан. Используется встроенный офлайн-агент.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
+        Text(
+            if (savedKey.isNotBlank()) "Ключ сохранён. Можно создавать блюдо."
+            else "Без ключа кнопка «Создать» не работает.",
+            style = MaterialTheme.typography.bodySmall,
+        )
         OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
             Text("Назад")
         }

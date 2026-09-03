@@ -16,7 +16,7 @@ class CulinaryAgentTest {
         assertThat(pack.tiktokTitle.lowercase()).contains("борщ")
         assertThat(pack.hashtags).hasSize(5)
         assertThat(pack.hashtags[0]).isEqualTo("#Борщ")
-        assertThat(pack.copyPrompt()).isEqualTo(pack.veoPrompt)
+        assertThat(pack.geminiPrompt()).isEqualTo(pack.veoPrompt)
     }
 
     @Test

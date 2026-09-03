@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
                 val result by vm.result.collectAsStateWithLifecycle()
                 val error by vm.error.collectAsStateWithLifecycle()
                 val apiKey by vm.apiKey.collectAsStateWithLifecycle()
+                val hasKey = apiKey.trim().startsWith("sk-")
                 var showSettings by rememberSaveable { mutableStateOf(false) }
                 val snackbar = remember { SnackbarHostState() }
 
@@ -61,6 +62,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     snackbarHost = { SnackbarHost(snackbar) },
                 ) { padding ->
+                    val pack = result
                     when {
                         showSettings -> SettingsScreen(
                             savedKey = apiKey,
@@ -69,15 +71,15 @@ class MainActivity : ComponentActivity() {
                             onBack = { showSettings = false },
                             modifier = Modifier.padding(padding),
                         )
-                        result != null -> ResultScreen(
-                            pack = result!!,
+                        pack != null -> ResultScreen(
+                            pack = pack,
                             onBack = vm::backToInput,
                             modifier = Modifier.padding(padding),
                         )
                         else -> HomeScreen(
                             dish = dish,
                             working = working,
-                            hasKey = vm.hasKey,
+                            hasKey = hasKey,
                             onDish = vm::setDish,
                             onCreate = vm::create,
                             onSettings = { showSettings = true },

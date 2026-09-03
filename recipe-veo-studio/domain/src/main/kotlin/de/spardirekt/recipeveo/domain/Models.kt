@@ -8,15 +8,18 @@ data class Recipe(
     val steps: List<String>,
 ) {
     fun asText(): String = buildString {
-        appendLine(dish.replaceFirstChar { it.uppercase() })
-        appendLine("Порции: $servings")
-        appendLine("Время: $time")
-        appendLine()
-        appendLine("Ингредиенты")
-        ingredients.forEach { appendLine("• $it") }
-        appendLine()
-        appendLine("Приготовление")
-        steps.forEachIndexed { i, step -> appendLine("${i + 1}. $step") }
+        if (servings.isNotBlank()) appendLine("Порции: $servings")
+        if (time.isNotBlank()) appendLine("Время: $time")
+        if (servings.isNotBlank() || time.isNotBlank()) appendLine()
+        if (ingredients.isNotEmpty()) {
+            appendLine("Ингредиенты")
+            ingredients.forEach { appendLine("• $it") }
+            appendLine()
+        }
+        if (steps.isNotEmpty()) {
+            appendLine("Приготовление")
+            steps.forEachIndexed { i, step -> appendLine("${i + 1}. $step") }
+        }
     }.trim()
 }
 
@@ -29,12 +32,32 @@ data class CulinaryPackage(
     val tiktokTitle: String,
     val hashtags: List<String>,
     val createdAt: Long,
+    val fromOpenAi: Boolean = false,
 ) {
-    init {
-        require(hashtags.size == 5) { "Нужно ровно 5 хештегов." }
-    }
+    fun geminiPrompt(): String = veoPrompt.trim()
 
-    fun copyPrompt(): String = veoPrompt
+    fun fullPackage(): String = buildString {
+        appendLine("БЛЮДО")
+        appendLine(dish)
+        appendLine()
+        appendLine("РЕЦЕПТ")
+        appendLine(recipe.asText())
+        appendLine()
+        appendLine("ПРОМПТ VEO 3.1 · 8 СЕКУНД")
+        appendLine(veoPrompt.trim())
+        appendLine()
+        appendLine("НЕГАТИВНЫЙ ПРОМПТ")
+        appendLine(negativePrompt.trim())
+        appendLine()
+        appendLine("ОЗВУЧКА")
+        appendLine(voiceover.trim())
+        appendLine()
+        appendLine("НАЗВАНИЕ TIKTOK")
+        appendLine(tiktokTitle.trim())
+        appendLine()
+        appendLine("ХЕШТЕГИ")
+        appendLine(hashtags.joinToString(" "))
+    }.trim()
 }
 
 object StudioRules {
