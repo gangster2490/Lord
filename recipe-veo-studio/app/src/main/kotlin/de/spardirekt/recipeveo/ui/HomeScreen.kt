@@ -2,6 +2,7 @@ package de.spardirekt.recipeveo.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -10,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,8 +25,10 @@ import de.spardirekt.recipeveo.domain.StudioRules
 fun HomeScreen(
     dish: String,
     working: Boolean,
+    hasKey: Boolean,
     onDish: (String) -> Unit,
     onCreate: () -> Unit,
+    onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -32,9 +36,17 @@ fun HomeScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Recipe VEO Studio", style = MaterialTheme.typography.headlineMedium)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Recipe VEO Studio", style = MaterialTheme.typography.headlineMedium)
+            OutlinedButton(onClick = onSettings) { Text("⚙") }
+        }
         Text(
-            "Название блюда — агент сам напишет рецепт и промпт для 8-секундного ролика Veo.",
+            if (hasKey) "Агент: OpenAI · название блюда → рецепт + промпт Veo 8с"
+            else "Агент: офлайн · название блюда → рецепт + промпт Veo 8с",
             modifier = Modifier.padding(top = 8.dp, bottom = 28.dp),
         )
         OutlinedTextField(
@@ -57,7 +69,10 @@ fun HomeScreen(
         }
         if (working) {
             CircularProgressIndicator(Modifier.padding(top = 28.dp))
-            Text("Агент пишет рецепт и промпт…", modifier = Modifier.padding(top = 12.dp))
+            Text(
+                if (hasKey) "OpenAI пишет рецепт и промпт…" else "Агент пишет рецепт и промпт…",
+                modifier = Modifier.padding(top = 12.dp),
+            )
         }
     }
 }

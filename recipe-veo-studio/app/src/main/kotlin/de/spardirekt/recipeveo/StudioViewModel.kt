@@ -1,19 +1,19 @@
 package de.spardirekt.recipeveo
 
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import de.spardirekt.recipeveo.domain.CulinaryAgent
 import de.spardirekt.recipeveo.domain.CulinaryPackage
 import de.spardirekt.recipeveo.domain.StudioRules
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import de.spardirekt.recipeveo.network.OpenAiCulinaryAgent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-class StudioViewModel : ViewModel() {
+class StudioViewModel(app: RecipeVeoApp) : AndroidViewModel(app) {
+    private val keyStore = app.apiKeyStore
+
     private val _dish = MutableStateFlow("")
     val dish: StateFlow<String> = _dish.asStateFlow()
 
@@ -26,8 +26,24 @@ class StudioViewModel : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    /** Key stored in EncryptedSharedPreferences — observed by Settings screen. */
+    private val _apiKey = MutableStateFlow(keyStore.getKey() ?: "")
+    val apiKey: StateFlow<String> = _apiKey.asStateFlow()
+
+    val hasKey: Boolean get() = keyStore.hasKey()
+
     fun setDish(value: String) {
         if (value.length <= StudioRules.MAX_DISH) _dish.value = value
+    }
+
+    fun saveApiKey(key: String) {
+        keyStore.setKey(key)
+        _apiKey.value = key.trim()
+    }
+
+    fun clearApiKey() {
+        keyStore.clearKey()
+        _apiKey.value = ""
     }
 
     fun create() {
@@ -35,8 +51,10 @@ class StudioViewModel : ViewModel() {
         viewModelScope.launch {
             _working.value = true
             _error.value = null
-            delay(700)
-            val outcome = withContext(Dispatchers.Default) {
+            val key = keyStore.getKey()
+            val outcome = if (!key.isNullOrBlank()) {
+                runCatching { OpenAiCulinaryAgent.create(_dish.value, key) }
+            } else {
                 runCatching { CulinaryAgent.create(_dish.value) }
             }
             _working.value = false

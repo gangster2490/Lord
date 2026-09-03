@@ -12,15 +12,27 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.spardirekt.recipeveo.ui.HomeScreen
 import de.spardirekt.recipeveo.ui.RecipeTheme
 import de.spardirekt.recipeveo.ui.ResultScreen
+import de.spardirekt.recipeveo.ui.SettingsScreen
 
 class MainActivity : ComponentActivity() {
-    private val vm: StudioViewModel by viewModels()
+    private val vm: StudioViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                StudioViewModel(application as RecipeVeoApp) as T
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,31 +42,45 @@ class MainActivity : ComponentActivity() {
                 val working by vm.working.collectAsStateWithLifecycle()
                 val result by vm.result.collectAsStateWithLifecycle()
                 val error by vm.error.collectAsStateWithLifecycle()
+                val apiKey by vm.apiKey.collectAsStateWithLifecycle()
+                var showSettings by rememberSaveable { mutableStateOf(false) }
                 val snackbar = remember { SnackbarHostState() }
+
                 LaunchedEffect(error) {
                     error?.let {
                         snackbar.showSnackbar(it)
                         vm.consumeError()
                     }
                 }
-                val pack = result
-                BackHandler(enabled = pack != null) { vm.backToInput() }
+
+                BackHandler(enabled = result != null || showSettings) {
+                    if (showSettings) showSettings = false else vm.backToInput()
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     snackbarHost = { SnackbarHost(snackbar) },
                 ) { padding ->
-                    if (pack == null) {
-                        HomeScreen(
-                            dish = dish,
-                            working = working,
-                            onDish = vm::setDish,
-                            onCreate = vm::create,
+                    when {
+                        showSettings -> SettingsScreen(
+                            savedKey = apiKey,
+                            onSave = { vm.saveApiKey(it); showSettings = false },
+                            onClear = { vm.clearApiKey() },
+                            onBack = { showSettings = false },
                             modifier = Modifier.padding(padding),
                         )
-                    } else {
-                        ResultScreen(
-                            pack = pack,
+                        result != null -> ResultScreen(
+                            pack = result!!,
                             onBack = vm::backToInput,
+                            modifier = Modifier.padding(padding),
+                        )
+                        else -> HomeScreen(
+                            dish = dish,
+                            working = working,
+                            hasKey = vm.hasKey,
+                            onDish = vm::setDish,
+                            onCreate = vm::create,
+                            onSettings = { showSettings = true },
                             modifier = Modifier.padding(padding),
                         )
                     }
