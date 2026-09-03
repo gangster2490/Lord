@@ -29,7 +29,10 @@ object GeminiVeoComplianceSystem {
             repairedHits.isNotEmpty() -> VERDICT_SANITIZED
             else -> VERDICT_READY
         }
-        val failed = gemini.filter { !it.repaired && it.code != "GV_SUBMIT" }.map { it.code }.toSet()
+        val failed = gemini.filter {
+            it.code != "GV_SUBMIT" &&
+                (!it.repaired || it.code in GeminiVeoPolicy.HARD_BLOCK_CODES)
+        }.map { it.code }.toSet()
         val lock = FinalPromptValidator.sectionBody(prompt, "PRODUCT LOCK")
         val productMatch = productModel.visualSignature.isEmpty() ||
             FinalPromptValidator.isProductSpecificLock(lock, productModel)
