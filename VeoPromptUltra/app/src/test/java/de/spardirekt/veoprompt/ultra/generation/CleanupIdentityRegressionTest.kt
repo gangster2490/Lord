@@ -58,11 +58,19 @@ class CleanupIdentityRegressionTest {
             "too long: ${copy.length}\n$copy",
             copy.length <= GeminiVeoPromptCleanup.MAX_COPIED_PROMPT_CHARS
         )
+        val semanticViolations = RegressionLocks.violations(copy, Fixtures.panModel())
+        assertTrue(
+            "Gemini copy failed positive product lock: $semanticViolations\n$copy",
+            semanticViolations.isEmpty()
+        )
         val identity = section(copy, "PRODUCT LOCK") + "\n" + section(copy, "SHOT SEQUENCE")
         assertTrue("missing wooden lid:\n$identity", identity.contains("wooden lid"))
         assertTrue("missing ferrule:\n$identity", identity.contains("ferrule"))
         assertTrue("missing bowl:\n$identity", identity.contains("bowl"))
-        assertTrue("missing high-sided shape:\n$identity", identity.contains("high-sided"))
+        assertTrue(
+            "missing high-sided shape:\n$identity",
+            identity.contains("high sides") || identity.contains("high-sided")
+        )
         assertTrue("missing wooden handle:\n$identity", identity.contains("wooden handle"))
         assertTrue("missing rivets:\n$identity", identity.contains("rivets"))
         assertTrue("missing hanging ring:\n$identity", identity.contains("hanging ring"))
@@ -94,6 +102,9 @@ class CleanupIdentityRegressionTest {
             "pan negatives lost wok/silhouette lock:\n$negatives",
             negatives.contains("wok") || negatives.contains("shallower bowl")
         )
+        assertTrue("pan negatives lost handle lock:\n$negatives", negatives.contains("handle changes"))
+        assertTrue("pan negatives lost non-stick lock:\n$negatives", negatives.contains("non-stick"))
+        assertTrue("pan negatives lost morphing lock:\n$negatives", negatives.contains("morphing"))
         val hook = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("0.0") }
         assertTrue(hook.contains(":"))
         assertTrue(hook.length > "0.0–2.0s — HOOK".length)
@@ -101,18 +112,25 @@ class CleanupIdentityRegressionTest {
             "HOOK must keep wooden lid and ferrule:\n$hook",
             hook.contains("wooden lid") && hook.contains("ferrule")
         )
-        assertTrue("HOOK must specify a close-up:\n$hook", hook.contains("close-up"))
-        assertTrue("HOOK must specify composition:\n$hook", hook.contains("frames"))
+        assertTrue(
+            "HOOK must specify a close-up:\n$hook",
+            hook.contains("close-up", ignoreCase = true)
+        )
+        assertTrue("HOOK must specify composition:\n$hook", hook.contains("shows"))
         assertTrue("HOOK must use grammatical list syntax:\n$hook", hook.contains(", and "))
         assertFalse(
             "HOOK must not ellipsize away lid/ferrule:\n$hook",
             hook.contains("…") && !hook.contains("lid") && !hook.contains("ferrule")
         )
         val identityLine = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("IDENTITY") }
-        assertTrue("IDENTITY must specify a hard cut:\n$identityLine", identityLine.contains("Hard cut"))
+        assertTrue(
+            "IDENTITY must specify a hard cut:\n$identityLine",
+            identityLine.contains("hard cut", ignoreCase = true)
+        )
         assertTrue(
             "IDENTITY must specify a full-profile shot:\n$identityLine",
-            identityLine.contains("full profile")
+            identityLine.contains("full-profile", ignoreCase = true) ||
+                identityLine.contains("full profile", ignoreCase = true)
         )
         val feature = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("FEATURE") }
         if (expectConfirmedLidLift) {
@@ -162,7 +180,7 @@ class CleanupIdentityRegressionTest {
     }
 
     private companion object {
-        const val PAN_TITLE = "Tiefe schwarze Pfanne mit Holzdeckel"
+        const val PAN_TITLE = "Schwarze Pfanne mit Holzdeckel"
         val PAN_HASHTAGS = listOf(
             "#Pfanne",
             "#Holzdeckel",

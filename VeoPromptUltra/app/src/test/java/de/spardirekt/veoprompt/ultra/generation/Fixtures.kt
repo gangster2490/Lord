@@ -83,23 +83,23 @@ object Fixtures {
         val hookParts = distinctiveDetails(details, 3)
         val identityParts = distinctiveDetails(details, 5)
             .filterNot { part -> hookParts.any { it.equals(part, ignoreCase = true) } }
-            .take(2)
+            .take(3)
             .ifEmpty { hookParts.take(2) }
         val keepParts = hookParts.sortedByDescending { distinctiveScore(it) }.take(2)
-        val hook = "A close-up frames the ${naturalList(hookParts)}"
-        val identity = "Hard cut to full profile shows the ${naturalList(identityParts)}"
+        val hook = "Close-up shows the ${naturalList(hookParts)}"
+        val identity = "Full-profile hard cut shows the ${naturalList(identityParts)}"
         val hasVerifiedLidLift = model.confirmedFunctions.any { function ->
             function.contains("lid", ignoreCase = true) && function.contains("lift", ignoreCase = true)
         }
         val feature = if (hasVerifiedLidLift) {
-            "One adult hand slightly lifts the lid, revealing the empty bowl"
+            "One adult hand lifts the lid slightly, revealing empty bowl"
         } else {
             "Slow push-in across ${keepParts.joinToString(", ")}; product remains still"
         }
         val hero = if (hasVerifiedLidLift) {
-            "Hard cut; lid seated, stable 3/4 hero. Hold to 8.0s"
+            "Hard cut: lid seated; stable hero. Hold to 8.0s"
         } else {
-            "Hard cut; stable 3/4 hero. Hold to 8.0s"
+            "Hard cut: stable hero. Hold to 8.0s"
         }
         return """
 FORMAT

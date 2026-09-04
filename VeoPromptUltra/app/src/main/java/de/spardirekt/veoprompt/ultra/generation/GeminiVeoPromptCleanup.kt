@@ -358,7 +358,7 @@ object GeminiVeoPromptCleanup {
                 maxBullets = negMax
             )
             map["SETTING"] = clipWords(map["SETTING"].orEmpty(), if (guard == 1) 6 else 4)
-            if (guard >= 2) map["AUDIO"] = "Subtle music."
+            if (guard >= 2) map["AUDIO"] = "Soft music."
             // Never truncate REFERENCES or SHOT SEQUENCE. A cut sentence is not
             // a pasteable Veo prompt, even when it would satisfy the soft budget.
             out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
@@ -608,7 +608,7 @@ object GeminiVeoPromptCleanup {
         val shape = when {
             blob.contains("deep rounded") &&
                 (blob.contains("high side") || blob.contains("high-side")) ->
-                "deep, rounded, high-sided bowl"
+                "deep rounded bowl with high sides"
             blob.contains("deep rounded") -> "deep rounded bowl"
             blob.contains("high side") -> "high-sided bowl"
             else -> "bowl"
@@ -807,7 +807,7 @@ object GeminiVeoPromptCleanup {
         val hookDetails = pickLockDetails(snippetList, 3)
         val identityDetails = snippetList.filterNot { snip ->
             hookDetails.any { it.equals(snip, ignoreCase = true) }
-        }.ifEmpty { snippetList.take(2) }.take(2)
+        }.ifEmpty { snippetList.take(3) }.take(3)
         return "$label: " + when (index) {
             0 -> composeHook(after, hookDetails)
             1 -> composeIdentity(after, identityDetails.ifEmpty { hookDetails.take(2) })
@@ -820,7 +820,7 @@ object GeminiVeoPromptCleanup {
         if (isActionableHook(after)) return after.trimEnd('.')
         val selected = selectShotDetails(mergeShotDetails(after, details), 44)
         val subject = naturalList(selected).ifBlank { "product" }
-        return "A close-up frames the $subject"
+        return "Close-up shows the $subject"
     }
 
     private fun composeIdentity(after: String, details: List<String>): String {
@@ -830,7 +830,7 @@ object GeminiVeoPromptCleanup {
         return if (subject.isBlank()) {
             "Hard cut to full product view"
         } else {
-            "Hard cut to full profile shows the $subject"
+            "Full-profile hard cut shows the $subject"
         }
     }
 
@@ -853,7 +853,7 @@ object GeminiVeoPromptCleanup {
         if (!isHeroPlaceholder(after) && after.contains("8.0") && after.length >= 20) {
             return after.trimEnd('.')
         }
-        return "Hard cut; stable 3/4 hero. Hold to 8.0s"
+        return "Hard cut: stable hero. Hold to 8.0s"
     }
 
     private fun isActionableHook(after: String): Boolean {
@@ -867,7 +867,8 @@ object GeminiVeoPromptCleanup {
     private fun isActionableIdentity(after: String): Boolean {
         val a = after.lowercase()
         val hasCutOrFraming = a.contains("hard cut") || a.contains("full profile") ||
-            a.contains("full product") || a.contains("full framing")
+            a.contains("full-profile") || a.contains("full product") ||
+            a.contains("full framing")
         return hasCutOrFraming && distinctiveKeysIn(after).isNotEmpty()
     }
 
@@ -1021,7 +1022,7 @@ object GeminiVeoPromptCleanup {
 
     private fun simplifyCritical(marketplace: Boolean): String {
         return if (marketplace) {
-            "Same product. Exactly 8.0s, four blocks. No listing UI."
+            "Same product. Exactly 8.0s, four blocks."
         } else {
             "Same product. Exactly 8.0s, four blocks only."
         }
@@ -1031,9 +1032,9 @@ object GeminiVeoPromptCleanup {
         val pan = looksLikeCookwarePan(identity)
         if (pan) {
             return listOf(
-                "no missing wooden lid, ferrule, rivets, or hanging ring",
-                "no generic pan or wok",
-                "no shallower bowl or changed silhouette"
+                "no missing lid, ferrule, rivets, or ring; no handle changes",
+                "no generic pan/wok, shallower bowl, or changed silhouette",
+                "no non-stick claims or product morphing"
             ).take(maxBullets).joinToString("\n") { "- $it" }
         }
         val fromPrompt = raw.lineSequence()
@@ -1438,6 +1439,6 @@ object GeminiVeoPromptCleanup {
         0.0–2.0s — HOOK: product visible now with strongest verified detail
         2.0–4.0s — IDENTITY: same product, full framing of verified parts
         4.0–6.0s — FEATURE / DEMO: slow camera push-in; product remains still
-        6.0–8.0s — HERO / CTA: hard cut; stable 3/4 hero. Hold to 8.0s
+        6.0–8.0s — HERO / CTA: hard cut: stable hero. Hold to 8.0s
     """.trimIndent()
 }

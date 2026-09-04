@@ -217,8 +217,11 @@ NEGATIVE PROMPT
             "HOOK must keep wooden lid and ferrule:\n$hook",
             hook.contains("wooden lid") && hook.contains("ferrule")
         )
-        assertTrue("HOOK must be a filmable close-up:\n$hook", hook.contains("close-up"))
-        assertTrue("HOOK must specify composition:\n$hook", hook.contains("frames"))
+        assertTrue(
+            "HOOK must be a filmable close-up:\n$hook",
+            hook.contains("close-up", ignoreCase = true)
+        )
+        assertTrue("HOOK must specify composition:\n$hook", hook.contains("shows"))
         val feature = section(cleaned, "SHOT SEQUENCE").lineSequence().first { it.contains("FEATURE") }
         assertTrue("FEATURE must be a concrete safe camera move:\n$feature", feature.contains("push-in"))
         assertTrue("FEATURE must keep the product still:\n$feature", feature.contains("remains still"))
