@@ -314,15 +314,17 @@ object FinalPromptValidator {
         ).count { key -> t.contains(key) } * 12 + minOf(t.length, 24)
         if (t.contains("ferrule")) score += 24
         if (t.contains("lid")) score += 20
+        if (t.contains("hanging")) score += 16
+        if (t.contains("handle")) score += 10
         if (t.contains("rivet")) score += 8
         return score
     }
 
     private fun defaultShotDetail(fallback: String, index: Int): String = when (index) {
-        0 -> fallback.ifBlank { "product visible with strongest verified detail" }
-        1 -> listOf("same unchanged product, full framing", fallback).first { it.isNotBlank() }
+        0 -> if (fallback.isBlank()) "product visible now with strongest verified detail" else "$fallback visible now"
+        1 -> if (fallback.isBlank()) "same product, full framing" else "same product, full framing — $fallback"
         2 -> "one hand, one verified action"
-        else -> "stable hero of the same product. End 8.0s"
+        else -> "stable hero of the same unchanged product. End 8.0s"
     }
 
     private val PAN_OVERLAY_LEAKS = setOf("holzdeckel", "tiefe form")

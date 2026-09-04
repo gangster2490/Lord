@@ -242,7 +242,7 @@ object GeminiVeoPromptCleanup {
         }
         map["FORMAT"] = "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
         map["REFERENCES"] = simplifyReferences(map["REFERENCES"].orEmpty(), marketplace)
-        map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 8)
+        map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 5)
         val identity = map["PRODUCT LOCK"].orEmpty()
         map["SETTING"] = simplifySetting(map["SETTING"].orEmpty(), identity)
         map["SHOT SEQUENCE"] = simplifyShotSequence(map["SHOT SEQUENCE"].orEmpty(), identity)
@@ -256,7 +256,7 @@ object GeminiVeoPromptCleanup {
         map["NEGATIVE PROMPT"] = simplifyNegative(
             map["NEGATIVE PROMPT"].orEmpty(),
             identity,
-            maxBullets = 6
+            maxBullets = 4
         )
         map["TITLE"] = map["TITLE"].orEmpty().lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
             .ifBlank { "Product Ad" }
@@ -267,21 +267,6 @@ object GeminiVeoPromptCleanup {
             "$name\n${map[name].orEmpty().trim()}"
         }.trim() + "\n"
 
-        // Hard budget: compress further if still long.
-        if (out.length > MAX_COPIED_PROMPT_CHARS) {
-            val tightIdentity = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 6)
-            map["PRODUCT LOCK"] = tightIdentity
-            map["NEGATIVE PROMPT"] = simplifyNegative(
-                map["NEGATIVE PROMPT"].orEmpty(),
-                tightIdentity,
-                maxBullets = 5
-            )
-            map["REFERENCES"] = clipChars(map["REFERENCES"].orEmpty(), 110)
-            map["SETTING"] = simplifySetting(map["SETTING"].orEmpty(), tightIdentity)
-            out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
-                "$name\n${map[name].orEmpty().trim()}"
-            }.trim() + "\n"
-        }
         return finalCleanupCopiedPrompt(out, marketplace)
     }
 
@@ -372,13 +357,23 @@ object GeminiVeoPromptCleanup {
                 map["PRODUCT LOCK"].orEmpty(),
                 maxBullets = negMax
             )
-            map["REFERENCES"] = clipChars(map["REFERENCES"].orEmpty(), if (guard == 1) 90 else 70)
             map["SETTING"] = clipWords(map["SETTING"].orEmpty(), if (guard == 1) 6 else 4)
-            val shotCap = if (guard == 1) 80 else 64
-            map["SHOT SEQUENCE"] = map["SHOT SEQUENCE"].orEmpty().lineSequence()
-                .map { line -> clipShotLine(line.trim(), shotCap) }
-                .filter { it.isNotBlank() }
-                .joinToString("\n")
+            if (guard >= 2) map["AUDIO"] = "Subtle music."
+            // Never truncate REFERENCES — a cut sentence is not a pasteable Veo prompt.
+            if (guard >= 3) {
+                map["SHOT SEQUENCE"] = map["SHOT SEQUENCE"].orEmpty().lineSequence()
+                    .map { line ->
+                        val t = line.trim()
+                        when {
+                            t.contains("HOOK", ignoreCase = true) -> t
+                            t.contains("FEATURE", ignoreCase = true) ||
+                                t.contains("HERO", ignoreCase = true) -> t
+                            else -> clipShotLine(t, 80)
+                        }
+                    }
+                    .filter { it.isNotBlank() }
+                    .joinToString("\n")
+            }
             out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
                 "$name\n${map[name].orEmpty().trim()}"
             }.trim() + "\n"
@@ -406,7 +401,7 @@ object GeminiVeoPromptCleanup {
         return when (name) {
             "FORMAT" -> "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
             "SHOT SEQUENCE" -> normalizeShotSequence(body, identity)
-            "NEGATIVE PROMPT" -> simplifyNegative(body, identity, maxBullets = 6)
+            "NEGATIVE PROMPT" -> simplifyNegative(body, identity, maxBullets = 4)
             "HASHTAGS" -> Regex("#[\\p{L}\\p{N}_]+")
                 .findAll(body)
                 .map { it.value }
@@ -422,12 +417,7 @@ object GeminiVeoPromptCleanup {
                 .filter { it.isNotBlank() }
                 .filterNot { isGenericFidelityBoilerplate(it) }
                 .joinToString("\n")
-            "REFERENCES" -> {
-                val one = body.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.joinToString(" ")
-                if (marketplace && !one.contains("marketplace", ignoreCase = true)) {
-                    "$one $SHORT_MARKETPLACE".trim()
-                } else one
-            }
+            "REFERENCES" -> simplifyReferences(body, marketplace)
             else -> body
         }.trim()
     }
@@ -578,16 +568,9 @@ object GeminiVeoPromptCleanup {
         return body.trimEnd('.', ',') + "."
     }
 
-    private fun simplifyReferences(raw: String, marketplace: Boolean): String {
-        var text = stripLongDoctrine(raw)
-        text = clipWords(firstSentences(text, 1), 16)
-        if (text.isBlank()) {
-            text = "Uploaded product photos are the visual evidence."
-        }
-        if (marketplace && !text.contains("marketplace", ignoreCase = true)) {
-            text = "$text $SHORT_MARKETPLACE".trim()
-        }
-        return clipChars(text, 140)
+    private fun simplifyReferences(@Suppress("UNUSED_PARAMETER") raw: String, marketplace: Boolean): String {
+        val evidence = "Uploaded product photos are the visual evidence."
+        return if (marketplace) "$evidence $SHORT_MARKETPLACE" else evidence
     }
 
     private fun simplifyProductLock(raw: String): String = compressProductLock(raw, maxDetails = 8)
@@ -641,9 +624,10 @@ object GeminiVeoPromptCleanup {
     private fun distinctiveness(token: String): Int {
         val t = token.lowercase()
         var score = DISTINCTIVE_KEYS.count { key -> t.contains(key) } * 12 + minOf(t.length, 24)
-        // Rare photographed parts outrank common silhouette words when HOOK is clipped.
         if (t.contains("ferrule")) score += 24
         if (t.contains("lid")) score += 20
+        if (t.contains("hanging")) score += 16
+        if (t.contains("handle")) score += 10
         if (t.contains("rivet")) score += 8
         return score
     }
@@ -744,7 +728,7 @@ object GeminiVeoPromptCleanup {
         )
         val matches = headerRe.findAll(raw).toList()
         if (matches.size < 4) return raw.trim()
-        val snippets = identitySnippets(identity, take = 3)
+        val snippets = identitySnippets(identity, take = 5)
         return matches.mapIndexed { index, match ->
             val header = match.groupValues[1].trim()
             val start = match.range.last + 1
@@ -785,32 +769,95 @@ object GeminiVeoPromptCleanup {
         val colon = line.indexOf(':')
         val label = if (colon >= 0) line.substring(0, colon).trim() else line
         val after = if (colon >= 0) line.substring(colon + 1).trim() else ""
-        val generic = after.isBlank() ||
-            GENERIC_SHOT_PREFIX.containsMatchIn(after) ||
-            after.equals("HOOK", ignoreCase = true) ||
-            after.equals("IDENTITY", ignoreCase = true) ||
-            after.equals("FEATURE / DEMO", ignoreCase = true) ||
-            after.equals("HERO / CTA", ignoreCase = true)
         val snippetList = snippets.split(',').map { it.trim() }.filter { it.isNotBlank() }
-        if (index == 0) {
-            val missing = snippetList.filter { snip ->
-                distinctiveKeysIn(snip).any { key -> !after.lowercase().contains(key) }
-            }
-            val merged = when {
-                generic -> snippetList.take(3).joinToString(", ")
-                    .ifBlank { "product visible with strongest verified detail" }
-                missing.isNotEmpty() -> "$after, ${missing.take(2).joinToString(", ")}"
-                else -> after
-            }
-            return "$label: ${clipHookDetails(merged)}"
+        val hookDetails = pickLockDetails(snippetList, 3)
+        val identityDetails = snippetList.filterNot { snip ->
+            hookDetails.any { it.equals(snip, ignoreCase = true) }
+        }.ifEmpty { snippetList.take(2) }.take(2)
+        return "$label: " + when (index) {
+            0 -> composeHook(after, hookDetails)
+            1 -> composeIdentity(after, identityDetails.ifEmpty { hookDetails.take(2) })
+            2 -> composeFeature(after, hookDetails)
+            else -> composeHero(after)
         }
-        if (!generic) return line
-        val detail = when (index) {
-            1 -> snippetList.take(2).joinToString(", ").ifBlank { "same unchanged product, full framing" }
-            2 -> "one hand, one verified action"
-            else -> "same product hero. End 8.0s"
+    }
+
+    private fun composeHook(after: String, details: List<String>): String {
+        val csv = clipHookDetails(mergeShotDetails(after, details), 56).ifBlank { "product" }
+        val alreadyGood = after.contains("visible now", ignoreCase = true) &&
+            distinctiveKeysIn(csv).all { after.lowercase().contains(it) }
+        return if (alreadyGood) after.trimEnd('.') else "$csv visible now"
+    }
+
+    private fun composeIdentity(after: String, details: List<String>): String {
+        val csv = clipHookDetails(mergeShotDetails(after, details), 40)
+        val alreadyGood = after.contains("full framing", ignoreCase = true) &&
+            after.contains("same product", ignoreCase = true) &&
+            distinctiveKeysIn(csv).all { after.lowercase().contains(it) }
+        if (alreadyGood) return after.trimEnd('.')
+        return if (csv.isBlank()) "same product, full framing" else "same product, full framing — $csv"
+    }
+
+    private fun composeFeature(after: String, details: List<String>): String {
+        if (!isFeaturePlaceholder(after) && after.length >= 24) {
+            return after.trimEnd('.')
         }
-        return "$label: $detail"
+        val keep = clipHookDetails(
+            details.sortedByDescending { distinctiveness(it) }.take(2).joinToString(", "),
+            36
+        )
+        return if (keep.isBlank()) {
+            "one hand, one verified action"
+        } else {
+            "one hand, one verified action; keep $keep"
+        }
+    }
+
+    private fun composeHero(after: String): String {
+        if (!isHeroPlaceholder(after) && after.contains("8.0") && after.length >= 20) {
+            return after.trimEnd('.')
+        }
+        return "stable hero of the same unchanged product. End 8.0s"
+    }
+
+    private fun isFeaturePlaceholder(after: String): Boolean {
+        val a = after.lowercase()
+        return a.isBlank() ||
+            a == "feature / demo" ||
+            a == "one hand, one verified action" ||
+            a.contains("one verified hero feature") ||
+            a.contains("one hero feature") ||
+            GENERIC_SHOT_PREFIX.containsMatchIn(after)
+    }
+
+    private fun isHeroPlaceholder(after: String): Boolean {
+        val a = after.lowercase()
+        return a.isBlank() ||
+            a == "hero / cta" ||
+            a.contains("same product hero") ||
+            a.contains("hero hold") ||
+            a.startsWith("stable desirable") ||
+            GENERIC_SHOT_PREFIX.containsMatchIn(after)
+    }
+
+    private fun mergeShotDetails(after: String, details: List<String>): String {
+        val stripped = after
+            .replace(Regex("(?i)\\bvisible now\\b"), "")
+            .replace(Regex("(?i)same product,\\s*full framing\\s*—\\s*"), "")
+            .replace(Regex("(?i)same product,\\s*full framing"), "")
+            .replace(Regex("(?i)^same\\s+"), "")
+            .replace(Regex("(?i),\\s*full framing"), "")
+            .replace(Regex("(?i)product visible now\\s*—\\s*"), "")
+            .replace(Regex("(?i)one hand,\\s*one verified action;\\s*keep\\s*"), "")
+        val fromAfter = stripped.split(Regex("[,;]|\\s+and\\s+|\\s+—\\s+"))
+            .map { it.trim().trimEnd('.') }
+            .filter { it.length in 3..40 }
+            .filterNot { part ->
+                val p = part.lowercase()
+                p.contains("verified") || p.contains("hero") || p.contains("framing") ||
+                    p.contains("visible") || p == "one hand" || p.startsWith("keep ")
+            }
+        return (fromAfter + details).distinctBy { it.lowercase() }.joinToString(", ")
     }
 
     /**
@@ -873,8 +920,7 @@ object GeminiVeoPromptCleanup {
         return out.replace(Regex("""\s{2,}"""), " ").trim()
     }
 
-    private fun clipShotLine(line: String, max: Int = 96): String {
-        // Drop filler that bloats timed lines without adding identity.
+    private fun clipShotLine(line: String, max: Int = 100): String {
         val cleaned = line
             .replace(Regex("""(?i)\bimmediately\b"""), "")
             .replace(Regex("""(?i),\s*physically plausible"""), "")
@@ -885,7 +931,18 @@ object GeminiVeoPromptCleanup {
             .replace(Regex("""\s{2,}"""), " ")
             .trim()
         if (cleaned.length <= max) return cleaned
+        if (Regex("(?i)FEATURE|HERO").containsMatchIn(cleaned)) return cleaned
         val colon = cleaned.indexOf(':')
+        if (colon >= 0 && cleaned.contains("HOOK", ignoreCase = true)) {
+            val prefix = cleaned.substring(0, colon).trim()
+            var body = cleaned.substring(colon + 1).trim()
+            val suffix = if (body.endsWith("visible now", ignoreCase = true)) " visible now" else ""
+            if (suffix.isNotEmpty()) {
+                body = body.removeSuffix(suffix).trim().trimEnd(',', ';')
+            }
+            val budget = (max - prefix.length - 2 - suffix.length).coerceAtLeast(24)
+            return "$prefix: ${clipHookDetails(body, budget)}$suffix"
+        }
         if (colon >= 0) {
             val prefix = cleaned.substring(0, colon).trim()
             val details = cleaned.substring(colon + 1).trim()
@@ -1309,9 +1366,9 @@ object GeminiVeoPromptCleanup {
     }
 
     private val CANONICAL_SHOT_SEQUENCE = """
-        0.0–2.0s — HOOK: product visible with strongest verified detail
-        2.0–4.0s — IDENTITY: clear full product framing
-        4.0–6.0s — FEATURE / DEMO: one hero feature; one hand only if hands used
-        6.0–8.0s — HERO / CTA: hero hold and soft CTA
+        0.0–2.0s — HOOK: product visible now with strongest verified detail
+        2.0–4.0s — IDENTITY: same product, full framing of verified parts
+        4.0–6.0s — FEATURE / DEMO: one hand, one verified action
+        6.0–8.0s — HERO / CTA: stable hero of the same unchanged product. End 8.0s
     """.trimIndent()
 }

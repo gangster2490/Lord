@@ -78,8 +78,15 @@ object Fixtures {
                 "- no marketplace UI",
                 "- no malformed hands"
             )
-        val hook = clipShotDetail(distinctiveDetails(details, 3).joinToString(", "))
-        val identity = clipShotDetail("same ${details.first()}, full framing")
+        val hookParts = distinctiveDetails(details, 3)
+        val identityParts = distinctiveDetails(details, 5)
+            .filterNot { part -> hookParts.any { it.equals(part, ignoreCase = true) } }
+            .take(2)
+            .ifEmpty { hookParts.take(2) }
+        val keepParts = hookParts.sortedByDescending { distinctiveScore(it) }.take(2)
+        val hook = "product visible now — ${clipShotDetail(hookParts.joinToString(", "))}"
+        val identity = "same product, full framing — ${clipShotDetail(identityParts.joinToString(", "))}"
+        val feature = "one hand, one verified action; keep ${keepParts.joinToString(", ")}"
         return """
 FORMAT
 Vertical 9:16.
@@ -108,8 +115,8 @@ $setting
 SHOT SEQUENCE
 0.0–2.0s — HOOK: $hook
 2.0–4.0s — IDENTITY: $identity
-4.0–6.0s — FEATURE / DEMO: one hand, one verified action
-6.0–8.0s — HERO / CTA: same product hero. End 8.0s
+4.0–6.0s — FEATURE / DEMO: $feature
+6.0–8.0s — HERO / CTA: stable hero of the same unchanged product. End 8.0s
 
 ON-SCREEN TEXT
 ${overlays.joinToString("\n")}
@@ -155,6 +162,8 @@ ${negatives.joinToString("\n")}
         ).count { key -> t.contains(key) } * 12 + minOf(t.length, 24)
         if (t.contains("ferrule")) score += 24
         if (t.contains("lid")) score += 20
+        if (t.contains("hanging")) score += 16
+        if (t.contains("handle")) score += 10
         if (t.contains("rivet")) score += 8
         return score
     }

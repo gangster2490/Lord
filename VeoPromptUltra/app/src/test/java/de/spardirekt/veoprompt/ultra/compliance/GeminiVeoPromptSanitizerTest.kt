@@ -108,7 +108,7 @@ class GeminiVeoPromptSanitizerTest {
     @Test
     fun goreInShotSequenceIsRewritten() {
         val dirty = Fixtures.validVeoPrompt(pan).replace(
-            "4.0–6.0s — FEATURE / DEMO: one hand, one verified action",
+            Regex("""4\.0–6\.0s — FEATURE / DEMO:.*"""),
             "4.0–6.0s — FEATURE / DEMO: Show gushing blood on the rim, then the same pan."
         )
         val result = GeminiVeoPromptSanitizer.sanitize(

@@ -214,9 +214,11 @@ NEGATIVE PROMPT
         assertTrue(overlays.contains("Holzdeckel"))
         val hook = section(cleaned, "SHOT SEQUENCE").lineSequence().first { it.contains("0.0") }
         assertTrue(
-            "HOOK must keep wooden lid or ferrule:\n$hook",
-            hook.contains("wooden lid") || hook.contains("ferrule")
+            "HOOK must keep wooden lid and ferrule:\n$hook",
+            hook.contains("wooden lid") && hook.contains("ferrule")
         )
+        assertTrue("HOOK must be visible-now:\n$hook", hook.contains("visible now"))
+        assertTrue(cleaned.contains("listing UI") || cleaned.contains("visual evidence"))
         assertFalse(cleaned.contains("no…"))
     }
 

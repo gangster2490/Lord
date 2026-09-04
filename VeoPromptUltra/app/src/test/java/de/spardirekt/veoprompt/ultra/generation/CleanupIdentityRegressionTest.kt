@@ -77,20 +77,48 @@ class CleanupIdentityRegressionTest {
         assertTrue(hook.contains(":"))
         assertTrue(hook.length > "0.0–2.0s — HOOK".length)
         assertTrue(
-            "HOOK must keep wooden lid or ferrule, not just bowl/handle:\n$hook",
-            hook.contains("wooden lid") || hook.contains("ferrule")
+            "HOOK must keep wooden lid and ferrule:\n$hook",
+            hook.contains("wooden lid") && hook.contains("ferrule")
+        )
+        assertTrue(
+            "HOOK must be a visible-now shot, not a parts CSV:\n$hook",
+            hook.contains("visible now")
         )
         assertFalse(
             "HOOK must not ellipsize away lid/ferrule:\n$hook",
             hook.contains("…") && !hook.contains("lid") && !hook.contains("ferrule")
         )
+        val identityLine = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("IDENTITY") }
+        assertTrue(
+            "IDENTITY must be a full-framing shot:\n$identityLine",
+            identityLine.contains("framing")
+        )
+        val feature = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("FEATURE") }
+        assertTrue("FEATURE must keep one hand:\n$feature", feature.contains("one hand"))
+        assertTrue(
+            "FEATURE must bind pan identity, not a bare placeholder:\n$feature",
+            feature.contains("lid") || feature.contains("ferrule") || feature.contains("bowl")
+        )
+        val hero = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("HERO") }
+        assertTrue("HERO must end at 8.0s:\n$hero", hero.contains("8.0"))
+        assertTrue(
+            "HERO must be a stable hero shot:\n$hero",
+            hero.contains("hero", ignoreCase = true)
+        )
         val refs = section(copy, "REFERENCES")
         assertFalse("REFERENCES must not clip to leftover 'no':\n$refs", refs.contains("no…"))
-        assertFalse(
-            "REFERENCES must not end on a leftover 'no':\n$refs",
-            refs.trim().endsWith(" no") || refs.trim().endsWith(" no.")
+        assertTrue(
+            "REFERENCES must stay a complete marketplace rule:\n$refs",
+            refs.contains("listing UI")
         )
-        assertTrue("REFERENCES must stay readable:\n$refs", refs.length >= 20)
+        assertTrue("REFERENCES must stay readable:\n$refs", refs.trim().endsWith(".") || refs.contains("UI."))
+        val lock = section(copy, "PRODUCT LOCK")
+        assertTrue(
+            "hanging ring must survive lock, shots, or negatives:\n$copy",
+            lock.contains("hanging ring") ||
+                section(copy, "SHOT SEQUENCE").contains("hanging ring") ||
+                negatives.contains("hanging ring")
+        )
     }
 
     @Test
