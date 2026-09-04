@@ -11,6 +11,8 @@ class ComplianceCheckerTest {
         val hits = ComplianceChecker.checkCompliance(text)
         assertThat(hits).isNotEmpty()
         assertThat(ComplianceChecker.evaluate(text).hasForbiddenLanguage).isTrue()
+        assertThat(ComplianceChecker.evaluate(text).forbiddenHits.map { it.label })
+            .containsAtLeast("beste", "einzigartig", "garantiert")
     }
 
     @Test
