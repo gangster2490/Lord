@@ -15,7 +15,9 @@ object Fixtures {
             "rivets",
             "hanging ring",
             "wooden lid"
-        )
+        ),
+        confirmedStates = listOf("wooden lid seated on the bowl"),
+        confirmedFunctions = listOf("wooden lid lifts off")
     )
 
     fun fishingChairModel() = ProductModel(
@@ -84,9 +86,21 @@ object Fixtures {
             .take(2)
             .ifEmpty { hookParts.take(2) }
         val keepParts = hookParts.sortedByDescending { distinctiveScore(it) }.take(2)
-        val hook = "product visible now — ${clipShotDetail(hookParts.joinToString(", "))}"
-        val identity = "same product, full framing — ${clipShotDetail(identityParts.joinToString(", "))}"
-        val feature = "one hand, one verified action; keep ${keepParts.joinToString(", ")}"
+        val hook = "A close-up frames the ${naturalList(hookParts)}"
+        val identity = "Hard cut to full profile shows the ${naturalList(identityParts)}"
+        val hasVerifiedLidLift = model.confirmedFunctions.any { function ->
+            function.contains("lid", ignoreCase = true) && function.contains("lift", ignoreCase = true)
+        }
+        val feature = if (hasVerifiedLidLift) {
+            "One adult hand slightly lifts the lid, revealing the empty bowl"
+        } else {
+            "Slow push-in across ${keepParts.joinToString(", ")}; product remains still"
+        }
+        val hero = if (hasVerifiedLidLift) {
+            "Hard cut; lid seated, stable 3/4 hero. Hold to 8.0s"
+        } else {
+            "Hard cut; stable 3/4 hero. Hold to 8.0s"
+        }
         return """
 FORMAT
 Vertical 9:16.
@@ -116,7 +130,7 @@ SHOT SEQUENCE
 0.0–2.0s — HOOK: $hook
 2.0–4.0s — IDENTITY: $identity
 4.0–6.0s — FEATURE / DEMO: $feature
-6.0–8.0s — HERO / CTA: stable hero of the same product. End 8.0s
+6.0–8.0s — HERO / CTA: $hero
 
 ON-SCREEN TEXT
 ${overlays.joinToString("\n")}
@@ -137,12 +151,11 @@ ${negatives.joinToString("\n")}
 """.trimIndent()
     }
 
-    private fun clipShotDetail(text: String, max: Int = 48): String {
-        val t = text.trim()
-        if (t.length <= max) return t
-        val cut = t.substring(0, max)
-        val at = cut.lastIndexOf(' ').takeIf { it > 16 } ?: max
-        return cut.substring(0, at).trimEnd(',', ';', '.')
+    private fun naturalList(parts: List<String>): String = when (parts.size) {
+        0 -> ""
+        1 -> parts.first()
+        2 -> "${parts[0]} and ${parts[1]}"
+        else -> parts.dropLast(1).joinToString(", ") + ", and " + parts.last()
     }
 
     /** First photographed token, then rare identity parts (lid / ferrule before handle). */

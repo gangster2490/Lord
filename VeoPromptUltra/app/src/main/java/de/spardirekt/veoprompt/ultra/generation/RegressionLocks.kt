@@ -41,7 +41,7 @@ object RegressionLocks {
             "- no invented non-stick claims",
             "- no product morphing between shots"
         ),
-        voiceover = "Tiefer Topf, fester Holzdeckel, einfach kochen."
+        voiceover = "Tiefe Pfanne, abnehmbarer Holzdeckel, einfach kochen."
     )
 
     val FISHING_CHAIR = ProductLockSpec(

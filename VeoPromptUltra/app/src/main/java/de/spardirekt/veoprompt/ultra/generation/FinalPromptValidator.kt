@@ -539,7 +539,7 @@ object FinalPromptValidator {
     fun normalizeHashtags(raw: List<String>, tiktokShop: Boolean): List<String> {
         val cleaned = raw.map { tag ->
             val t = tag.trim().trimStart('#')
-                .replace(Regex("[^A-Za-z0-9_А-Яа-яЁё]"), "")
+                .replace(Regex("[^\\p{L}\\p{N}_]"), "")
             if (t.isBlank()) "" else "#$t"
         }.filter { it.length > 1 }.distinctBy { it.lowercase() }.toMutableList()
         if (tiktokShop && cleaned.none { it.equals("#TikTokShop", true) }) {

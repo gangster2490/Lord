@@ -20,9 +20,9 @@ class CleanupIdentityRegressionTest {
         val repaired = FinalPromptValidator.localRepair(
             StructuredResponse(
                 veoPrompt = Fixtures.validVeoPrompt(model),
-                voiceover = "Tiefer Topf, fester Holzdeckel, einfach kochen.",
-                title = "Tiefe Pfanne mit Holzdeckel",
-                hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop")
+                voiceover = RegressionLocks.PAN.voiceover,
+                title = PAN_TITLE,
+                hashtags = PAN_HASHTAGS
             ),
             model,
             VoiceLanguage.DE,
@@ -36,7 +36,7 @@ class CleanupIdentityRegressionTest {
             marketplace = true,
             tiktokShopMode = true
         )
-        assertPanCopy(copy)
+        assertPanCopy(copy, expectConfirmedLidLift = true)
     }
 
     @Test
@@ -44,16 +44,16 @@ class CleanupIdentityRegressionTest {
         val model = Fixtures.panModel()
         val copy = ResultComposition.geminiPrompt(
             storedPrompt = twoLinePanShapedPrompt(model),
-            voiceover = "Tiefer Topf, fester Holzdeckel, einfach kochen.",
-            title = model.productIdentity,
-            hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop"),
+            voiceover = RegressionLocks.PAN.voiceover,
+            title = PAN_TITLE,
+            hashtags = PAN_HASHTAGS,
             marketplace = true,
             tiktokShopMode = true
         )
-        assertPanCopy(copy)
+        assertPanCopy(copy, expectConfirmedLidLift = false)
     }
 
-    private fun assertPanCopy(copy: String) {
+    private fun assertPanCopy(copy: String, expectConfirmedLidLift: Boolean) {
         assertTrue(
             "too long: ${copy.length}\n$copy",
             copy.length <= GeminiVeoPromptCleanup.MAX_COPIED_PROMPT_CHARS
@@ -62,8 +62,29 @@ class CleanupIdentityRegressionTest {
         assertTrue("missing wooden lid:\n$identity", identity.contains("wooden lid"))
         assertTrue("missing ferrule:\n$identity", identity.contains("ferrule"))
         assertTrue("missing bowl:\n$identity", identity.contains("bowl"))
+        assertTrue("missing high-sided shape:\n$identity", identity.contains("high-sided"))
+        assertTrue("missing wooden handle:\n$identity", identity.contains("wooden handle"))
+        assertTrue("missing rivets:\n$identity", identity.contains("rivets"))
+        assertTrue("missing hanging ring:\n$identity", identity.contains("hanging ring"))
         val overlays = section(copy, "ON-SCREEN TEXT")
         assertTrue("missing Holzdeckel:\n$overlays", overlays.contains("Holzdeckel"))
+        val voiceover = section(copy, "VOICEOVER")
+        assertTrue("voiceover must name the pan:\n$voiceover", voiceover.contains("Pfanne"))
+        assertFalse("voiceover must not rename the pan as a pot:\n$voiceover", voiceover.contains("Topf"))
+        val title = section(copy, "TITLE")
+        assertTrue("title must name the pan:\n$title", title.contains("Pfanne"))
+        assertTrue("title must name the lid:\n$title", title.contains("Holzdeckel"))
+        val hashtags = Regex("#[\\p{L}\\p{N}_]+").findAll(section(copy, "HASHTAGS"))
+            .map { it.value }
+            .toList()
+        assertTrue("hashtags must remain exactly five:\n$hashtags", hashtags.size == 5)
+        assertTrue("hashtags must describe the product:\n$hashtags", hashtags.contains("#Pfanne"))
+        assertTrue("hashtags must describe the lid:\n$hashtags", hashtags.contains("#Holzdeckel"))
+        assertTrue("TikTok Shop hashtag missing:\n$hashtags", hashtags.contains("#TikTokShop"))
+        assertFalse(
+            "placeholder hashtags leaked:\n$hashtags",
+            hashtags.any { Regex("""#[a-e]""", RegexOption.IGNORE_CASE).matches(it) }
+        )
         val negatives = section(copy, "NEGATIVE PROMPT")
         assertTrue(
             "pan negatives lost lid/ferrule:\n$negatives",
@@ -80,44 +101,82 @@ class CleanupIdentityRegressionTest {
             "HOOK must keep wooden lid and ferrule:\n$hook",
             hook.contains("wooden lid") && hook.contains("ferrule")
         )
-        assertTrue(
-            "HOOK must be a visible-now shot, not a parts CSV:\n$hook",
-            hook.contains("visible now")
-        )
+        assertTrue("HOOK must specify a close-up:\n$hook", hook.contains("close-up"))
+        assertTrue("HOOK must specify composition:\n$hook", hook.contains("frames"))
+        assertTrue("HOOK must use grammatical list syntax:\n$hook", hook.contains(", and "))
         assertFalse(
             "HOOK must not ellipsize away lid/ferrule:\n$hook",
             hook.contains("…") && !hook.contains("lid") && !hook.contains("ferrule")
         )
         val identityLine = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("IDENTITY") }
+        assertTrue("IDENTITY must specify a hard cut:\n$identityLine", identityLine.contains("Hard cut"))
         assertTrue(
-            "IDENTITY must be a full-framing shot:\n$identityLine",
-            identityLine.contains("framing")
+            "IDENTITY must specify a full-profile shot:\n$identityLine",
+            identityLine.contains("full profile")
         )
         val feature = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("FEATURE") }
-        assertTrue("FEATURE must keep one hand:\n$feature", feature.contains("one hand"))
-        assertTrue(
-            "FEATURE must bind pan identity, not a bare placeholder:\n$feature",
-            feature.contains("lid") || feature.contains("ferrule") || feature.contains("bowl")
-        )
+        if (expectConfirmedLidLift) {
+            assertTrue("FEATURE must use one adult hand:\n$feature", feature.contains("One adult hand"))
+            assertTrue("FEATURE must state the action:\n$feature", feature.contains("lifts the lid"))
+            assertTrue("FEATURE must state the reveal:\n$feature", feature.contains("empty bowl"))
+        } else {
+            assertTrue("fallback FEATURE must be a concrete camera move:\n$feature", feature.contains("push-in"))
+            assertTrue("fallback FEATURE must not animate unverified parts:\n$feature", feature.contains("remains still"))
+            assertFalse(
+                "fallback FEATURE must not invent a hand action:\n$feature",
+                Regex("""(?i)\bhand\b""").containsMatchIn(feature)
+            )
+        }
         val hero = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("HERO") }
         assertTrue("HERO must end at 8.0s:\n$hero", hero.contains("8.0"))
+        assertTrue("HERO must specify a hard cut:\n$hero", hero.contains("Hard cut"))
         assertTrue(
             "HERO must be a stable hero shot:\n$hero",
             hero.contains("hero", ignoreCase = true)
+        )
+        assertTrue("HERO must specify the hold:\n$hero", hero.contains("Hold to 8.0s"))
+        if (expectConfirmedLidLift) {
+            assertTrue("HERO must restore the confirmed lid state:\n$hero", hero.contains("lid seated"))
+        }
+        val shots = section(copy, "SHOT SEQUENCE")
+        assertTrue("semantic placeholders leaked:\n$shots", SEMANTIC_PLACEHOLDERS.none { shots.contains(it) })
+        assertFalse("ellipsis is not a complete shot instruction:\n$shots", shots.contains("…"))
+        assertTrue(
+            "SHOT SEQUENCE must remain exactly four single-line blocks:\n$shots",
+            shots.lineSequence().count { it.isNotBlank() } == 4
         )
         val refs = section(copy, "REFERENCES")
         assertFalse("REFERENCES must not clip to leftover 'no':\n$refs", refs.contains("no…"))
         assertTrue(
             "REFERENCES must stay a complete marketplace rule:\n$refs",
-            refs.contains("listing UI")
+            refs.contains("marketplace UI")
         )
-        assertTrue("REFERENCES must stay readable:\n$refs", refs.trim().endsWith(".") || refs.contains("UI."))
+        assertTrue("REFERENCES must stay readable:\n$refs", refs.trim().endsWith("."))
         val lock = section(copy, "PRODUCT LOCK")
         assertTrue(
             "hanging ring must survive lock, shots, or negatives:\n$copy",
             lock.contains("hanging ring") ||
                 section(copy, "SHOT SEQUENCE").contains("hanging ring") ||
                 negatives.contains("hanging ring")
+        )
+    }
+
+    private companion object {
+        const val PAN_TITLE = "Tiefe schwarze Pfanne mit Holzdeckel"
+        val PAN_HASHTAGS = listOf(
+            "#Pfanne",
+            "#Holzdeckel",
+            "#Kochen",
+            "#Küche",
+            "#TikTokShop"
+        )
+        val SEMANTIC_PLACEHOLDERS = listOf(
+            "verified action",
+            "; keep ",
+            "visible now",
+            "same product hero",
+            "one hero feature",
+            "physically plausible"
         )
     }
 

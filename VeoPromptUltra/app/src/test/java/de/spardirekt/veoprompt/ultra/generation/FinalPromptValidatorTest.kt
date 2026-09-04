@@ -25,6 +25,18 @@ class FinalPromptValidatorTest {
     )
 
     @Test
+    fun hashtagNormalizationKeepsUnicodeLetters() {
+        val tags = FinalPromptValidator.normalizeHashtags(
+            listOf("#TiefePfanne", "#Holzdeckel", "#Kochen", "#Küche", "#TikTokShop"),
+            tiktokShop = true
+        )
+        assertEquals(
+            listOf("#TiefePfanne", "#Holzdeckel", "#Kochen", "#Küche", "#TikTokShop"),
+            tags
+        )
+    }
+
+    @Test
     fun validPackagePasses() {
         val response = StructuredResponse(
             veoPrompt = Fixtures.validVeoPrompt(panModel),

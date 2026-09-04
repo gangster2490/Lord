@@ -217,8 +217,13 @@ NEGATIVE PROMPT
             "HOOK must keep wooden lid and ferrule:\n$hook",
             hook.contains("wooden lid") && hook.contains("ferrule")
         )
-        assertTrue("HOOK must be visible-now:\n$hook", hook.contains("visible now"))
-        assertTrue(cleaned.contains("listing UI") || cleaned.contains("visual evidence"))
+        assertTrue("HOOK must be a filmable close-up:\n$hook", hook.contains("close-up"))
+        assertTrue("HOOK must specify composition:\n$hook", hook.contains("frames"))
+        val feature = section(cleaned, "SHOT SEQUENCE").lineSequence().first { it.contains("FEATURE") }
+        assertTrue("FEATURE must be a concrete safe camera move:\n$feature", feature.contains("push-in"))
+        assertTrue("FEATURE must keep the product still:\n$feature", feature.contains("remains still"))
+        assertFalse("FEATURE placeholder leaked:\n$feature", feature.contains("verified action"))
+        assertTrue(cleaned.contains("listing UI") || cleaned.contains("define appearance"))
         assertFalse(cleaned.contains("no…"))
     }
 
