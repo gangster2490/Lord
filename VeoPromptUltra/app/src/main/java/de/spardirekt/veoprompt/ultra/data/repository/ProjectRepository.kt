@@ -1,0 +1,162 @@
+package de.spardirekt.veoprompt.ultra.data.repository
+
+import de.spardirekt.veoprompt.ultra.data.db.ProjectDao
+import de.spardirekt.veoprompt.ultra.data.db.ProjectEntity
+import de.spardirekt.veoprompt.ultra.model.AppMode
+import de.spardirekt.veoprompt.ultra.model.CreativeMode
+import de.spardirekt.veoprompt.ultra.model.GenerationStage
+import de.spardirekt.veoprompt.ultra.model.ProjectImage
+import de.spardirekt.veoprompt.ultra.model.ProjectStatus
+import de.spardirekt.veoprompt.ultra.model.VoiceLanguage
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.util.UUID
+
+class ProjectRepository(
+    private val dao: ProjectDao,
+    private val json: Json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+) {
+    fun observeAll(): Flow<List<ProjectEntity>> = dao.observeAll()
+
+    fun observeHistory(): Flow<List<ProjectEntity>> = dao.observeAll().map { list ->
+        list.filter { entity ->
+            HistoryFilter.include(
+                status = entity.status,
+                imageCount = parseImages(entity).size,
+                veoPrompt = entity.veoPrompt
+            )
+        }
+    }
+
+    fun observe(id: String): Flow<ProjectEntity?> = dao.observeById(id)
+    suspend fun get(id: String): ProjectEntity? = dao.getById(id)
+    suspend fun delete(id: String) = dao.delete(id)
+    suspend fun clearAll() = dao.clearAll()
+    suspend fun count(): Int = dao.count()
+    suspend fun getActiveGenerating(): ProjectEntity? = dao.getActiveGenerating()
+
+    suspend fun findReusableEmptyDraft(): ProjectEntity? {
+        return dao.getRecentDrafts().firstOrNull { parseImages(it).isEmpty() && it.veoPrompt.isBlank() }
+    }
+
+    suspend fun createDraft(
+        voice: VoiceLanguage,
+        mode: AppMode,
+        creative: CreativeMode,
+        tiktok: Boolean
+    ): ProjectEntity {
+        val now = System.currentTimeMillis()
+        val entity = ProjectEntity(
+            id = UUID.randomUUID().toString(),
+            createdAt = now,
+            updatedAt = now,
+            voiceLanguage = voice.name,
+            mode = mode.name,
+            creativeMode = creative.name,
+            tiktokShopMode = tiktok,
+            status = ProjectStatus.Draft.name
+        )
+        dao.upsert(entity)
+        return entity
+    }
+
+    suspend fun duplicate(source: ProjectEntity): ProjectEntity {
+        val now = System.currentTimeMillis()
+        val copy = source.copy(
+            id = UUID.randomUUID().toString(),
+            createdAt = now,
+            updatedAt = now,
+            title = source.title.takeIf { it.isNotBlank() }?.let { "$it (copy)" } ?: "",
+            status = if (source.veoPrompt.isNotBlank()) ProjectStatus.Ready.name else ProjectStatus.Draft.name,
+            errorState = "",
+            errorDetail = ""
+        )
+        dao.upsert(copy)
+        return copy
+    }
+
+    suspend fun attachCopiedImages(entity: ProjectEntity, images: List<ProjectImage>): ProjectEntity {
+        val updated = entity.copy(
+            imageUrisJson = encodeImages(images),
+            thumbnailUri = images.firstOrNull()?.let { it.localPath ?: it.uri }.orEmpty()
+        )
+        dao.upsert(updated)
+        return updated
+    }
+
+    suspend fun newVersion(source: ProjectEntity): ProjectEntity {
+        val now = System.currentTimeMillis()
+        val copy = source.copy(
+            id = UUID.randomUUID().toString(),
+            createdAt = now,
+            updatedAt = now,
+            veoPrompt = "",
+            voiceover = "",
+            title = "",
+            hashtagsJson = "[]",
+            safetyAuditJson = "",
+            analysisResultJson = "",
+            productModelJson = "",
+            creativePlanJson = "",
+            generationStage = GenerationStage.IDLE.name,
+            completedStagesJson = "[]",
+            errorState = "",
+            errorDetail = "",
+            status = ProjectStatus.Draft.name
+        )
+        dao.upsert(copy)
+        return copy
+    }
+
+    suspend fun save(entity: ProjectEntity) {
+        dao.upsert(entity.copy(updatedAt = System.currentTimeMillis()))
+    }
+
+    fun parseImages(entity: ProjectEntity): List<ProjectImage> {
+        return runCatching {
+            json.decodeFromString<List<ProjectImage>>(entity.imageUrisJson)
+        }.getOrDefault(emptyList())
+    }
+
+    fun encodeImages(images: List<ProjectImage>): String = json.encodeToString(images)
+
+    fun parseHashtags(entity: ProjectEntity): List<String> {
+        return runCatching {
+            json.decodeFromString<List<String>>(entity.hashtagsJson)
+        }.getOrDefault(emptyList())
+    }
+
+    fun encodeHashtags(tags: List<String>): String = json.encodeToString(tags)
+
+    fun parseCompletedStages(entity: ProjectEntity): Set<GenerationStage> {
+        return runCatching {
+            json.decodeFromString<List<String>>(entity.completedStagesJson)
+                .mapNotNull { runCatching { GenerationStage.valueOf(it) }.getOrNull() }
+                .toSet()
+        }.getOrDefault(emptySet())
+    }
+
+    fun encodeCompletedStages(stages: Set<GenerationStage>): String =
+        json.encodeToString(stages.map { it.name })
+
+    fun parseRetryCounts(entity: ProjectEntity): Map<String, Int> {
+        return runCatching {
+            json.decodeFromString<Map<String, Int>>(entity.retryCountJson)
+        }.getOrDefault(emptyMap())
+    }
+
+    fun encodeRetryCounts(map: Map<String, Int>): String = json.encodeToString(map)
+
+    fun nextResumeStage(completed: Set<GenerationStage>): GenerationStage {
+        val order = listOf(
+            GenerationStage.PHOTO_ANALYSIS,
+            GenerationStage.PRODUCT_MODEL,
+            GenerationStage.VISUAL_LOCK,
+            GenerationStage.CREATIVE_DIRECTOR,
+            GenerationStage.FINAL_PROMPT
+        )
+        return order.firstOrNull { it !in completed } ?: GenerationStage.FINAL_PROMPT
+    }
+}
