@@ -78,7 +78,7 @@ object Fixtures {
                 "- no marketplace UI",
                 "- no malformed hands"
             )
-        val hook = clipShotDetail(details.take(3).joinToString(", "))
+        val hook = clipShotDetail(distinctiveDetails(details, 3).joinToString(", "))
         val identity = clipShotDetail("same ${details.first()}, full framing")
         return """
 FORMAT
@@ -136,5 +136,26 @@ ${negatives.joinToString("\n")}
         val cut = t.substring(0, max)
         val at = cut.lastIndexOf(' ').takeIf { it > 16 } ?: max
         return cut.substring(0, at).trimEnd(',', ';', '.')
+    }
+
+    /** First photographed token, then rare identity parts (lid / ferrule before handle). */
+    private fun distinctiveDetails(details: List<String>, take: Int): List<String> {
+        val cleaned = details.map { it.trim() }.filter { it.isNotBlank() }
+        if (cleaned.size <= take) return cleaned
+        val first = cleaned.first()
+        val ranked = cleaned.drop(1).sortedByDescending { distinctiveScore(it) }
+        return (listOf(first) + ranked).distinctBy { it.lowercase() }.take(take)
+    }
+
+    private fun distinctiveScore(token: String): Int {
+        val t = token.lowercase()
+        var score = listOf(
+            "lid", "ferrule", "rivet", "hanging", "handle", "bowl",
+            "tray", "frame", "collar", "bit", "drain", "plate", "latch"
+        ).count { key -> t.contains(key) } * 12 + minOf(t.length, 24)
+        if (t.contains("ferrule")) score += 24
+        if (t.contains("lid")) score += 20
+        if (t.contains("rivet")) score += 8
+        return score
     }
 }

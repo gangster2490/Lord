@@ -376,10 +376,7 @@ object GeminiVeoPromptCleanup {
             map["SETTING"] = clipWords(map["SETTING"].orEmpty(), if (guard == 1) 6 else 4)
             val shotCap = if (guard == 1) 80 else 64
             map["SHOT SEQUENCE"] = map["SHOT SEQUENCE"].orEmpty().lineSequence()
-                .map { line ->
-                    val t = line.trim()
-                    if (t.length <= shotCap) t else clipChars(t, shotCap)
-                }
+                .map { line -> clipShotLine(line.trim(), shotCap) }
                 .filter { it.isNotBlank() }
                 .joinToString("\n")
             out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
@@ -636,13 +633,24 @@ object GeminiVeoPromptCleanup {
         return (listOf(first) + ranked).distinctBy { it.lowercase() }.take(maxDetails)
     }
 
+    private val DISTINCTIVE_KEYS = listOf(
+        "lid", "ferrule", "rivet", "hanging", "handle", "bowl",
+        "tray", "frame", "collar", "bit", "drain", "plate", "latch", "wok"
+    )
+
     private fun distinctiveness(token: String): Int {
         val t = token.lowercase()
-        val hits = listOf(
-            "lid", "ferrule", "rivet", "hanging", "handle", "bowl",
-            "tray", "frame", "collar", "bit", "drain", "plate", "latch"
-        ).count { key -> t.contains(key) }
-        return hits * 12 + minOf(t.length, 24)
+        var score = DISTINCTIVE_KEYS.count { key -> t.contains(key) } * 12 + minOf(t.length, 24)
+        // Rare photographed parts outrank common silhouette words when HOOK is clipped.
+        if (t.contains("ferrule")) score += 24
+        if (t.contains("lid")) score += 20
+        if (t.contains("rivet")) score += 8
+        return score
+    }
+
+    private fun distinctiveKeysIn(text: String): Set<String> {
+        val l = text.lowercase()
+        return DISTINCTIVE_KEYS.filter { l.contains(it) }.toSet()
     }
 
     private fun prioritizeDetailCsv(csv: String): String {
@@ -783,15 +791,46 @@ object GeminiVeoPromptCleanup {
             after.equals("IDENTITY", ignoreCase = true) ||
             after.equals("FEATURE / DEMO", ignoreCase = true) ||
             after.equals("HERO / CTA", ignoreCase = true)
+        val snippetList = snippets.split(',').map { it.trim() }.filter { it.isNotBlank() }
+        if (index == 0) {
+            val missing = snippetList.filter { snip ->
+                distinctiveKeysIn(snip).any { key -> !after.lowercase().contains(key) }
+            }
+            val merged = when {
+                generic -> snippetList.take(3).joinToString(", ")
+                    .ifBlank { "product visible with strongest verified detail" }
+                missing.isNotEmpty() -> "$after, ${missing.take(2).joinToString(", ")}"
+                else -> after
+            }
+            return "$label: ${clipHookDetails(merged)}"
+        }
         if (!generic) return line
         val detail = when (index) {
-            0 -> snippets.ifBlank { "product visible with strongest verified detail" }
-            1 -> snippets.split(',').map { it.trim() }.filter { it.isNotBlank() }.take(2)
-                .joinToString(", ").ifBlank { "same unchanged product, full framing" }
+            1 -> snippetList.take(2).joinToString(", ").ifBlank { "same unchanged product, full framing" }
             2 -> "one hand, one verified action"
             else -> "same product hero. End 8.0s"
         }
         return "$label: $detail"
+    }
+
+    /**
+     * Keep the first photographed token, then the most distinctive ones that fit.
+     * Never tail-ellipsis a HOOK — that is how ferrule / wooden lid disappeared.
+     */
+    private fun clipHookDetails(csv: String, max: Int = 72): String {
+        val parts = csv.split(',')
+            .map { it.trim().trimEnd('.') }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.lowercase() }
+        if (parts.isEmpty()) return csv.trim()
+        val first = parts.first()
+        val rest = parts.drop(1).sortedByDescending { distinctiveness(it) }
+        val kept = mutableListOf(first)
+        for (part in rest) {
+            val candidate = (kept + part).joinToString(", ")
+            if (candidate.length <= max) kept += part
+        }
+        return kept.joinToString(", ")
     }
 
     private fun identitySnippets(lock: String, take: Int): String {
@@ -834,9 +873,9 @@ object GeminiVeoPromptCleanup {
         return out.replace(Regex("""\s{2,}"""), " ").trim()
     }
 
-    private fun clipShotLine(line: String): String {
+    private fun clipShotLine(line: String, max: Int = 96): String {
         // Drop filler that bloats timed lines without adding identity.
-        var cleaned = line
+        val cleaned = line
             .replace(Regex("""(?i)\bimmediately\b"""), "")
             .replace(Regex("""(?i),\s*physically plausible"""), "")
             .replace(Regex("""(?i)\bphysically plausible\b"""), "")
@@ -845,11 +884,16 @@ object GeminiVeoPromptCleanup {
             .replace(Regex("""(?i)\bwith strongest verified detail\b"""), "strongest detail")
             .replace(Regex("""\s{2,}"""), " ")
             .trim()
-        val max = 96
         if (cleaned.length <= max) return cleaned
-        val cut = cleaned.substring(0, max)
-        val at = cut.lastIndexOf(' ').takeIf { it > 32 } ?: max
-        return cut.substring(0, at).trimEnd(',', ';', ':', '—', '-') + "…"
+        val colon = cleaned.indexOf(':')
+        if (colon >= 0) {
+            val prefix = cleaned.substring(0, colon).trim()
+            val details = cleaned.substring(colon + 1).trim()
+            val budget = (max - prefix.length - 2).coerceAtLeast(24)
+            val clipped = clipHookDetails(details, budget)
+            if (clipped.isNotBlank()) return "$prefix: $clipped"
+        }
+        return clipChars(cleaned, max)
     }
 
     private fun simplifyCritical(marketplace: Boolean): String {
@@ -878,11 +922,12 @@ object GeminiVeoPromptCleanup {
             .map { it.trim() }
             .filter { it.length in 3..70 }
             .map { "no missing or redesigned $it" }
-        val bullets = (fromPrompt + fromIdentity)
-            .distinctBy { it.lowercase() }
-            .sortedByDescending { bullet -> negativeScore(bullet, identity, pan) }
-            .map { clipChars(it, 72) }
-            .toList()
+        val bullets = dropRedundantNegatives(
+            (fromPrompt + fromIdentity)
+                .distinctBy { it.lowercase() }
+                .sortedByDescending { bullet -> negativeScore(bullet, identity, pan) }
+                .map { clipChars(it, 72) }
+        )
         val chosen = when {
             bullets.size >= 4 -> bullets
             bullets.isNotEmpty() -> (bullets + SHORT_NEGATIVE).distinctBy { it.lowercase() }
@@ -916,12 +961,48 @@ object GeminiVeoPromptCleanup {
         return score
     }
 
+    private val CLIP_TRAILING_STOP = setOf(
+        "no", "or", "a", "an", "the", "of", "to", "in", "on", "at", "and", "be"
+    )
+
+    private fun dropRedundantNegatives(bullets: List<String>): List<String> {
+        val kept = mutableListOf<String>()
+        for (bullet in bullets) {
+            val keys = distinctiveKeysIn(bullet)
+            val covered = keys.isNotEmpty() && kept.any { existing ->
+                val existingKeys = distinctiveKeysIn(existing)
+                keys.all { it in existingKeys }
+            }
+            if (!covered) kept += bullet
+        }
+        return kept
+    }
+
     private fun clipChars(text: String, max: Int): String {
         val t = text.trim()
         if (t.length <= max) return t
-        val cut = t.substring(0, max)
-        val at = cut.lastIndexOf(' ').takeIf { it > max / 2 } ?: max
-        return cut.substring(0, at).trimEnd(',', ';', '.') + "…"
+        val window = t.substring(0, max)
+        val punct = maxOf(window.lastIndexOf('.'), window.lastIndexOf(';'), window.lastIndexOf(','))
+        val space = window.lastIndexOf(' ')
+        val cutAt = when {
+            punct > max / 3 -> punct + 1
+            space > max / 3 -> space
+            else -> max
+        }
+        var result = t.substring(0, cutAt.coerceIn(1, t.length)).trimEnd(' ', ',', ';', '.')
+        val words = result.split(Regex("\\s+")).filter { it.isNotBlank() }.toMutableList()
+        while (words.isNotEmpty()) {
+            val last = words.last().lowercase().trimEnd(',', ';', '.', '…')
+            if (last.length <= 2 || last in CLIP_TRAILING_STOP) {
+                words.removeAt(words.lastIndex)
+            } else {
+                break
+            }
+        }
+        result = words.joinToString(" ").trimEnd(',', ';', '.')
+        if (result.isBlank()) return t.take(max).trimEnd()
+        val cutAtPunctuation = punct > max / 3 && cutAt == punct + 1
+        return if (cutAtPunctuation) result else "$result…"
     }
 
     private fun clipWords(text: String, maxWords: Int): String {

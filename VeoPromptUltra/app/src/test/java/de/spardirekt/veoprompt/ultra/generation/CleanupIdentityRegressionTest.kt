@@ -51,11 +51,6 @@ class CleanupIdentityRegressionTest {
             tiktokShopMode = true
         )
         assertPanCopy(copy)
-        val hook = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("0.0") }
-        assertTrue(
-            "hook must keep pan identity:\n$hook",
-            hook.contains("lid") || hook.contains("ferrule") || hook.contains("bowl")
-        )
     }
 
     private fun assertPanCopy(copy: String) {
@@ -71,14 +66,31 @@ class CleanupIdentityRegressionTest {
         assertTrue("missing Holzdeckel:\n$overlays", overlays.contains("Holzdeckel"))
         val negatives = section(copy, "NEGATIVE PROMPT")
         assertTrue(
-            "pan negatives lost wok/lid/ferrule:\n$negatives",
-            negatives.contains("wok") ||
-                negatives.contains("wooden lid") ||
-                negatives.contains("ferrule")
+            "pan negatives lost lid/ferrule:\n$negatives",
+            negatives.contains("wooden lid") || negatives.contains("ferrule")
+        )
+        assertTrue(
+            "pan negatives lost wok/silhouette lock:\n$negatives",
+            negatives.contains("wok") || negatives.contains("shallower bowl")
         )
         val hook = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("0.0") }
         assertTrue(hook.contains(":"))
         assertTrue(hook.length > "0.0–2.0s — HOOK".length)
+        assertTrue(
+            "HOOK must keep wooden lid or ferrule, not just bowl/handle:\n$hook",
+            hook.contains("wooden lid") || hook.contains("ferrule")
+        )
+        assertFalse(
+            "HOOK must not ellipsize away lid/ferrule:\n$hook",
+            hook.contains("…") && !hook.contains("lid") && !hook.contains("ferrule")
+        )
+        val refs = section(copy, "REFERENCES")
+        assertFalse("REFERENCES must not clip to leftover 'no':\n$refs", refs.contains("no…"))
+        assertFalse(
+            "REFERENCES must not end on a leftover 'no':\n$refs",
+            refs.trim().endsWith(" no") || refs.trim().endsWith(" no.")
+        )
+        assertTrue("REFERENCES must stay readable:\n$refs", refs.length >= 20)
     }
 
     @Test

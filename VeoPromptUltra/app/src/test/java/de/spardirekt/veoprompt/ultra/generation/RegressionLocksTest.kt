@@ -24,6 +24,12 @@ class RegressionLocksTest {
         assertTrue(prompt.contains("rivet"))
         assertTrue(prompt.contains("hanging ring"))
         assertTrue(prompt.contains("wooden lid"))
+        val hook = prompt.substringAfter("SHOT SEQUENCE").substringBefore("ON-SCREEN TEXT")
+            .lineSequence().first { it.contains("0.0") }
+        assertTrue(
+            "stored HOOK must lead with lid or ferrule, not only bowl/handle:\n$hook",
+            hook.contains("wooden lid") || hook.contains("ferrule")
+        )
         val lock = prompt.substringAfter("PRODUCT LOCK").substringBefore("SETTING")
         assertTrue(!lock.contains("wok"))
     }

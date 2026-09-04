@@ -232,10 +232,7 @@ object FinalPromptValidator {
         )
         val matches = headerRe.findAll(raw).toList()
         if (matches.size < 4) return raw.trim()
-        val fallback = productModel.visualSignature
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .take(3)
+        val fallback = distinctiveDetails(productModel.visualSignature, 3)
             .joinToString(", ")
         return matches.mapIndexed { index, match ->
             val header = match.groupValues[1].trim()
@@ -299,6 +296,26 @@ object FinalPromptValidator {
         } else {
             "$identity. $stripped"
         }
+    }
+
+    private fun distinctiveDetails(details: List<String>, take: Int): List<String> {
+        val cleaned = details.map { it.trim() }.filter { it.isNotBlank() }
+        if (cleaned.size <= take) return cleaned
+        val first = cleaned.first()
+        val ranked = cleaned.drop(1).sortedByDescending { distinctiveScore(it) }
+        return (listOf(first) + ranked).distinctBy { it.lowercase() }.take(take)
+    }
+
+    private fun distinctiveScore(token: String): Int {
+        val t = token.lowercase()
+        var score = listOf(
+            "lid", "ferrule", "rivet", "hanging", "handle", "bowl",
+            "tray", "frame", "collar", "bit", "drain", "plate", "latch"
+        ).count { key -> t.contains(key) } * 12 + minOf(t.length, 24)
+        if (t.contains("ferrule")) score += 24
+        if (t.contains("lid")) score += 20
+        if (t.contains("rivet")) score += 8
+        return score
     }
 
     private fun defaultShotDetail(fallback: String, index: Int): String = when (index) {

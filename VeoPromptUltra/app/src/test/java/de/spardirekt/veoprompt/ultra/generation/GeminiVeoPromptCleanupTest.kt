@@ -212,6 +212,12 @@ NEGATIVE PROMPT
         assertTrue("ferrule must survive compress:\n$lock", lock.contains("ferrule"))
         val overlays = section(cleaned, "ON-SCREEN TEXT")
         assertTrue(overlays.contains("Holzdeckel"))
+        val hook = section(cleaned, "SHOT SEQUENCE").lineSequence().first { it.contains("0.0") }
+        assertTrue(
+            "HOOK must keep wooden lid or ferrule:\n$hook",
+            hook.contains("wooden lid") || hook.contains("ferrule")
+        )
+        assertFalse(cleaned.contains("no…"))
     }
 
     private fun section(prompt: String, header: String): String {
