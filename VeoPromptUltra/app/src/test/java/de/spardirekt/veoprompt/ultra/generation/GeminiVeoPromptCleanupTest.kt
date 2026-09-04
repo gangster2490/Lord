@@ -1,5 +1,6 @@
 package de.spardirekt.veoprompt.ultra.generation
 
+import de.spardirekt.veoprompt.ultra.model.ProductModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -109,6 +110,114 @@ Do not paste this
         assertTrue(cleaned.contains("PRODUCT LOCK"))
         assertFalse(cleaned.contains("SAFETY AUDIT"))
         assertTrue(cleaned.length < stored.length || cleaned.contains("TITLE"))
+    }
+
+    @Test
+    fun twoLineChairKeepsIdentityAndDropsPanLeaks() {
+        val details = "metal frame, padded backrest, side tray, rubber feet"
+        val raw = """
+FORMAT
+Vertical 9:16. Exactly 8.0 seconds.
+
+REFERENCES
+Recreate only the physical product.
+
+PRODUCT LOCK
+Preserve $details.
+
+SETTING
+Product-appropriate premium kitchen.
+
+SHOT SEQUENCE
+0.0–2.0s — HOOK
+Product visible immediately with strongest verified visual detail: $details.
+2.0–4.0s — IDENTITY
+Clear framing of the same exact physical product.
+4.0–6.0s — FEATURE / DEMO
+Exactly one verified hero feature or physically plausible action with one hand.
+6.0–8.0s — HERO / CTA
+Stable desirable hero shot of the same unchanged product. End exactly at 8.0s.
+
+ON-SCREEN TEXT
+Holzdeckel
+Tiefe Form
+
+VOICEOVER
+Tiefer Topf, fester Holzdeckel, einfach kochen.
+
+AUDIO
+Subtle music.
+
+CRITICAL
+Keep identity locked.
+
+NEGATIVE PROMPT
+- no generic replacement pan or wok
+- no redesigned silhouette or shallower bowl
+- no missing wooden lid, ferrule, rivets or hanging ring
+- no changed handle geometry
+- no invented non-stick claims
+- no product morphing between shots
+- no marketplace UI
+- no missing metal frame
+- no missing padded backrest
+- no missing side tray
+""".trimIndent()
+        val cleaned = GeminiVeoPromptCleanup.composeCopiedPrompt(
+            rawPrompt = raw,
+            voiceover = "Fester Rahmen, gepolsterte Lehne.",
+            title = "folding fishing chair",
+            hashtags = listOf("#Chair", "#Fold", "#c", "#d", "#TikTokShop"),
+            marketplace = true,
+            tiktokShopMode = true
+        )
+        val shots = section(cleaned, "SHOT SEQUENCE")
+        val hook = shots.lineSequence().first { it.contains("0.0") }
+        assertTrue("hook must keep identity:\n$hook", hook.contains("frame") || hook.contains("tray"))
+        assertTrue(hook.contains(":"))
+        val negatives = section(cleaned, "NEGATIVE PROMPT")
+        assertTrue(negatives.contains("frame") || negatives.contains("tray") || negatives.contains("backrest"))
+        assertFalse(negatives.contains("wok"))
+        assertFalse(negatives.contains("shallower bowl"))
+        assertFalse(negatives.contains("non-stick"))
+        assertFalse(negatives.contains("ferrule"))
+        val overlays = section(cleaned, "ON-SCREEN TEXT")
+        assertFalse(overlays.contains("Holzdeckel"))
+        assertFalse(overlays.contains("Tiefe Form"))
+        val setting = section(cleaned, "SETTING")
+        assertFalse(setting.equals("kitchen.", ignoreCase = true))
+        assertFalse(setting.contains("premium kitchen", ignoreCase = true))
+        val lock = section(cleaned, "PRODUCT LOCK")
+        assertTrue(lock.contains("metal frame"))
+        assertTrue(cleaned.length <= GeminiVeoPromptCleanup.MAX_COPIED_PROMPT_CHARS)
+    }
+
+    @Test
+    fun panCopyKeepsWoodenLid() {
+        val stored = Fixtures.validVeoPrompt(
+            ProductModel(
+                productIdentity = "Deep black pan with wooden lid",
+                visualSignature = listOf(
+                    "deep rounded bowl", "high sides", "wooden handle",
+                    "ferrule", "rivets", "hanging ring", "wooden lid"
+                )
+            )
+        )
+        val cleaned = ResultCompositionHelper.clean(stored)
+        val lock = section(cleaned, "PRODUCT LOCK")
+        assertTrue("wooden lid must survive compress:\n$lock", lock.contains("wooden lid"))
+        val overlays = section(cleaned, "ON-SCREEN TEXT")
+        assertTrue(overlays.contains("Holzdeckel"))
+    }
+
+    private fun section(prompt: String, header: String): String {
+        val pattern = Regex("(?im)^" + Regex.escape(header) + "\\s*$")
+        val match = pattern.find(prompt) ?: return ""
+        val start = match.range.last + 1
+        val next = Regex(
+            "(?im)^(FORMAT|REFERENCES|PRODUCT LOCK|SETTING|SHOT SEQUENCE|ON-SCREEN TEXT|VOICEOVER|AUDIO|CRITICAL|NEGATIVE PROMPT|TITLE|HASHTAGS)\\s*$"
+        ).find(prompt, start)
+        return prompt.substring(start, next?.range?.first ?: prompt.length).trim()
     }
 
     private object ResultCompositionHelper {

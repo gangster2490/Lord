@@ -9,9 +9,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Gemini copy keeps only timed shot lines and the first 6 negative bullets.
- * These tests lock the stored-path sources so identity survives that compress.
- * GeminiVeoPromptCleanup itself is frozen.
+ * Gemini copy must keep photographed identity even when the stored prompt is
+ * two-line shots with pan-default overlays and pan-first negatives.
  */
 class CleanupIdentityRegressionTest {
 
@@ -50,6 +49,34 @@ class CleanupIdentityRegressionTest {
             mustKeep = listOf("plate"),
             mustDrop = listOf("Holzdeckel", "Tiefe Form", "shallower bowl")
         )
+    }
+
+    @Test
+    fun twoLineChairSurvivesCleanupWithoutLocalRepair() {
+        val model = Fixtures.fishingChairModel()
+        val copy = ResultComposition.geminiPrompt(
+            storedPrompt = twoLinePanShapedPrompt(model),
+            voiceover = "Fester Rahmen, gepolsterte Lehne.",
+            title = model.productIdentity,
+            hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop"),
+            marketplace = true,
+            tiktokShopMode = true
+        )
+        val lockOrShots = section(copy, "PRODUCT LOCK") + "\n" + section(copy, "SHOT SEQUENCE")
+        assertTrue(lockOrShots.contains("frame") || lockOrShots.contains("tray"))
+        assertFalse(copy.contains("Holzdeckel"))
+        assertFalse(copy.contains("Tiefe Form"))
+        val negatives = section(copy, "NEGATIVE PROMPT")
+        assertFalse(negatives.contains("wok"))
+        assertFalse(negatives.contains("shallower bowl"))
+        assertFalse(negatives.contains("non-stick"))
+        assertTrue(
+            negatives.contains("frame") ||
+                negatives.contains("tray") ||
+                negatives.contains("backrest")
+        )
+        val hook = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("0.0") }
+        assertTrue(hook.contains("frame") || hook.contains("backrest") || hook.contains("tray"))
     }
 
     @Test

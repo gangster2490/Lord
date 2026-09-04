@@ -242,17 +242,22 @@ object GeminiVeoPromptCleanup {
         }
         map["FORMAT"] = "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
         map["REFERENCES"] = simplifyReferences(map["REFERENCES"].orEmpty(), marketplace)
-        map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 6)
-        map["SETTING"] = simplifySetting(map["SETTING"].orEmpty())
-        map["SHOT SEQUENCE"] = simplifyShotSequence(map["SHOT SEQUENCE"].orEmpty())
-        map["ON-SCREEN TEXT"] = simplifyOnScreenText(map["ON-SCREEN TEXT"].orEmpty())
+        map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 8)
+        val identity = map["PRODUCT LOCK"].orEmpty()
+        map["SETTING"] = simplifySetting(map["SETTING"].orEmpty(), identity)
+        map["SHOT SEQUENCE"] = simplifyShotSequence(map["SHOT SEQUENCE"].orEmpty(), identity)
+        map["ON-SCREEN TEXT"] = simplifyOnScreenText(map["ON-SCREEN TEXT"].orEmpty(), identity)
         map["VOICEOVER"] = map["VOICEOVER"].orEmpty().lineSequence()
             .firstOrNull { it.isNotBlank() }?.trim().orEmpty()
             .ifBlank { "OFF" }
         map["AUDIO"] = clipWords(firstSentences(map["AUDIO"].orEmpty(), 1), 8)
             .ifBlank { "Subtle music. Clear voice." }
         map["CRITICAL"] = simplifyCritical(marketplace)
-        map["NEGATIVE PROMPT"] = simplifyNegative(map["NEGATIVE PROMPT"].orEmpty(), maxBullets = 6)
+        map["NEGATIVE PROMPT"] = simplifyNegative(
+            map["NEGATIVE PROMPT"].orEmpty(),
+            identity,
+            maxBullets = 6
+        )
         map["TITLE"] = map["TITLE"].orEmpty().lineSequence().firstOrNull { it.isNotBlank() }.orEmpty()
             .ifBlank { "Product Ad" }
             .let { clipChars(it, 48) }
@@ -264,10 +269,15 @@ object GeminiVeoPromptCleanup {
 
         // Hard budget: compress further if still long.
         if (out.length > MAX_COPIED_PROMPT_CHARS) {
-            map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 5)
-            map["NEGATIVE PROMPT"] = simplifyNegative(map["NEGATIVE PROMPT"].orEmpty(), maxBullets = 5)
+            val tightIdentity = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 6)
+            map["PRODUCT LOCK"] = tightIdentity
+            map["NEGATIVE PROMPT"] = simplifyNegative(
+                map["NEGATIVE PROMPT"].orEmpty(),
+                tightIdentity,
+                maxBullets = 5
+            )
             map["REFERENCES"] = clipChars(map["REFERENCES"].orEmpty(), 110)
-            map["SETTING"] = simplifySetting(map["SETTING"].orEmpty())
+            map["SETTING"] = simplifySetting(map["SETTING"].orEmpty(), tightIdentity)
             out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
                 "$name\n${map[name].orEmpty().trim()}"
             }.trim() + "\n"
@@ -293,8 +303,9 @@ object GeminiVeoPromptCleanup {
         text = text.replace(Regex("""(?im)^No continuation after.*$"""), "")
 
         val map = linkedMapOf<String, String>()
+        val identity = extractSection(text, "PRODUCT LOCK")
         REQUIRED_SECTIONS.forEach { name ->
-            map[name] = polishSectionBody(name, extractSection(text, name), marketplace)
+            map[name] = polishSectionBody(name, extractSection(text, name), marketplace, identity)
         }
 
         // Guarantee required non-blank defaults for every structural section.
@@ -347,12 +358,31 @@ object GeminiVeoPromptCleanup {
                 .joinToString(" ")
         }
 
-        return REQUIRED_SECTIONS.joinToString("\n\n") { name ->
+        var out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
             "$name\n${map[name].orEmpty().trim()}"
         }.trim() + "\n"
+        if (out.length > MAX_COPIED_PROMPT_CHARS) {
+            map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 5)
+            map["NEGATIVE PROMPT"] = simplifyNegative(
+                map["NEGATIVE PROMPT"].orEmpty(),
+                map["PRODUCT LOCK"].orEmpty(),
+                maxBullets = 4
+            )
+            map["REFERENCES"] = clipChars(map["REFERENCES"].orEmpty(), 90)
+            map["SETTING"] = clipChars(map["SETTING"].orEmpty(), 48)
+            out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
+                "$name\n${map[name].orEmpty().trim()}"
+            }.trim() + "\n"
+        }
+        return out
     }
 
-    private fun polishSectionBody(name: String, raw: String, marketplace: Boolean): String {
+    private fun polishSectionBody(
+        name: String,
+        raw: String,
+        marketplace: Boolean,
+        identity: String
+    ): String {
         var body = raw.trim()
             .replace(Regex("\r\n?"), "\n")
             .replace(Regex("[ \t]+"), " ")
@@ -366,26 +396,18 @@ object GeminiVeoPromptCleanup {
 
         return when (name) {
             "FORMAT" -> "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
-            "SHOT SEQUENCE" -> normalizeShotSequence(body)
-            "NEGATIVE PROMPT" -> body.lineSequence()
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-                .map { line ->
-                    val t = line.removePrefix("-").trim()
-                    "- $t"
-                }
-                .distinctBy { it.lowercase() }
-                .take(6)
-                .joinToString("\n")
+            "SHOT SEQUENCE" -> normalizeShotSequence(body, identity)
+            "NEGATIVE PROMPT" -> simplifyNegative(body, identity, maxBullets = 6)
             "HASHTAGS" -> Regex("#[\\p{L}\\p{N}_]+")
                 .findAll(body)
                 .map { it.value }
                 .distinct()
                 .take(5)
                 .joinToString(" ")
-            "TITLE", "VOICEOVER", "SETTING", "AUDIO", "CRITICAL" ->
+            "TITLE", "VOICEOVER", "AUDIO", "CRITICAL" ->
                 body.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.joinToString(" ").trim()
-            "ON-SCREEN TEXT" -> simplifyOnScreenText(body)
+            "SETTING" -> simplifySetting(body, identity)
+            "ON-SCREEN TEXT" -> simplifyOnScreenText(body, identity)
             "PRODUCT LOCK" -> body.lineSequence()
                 .map { it.trim() }
                 .filter { it.isNotBlank() }
@@ -405,7 +427,7 @@ object GeminiVeoPromptCleanup {
      * ON-SCREEN TEXT must only contain actual overlay copy that may appear in the video.
      * Never keep production instructions, prompt labels, or meta rules here.
      */
-    fun simplifyOnScreenText(raw: String): String {
+    fun simplifyOnScreenText(raw: String, identityBlob: String = ""): String {
         val cleaned = raw.lineSequence()
             .map { it.trim().trimStart('-', '•', '*').trim() }
             .filter { it.isNotBlank() }
@@ -418,10 +440,10 @@ object GeminiVeoPromptCleanup {
             .filter { it.isNotBlank() }
             .filterNot { isOnScreenInstruction(it) }
             .distinct()
-            .take(3)
             .toList()
-        if (cleaned.isEmpty()) return "None."
-        val joined = cleaned.joinToString(" · ")
+        val kept = dropLeakedPanOverlays(cleaned, identityBlob).take(3)
+        if (kept.isEmpty()) return "None."
+        val joined = kept.joinToString(" · ")
         return clipChars(joined, 80)
     }
 
@@ -456,10 +478,11 @@ object GeminiVeoPromptCleanup {
             REQUIRED_SECTIONS.any { sec -> l.equals(sec, ignoreCase = true) }
     }
 
-    private fun normalizeShotSequence(raw: String): String {
-        val lines = if (hasFourBlocks(raw)) {
+    private fun normalizeShotSequence(raw: String, identity: String = ""): String {
+        val merged = mergeTimedShotBlocks(raw, identity)
+        val lines = if (hasFourBlocks(merged)) {
             Regex("""(?m)^\s*0\.0[^\n]*|^\s*2\.0[^\n]*|^\s*4\.0[^\n]*|^\s*6\.0[^\n]*""")
-                .findAll(raw)
+                .findAll(merged)
                 .map { normalizeShotLine(enforceOneHandInFeatureDemo(it.value.trim())) }
                 .distinct()
                 .take(4)
@@ -537,15 +560,12 @@ object GeminiVeoPromptCleanup {
         return "Vertical 9:16. Photorealistic TikTok Shop ad. Exactly 8.0s."
     }
 
-    private fun simplifySetting(raw: String): String {
-        val first = firstSentences(stripLongDoctrine(raw), 1)
-        val known = Regex(
-            """(?i)\b((?:uncluttered\s+)?(?:premium\s+)?(?:studio|kitchen|workshop|desk|garage|camping|lake|outdoor|countertop)(?:\s+environment)?)\b"""
-        ).find(first)?.groupValues?.getOrNull(1)?.trim()
-        val body = when {
-            !known.isNullOrBlank() -> known.replace(Regex("(?i)\\benvironment\\b"), "").trim()
-            else -> clipWords(first, 4)
-        }.ifBlank { "Uncluttered premium studio" }
+    private fun simplifySetting(raw: String, identity: String = ""): String {
+        var first = firstSentences(stripLongDoctrine(raw), 1)
+        if (isWrongKitchenSetting(first, identity)) {
+            first = "Uncluttered premium studio"
+        }
+        val body = clipWords(first, 8).ifBlank { "Uncluttered premium studio" }
         return body.trimEnd('.', ',') + "."
     }
 
@@ -587,7 +607,7 @@ object GeminiVeoPromptCleanup {
                     .filterNot { isGenericFidelityBoilerplate(it) }
                     .forEach { tokens += it }
             }
-        val details = tokens.distinctBy { it.lowercase() }.take(maxDetails)
+        val details = pickLockDetails(tokens.distinctBy { it.lowercase() }, maxDetails)
         return buildString {
             append(SHORT_PRODUCT_LOCK)
             if (details.isNotEmpty()) {
@@ -595,6 +615,54 @@ object GeminiVeoPromptCleanup {
                 append(details.joinToString(", "))
             }
         }.trim()
+    }
+
+    private fun pickLockDetails(details: List<String>, maxDetails: Int): List<String> {
+        if (details.size <= maxDetails) return details
+        val head = (maxDetails + 1) / 2
+        val tail = maxDetails - head
+        return (details.take(head) + details.takeLast(tail)).distinctBy { it.lowercase() }
+    }
+
+    private val PAN_OVERLAY_LEAKS = setOf("holzdeckel", "tiefe form")
+    private val PAN_NEGATIVE_LEAKS = listOf(
+        "wok",
+        "skillet",
+        "shallower bowl",
+        "non-stick",
+        "wooden lid",
+        "ferrule",
+        "hanging ring",
+        "generic replacement pan"
+    )
+
+    private fun looksLikeCookwarePan(identity: String): Boolean {
+        val i = identity.lowercase()
+        return i.contains("deep rounded") ||
+            i.contains("wooden lid") ||
+            i.contains("holzdeckel") ||
+            i.contains("ferrule") ||
+            i.contains("shallower bowl") ||
+            (i.contains("wooden handle") && i.contains("bowl"))
+    }
+
+    private fun isWrongKitchenSetting(setting: String, identity: String): Boolean {
+        if (!setting.contains("kitchen", ignoreCase = true)) return false
+        if (looksLikeCookwarePan(identity)) return false
+        val i = identity.lowercase()
+        if (i.contains("rice") || i.contains("grill") || (i.contains("bowl") && i.contains("drain"))) {
+            return false
+        }
+        return i.contains("chair") ||
+            (i.contains("frame") && i.contains("tray")) ||
+            i.contains("bit") ||
+            i.contains("collar") ||
+            i.contains("closed case")
+    }
+
+    private fun dropLeakedPanOverlays(lines: List<String>, identity: String): List<String> {
+        if (looksLikeCookwarePan(identity)) return lines
+        return lines.filterNot { it.trim().lowercase() in PAN_OVERLAY_LEAKS }
     }
 
     private fun isGenericFidelityBoilerplate(line: String): Boolean {
@@ -613,10 +681,11 @@ object GeminiVeoPromptCleanup {
             l.contains("same silhouette, proportions, colors, materials")
     }
 
-    private fun simplifyShotSequence(raw: String): String {
-        if (hasFourBlocks(raw)) {
+    private fun simplifyShotSequence(raw: String, identity: String = ""): String {
+        val merged = mergeTimedShotBlocks(raw, identity)
+        if (hasFourBlocks(merged)) {
             val blocks = Regex("""(?m)^\s*0\.0[^\n]*|^\s*2\.0[^\n]*|^\s*4\.0[^\n]*|^\s*6\.0[^\n]*""")
-                .findAll(raw)
+                .findAll(merged)
                 .map { clipShotLine(enforceOneHandInFeatureDemo(it.value.trim())) }
                 .distinct()
                 .take(4)
@@ -626,6 +695,86 @@ object GeminiVeoPromptCleanup {
             }
         }
         return CANONICAL_SHOT_SEQUENCE
+    }
+
+    /**
+     * Gemini copy keeps only timed header lines. Fold the following identity
+     * sentence onto that line and put photographed detail first.
+     */
+    private fun mergeTimedShotBlocks(raw: String, identity: String): String {
+        val headerRe = Regex(
+            """(?m)^\s*((?:0\.0|2\.0|4\.0|6\.0)\s*[–\-]\s*(?:2\.0|4\.0|6\.0|8\.0)s[^\n]*)"""
+        )
+        val matches = headerRe.findAll(raw).toList()
+        if (matches.size < 4) return raw.trim()
+        val snippets = identitySnippets(identity, take = 3)
+        return matches.mapIndexed { index, match ->
+            val header = match.groupValues[1].trim()
+            val start = match.range.last + 1
+            val end = matches.getOrNull(index + 1)?.range?.first ?: raw.length
+            val body = raw.substring(start, end)
+                .lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .joinToString(" ")
+            enrichBareShotLine(mergeShotHeaderAndBody(header, body), snippets)
+        }.joinToString("\n")
+    }
+
+    private val GENERIC_SHOT_PREFIX = Regex(
+        """(?i)^(?:Product visible immediately with strongest verified visual detail:\s*|""" +
+            """Clear framing of the same exact physical product\.?\s*|""" +
+            """Exactly one verified hero feature or physically plausible action with one hand\.?\s*|""" +
+            """Stable desirable hero shot of the same unchanged product\.?\s*(?:End exactly at 8\.0s\.?)?\s*)"""
+    )
+
+    private fun mergeShotHeaderAndBody(header: String, body: String): String {
+        val colon = header.indexOf(':')
+        val label = if (colon >= 0) header.substring(0, colon).trim() else header
+        val existing = if (colon >= 0) header.substring(colon + 1).trim() else ""
+        val combined = listOf(existing, body).filter { it.isNotBlank() }.joinToString(" ")
+        if (combined.isBlank()) return header
+        val prefix = GENERIC_SHOT_PREFIX.find(combined)
+        val detail = if (prefix != null) {
+            val tail = combined.substring(prefix.range.last + 1).trim().trimEnd('.')
+            if (tail.length >= 8) tail else combined
+        } else {
+            combined
+        }
+        return "$label: $detail"
+    }
+
+    private fun enrichBareShotLine(line: String, snippets: String): String {
+        if (snippets.isBlank()) return line
+        val colon = line.indexOf(':')
+        val label = if (colon >= 0) line.substring(0, colon).trim() else line
+        val after = if (colon >= 0) line.substring(colon + 1).trim() else ""
+        val generic = after.isBlank() ||
+            GENERIC_SHOT_PREFIX.containsMatchIn(after) ||
+            after.equals("HOOK", ignoreCase = true) ||
+            after.equals("IDENTITY", ignoreCase = true) ||
+            after.equals("FEATURE / DEMO", ignoreCase = true) ||
+            after.equals("HERO / CTA", ignoreCase = true)
+        if (!generic) return line
+        return "$label: $snippets"
+    }
+
+    private fun identitySnippets(lock: String, take: Int): String {
+        return lock.lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filterNot { isGenericFidelityBoilerplate(it) }
+            .filterNot { it.startsWith("Match uploaded", ignoreCase = true) }
+            .flatMap { it.split(Regex("[,;]|(?:\\s+and\\s+)")) }
+            .map {
+                it.trim().trimEnd('.')
+                    .removePrefix("Preserve ").removePrefix("preserve ")
+                    .trim()
+            }
+            .filter { it.length in 3..70 }
+            .distinctBy { it.lowercase() }
+            .take(take)
+            .joinToString(", ")
     }
 
     /** FEATURE / DEMO may use at most one hand — never two hands / both hands. */
@@ -660,7 +809,7 @@ object GeminiVeoPromptCleanup {
             .replace(Regex("""(?i)\bwith strongest verified detail\b"""), "strongest detail")
             .replace(Regex("""\s{2,}"""), " ")
             .trim()
-        val max = 68
+        val max = 96
         if (cleaned.length <= max) return cleaned
         val cut = cleaned.substring(0, max)
         val at = cut.lastIndexOf(' ').takeIf { it > 32 } ?: max
@@ -675,20 +824,49 @@ object GeminiVeoPromptCleanup {
         }
     }
 
-    private fun simplifyNegative(raw: String, maxBullets: Int = 6): String {
-        val bullets = raw.lineSequence()
+    private fun simplifyNegative(raw: String, identity: String = "", maxBullets: Int = 6): String {
+        val pan = looksLikeCookwarePan(identity)
+        val fromPrompt = raw.lineSequence()
             .map { it.trim().removePrefix("-").trim() }
             .filter { it.isNotBlank() }
             .filterNot {
                 it.contains("malformed hands", ignoreCase = true) ||
                     it.contains("impossible mechanics", ignoreCase = true)
             }
-            .map { clipChars(it, 72) }
-            .distinctBy { it.lowercase() }
-            .take(maxBullets)
+            .filterNot { bullet ->
+                !pan && PAN_NEGATIVE_LEAKS.any { leak -> bullet.lowercase().contains(leak) }
+            }
             .toList()
-        val chosen = if (bullets.size >= 4) bullets else SHORT_NEGATIVE
+        val fromIdentity = identitySnippets(identity, take = 6)
+            .split(",")
+            .map { it.trim() }
+            .filter { it.length in 3..70 }
+            .map { "no missing or redesigned $it" }
+        val bullets = (fromPrompt + fromIdentity)
+            .distinctBy { it.lowercase() }
+            .sortedByDescending { bullet -> negativeScore(bullet, identity, pan) }
+            .map { clipChars(it, 72) }
+            .toList()
+        val chosen = when {
+            bullets.size >= 4 -> bullets
+            bullets.isNotEmpty() -> (bullets + SHORT_NEGATIVE).distinctBy { it.lowercase() }
+            else -> SHORT_NEGATIVE
+        }
         return chosen.take(maxBullets).joinToString("\n") { "- $it" }
+    }
+
+    private fun negativeScore(bullet: String, identity: String, panIdentity: Boolean): Int {
+        val b = bullet.lowercase()
+        if (!panIdentity && PAN_NEGATIVE_LEAKS.any { leak -> b.contains(leak) }) return -20
+        val tokens = b.split(Regex("[^a-zA-Zа-яА-Я0-9]+")).filter { it.length >= 4 }
+        val blob = identity.lowercase()
+        val overlap = tokens.count { blob.contains(it) }
+        return when {
+            overlap >= 2 -> overlap + 8
+            overlap == 1 -> 4
+            b.contains("morphing") || b.contains("marketplace") || b.contains("listing ui") -> 1
+            else -> 0
+        }
     }
 
     private fun clipChars(text: String, max: Int): String {
