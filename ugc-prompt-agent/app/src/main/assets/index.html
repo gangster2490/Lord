@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>UGC Prompt Agent</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <span class="logo">UGC</span>
+    <span class="brand" data-i18n="brand">UGC Agent</span>
+    <span class="badge">v1.0</span>
+    <span class="header-spacer"></span>
+    <button class="icon-btn" id="btn-settings" data-i18n="settings">Settings</button>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-tab="home" data-i18n="tabHome">Home</button>
+    <button class="tab" data-tab="text" data-i18n="tabText">Text</button>
+    <button class="tab" data-tab="veo" data-i18n="tabVeo">VEO</button>
+    <button class="tab" data-tab="check" data-i18n="tabCheck">Check</button>
+    <button class="tab" data-tab="history" data-i18n="tabHistory">Verlauf</button>
+  </div>
+
+  <div class="page active" id="page-home">
+    <div class="card">
+      <div class="section-title" data-i18n="uploadTitle">① Produktfotos (15–20)</div>
+      <p class="hint" data-i18n="uploadHint"></p>
+      <div class="dropzone" id="dropzone">
+        <div class="drop-icon">📸</div>
+        <div class="hint" data-i18n="drop">Fotos hier ablegen oder tippen</div>
+        <div class="hint" data-i18n="dropSub"></div>
+      </div>
+      <input id="file-input" type="file" accept="image/*" multiple hidden/>
+      <div class="thumbs" id="thumbs"></div>
+      <p class="hint" id="count-hint"></p>
+      <p class="hint" data-i18n="firstFrameHint"></p>
+    </div>
+    <div class="card" id="sim-card">
+      <div class="section-title" data-i18n="similarityTitle"></div>
+      <div id="sim-box" class="hint"></div>
+    </div>
+    <div class="card">
+      <div class="section-title" data-i18n="analyzeTitle"></div>
+      <button class="btn btn-primary" id="btn-analyze" data-i18n="analyzeBtn">Analysieren</button>
+      <div class="load hidden" id="analyze-load"></div>
+      <div id="analyze-error"></div>
+      <div id="dna-box" class="hidden dna"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-text">
+    <div class="card">
+      <div class="section-title" data-i18n="scenesTitle"></div>
+      <p class="hint" data-i18n="scenesHint"></p>
+      <button class="btn btn-outline" id="btn-scenes" data-i18n="scenesBtn">Szenen würfeln</button>
+      <div id="scenes"></div>
+    </div>
+    <div class="card">
+      <div class="section-title" data-i18n="promptTitle"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-prompt" data-i18n="promptBtn">Veo-Prompt bauen</button>
+        <button class="btn btn-outline" id="btn-improve" data-i18n="improveBtn" disabled>Verbessern</button>
+      </div>
+      <div class="load hidden" id="prompt-load"></div>
+      <div id="prompt-error"></div>
+      <div id="prompt-box" class="prompt-box hidden"></div>
+      <div class="meta" id="word-count"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-veo">
+    <div class="card">
+      <div class="section-title" data-i18n="exportTitle"></div>
+      <p class="hint" data-i18n="exportHint"></p>
+      <div class="ref-card" id="ref-card"><span class="hint">9:16</span></div>
+      <div id="export-prompt" class="prompt-box"></div>
+      <label class="hint" style="display:block;margin:12px 0 6px" data-i18n="captionLabel"></label>
+      <textarea class="field area" id="caption" rows="3"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-copy-prompt" data-i18n="copyPrompt"></button>
+        <button class="btn btn-outline" id="btn-copy-all" data-i18n="copyAll"></button>
+        <button class="btn btn-ghost" id="btn-save" data-i18n="saveHistory"></button>
+      </div>
+      <div id="export-msg"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-check">
+    <div class="card">
+      <div class="section-title" data-i18n="checkTitle"></div>
+      <p class="hint" data-i18n="checkHint"></p>
+      <button class="btn btn-primary" id="btn-check" data-i18n="checkBtn"></button>
+      <div id="check-result"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-history">
+    <div class="card">
+      <div class="section-title" data-i18n="historyTitle"></div>
+      <div id="history-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="settings">
+  <div class="card">
+    <div class="section-title" data-i18n="settingsTitle"></div>
+    <label class="hint" data-i18n="apiKey"></label>
+    <input class="field" id="api-key" type="password" autocomplete="off" placeholder="AIza…"/>
+    <p class="hint" id="masked-key"></p>
+    <p class="hint" data-i18n="apiHint"></p>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-save-key" data-i18n="apiSave"></button>
+      <button class="btn btn-danger" id="btn-clear-key" data-i18n="apiClear"></button>
+    </div>
+    <p class="hint" style="margin-top:16px" data-i18n="lang"></p>
+    <div class="lang-row">
+      <button class="lang-btn" id="lang-de" data-i18n="langDe">Deutsch</button>
+      <button class="lang-btn" id="lang-ru" data-i18n="langRu">Русский</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-close-settings" data-i18n="close"></button>
+    </div>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
