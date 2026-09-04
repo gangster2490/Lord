@@ -205,7 +205,11 @@ NEGATIVE PROMPT
         )
         val cleaned = ResultCompositionHelper.clean(stored)
         val lock = section(cleaned, "PRODUCT LOCK")
-        assertTrue("wooden lid must survive compress:\n$lock", lock.contains("wooden lid"))
+        assertTrue(
+            "wooden lid must survive compress:\n$lock",
+            lock.contains("wooden lid")
+        )
+        assertTrue("ferrule must survive compress:\n$lock", lock.contains("ferrule"))
         val overlays = section(cleaned, "ON-SCREEN TEXT")
         assertTrue(overlays.contains("Holzdeckel"))
     }

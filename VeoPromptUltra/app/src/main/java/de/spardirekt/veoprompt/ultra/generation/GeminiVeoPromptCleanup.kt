@@ -361,15 +361,27 @@ object GeminiVeoPromptCleanup {
         var out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
             "$name\n${map[name].orEmpty().trim()}"
         }.trim() + "\n"
-        if (out.length > MAX_COPIED_PROMPT_CHARS) {
-            map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = 5)
+        var guard = 0
+        while (out.length > MAX_COPIED_PROMPT_CHARS && guard < 3) {
+            guard++
+            val lockMax = if (guard == 1) 5 else 4
+            val negMax = if (guard == 1) 4 else 3
+            map["PRODUCT LOCK"] = compressProductLock(map["PRODUCT LOCK"].orEmpty(), maxDetails = lockMax)
             map["NEGATIVE PROMPT"] = simplifyNegative(
                 map["NEGATIVE PROMPT"].orEmpty(),
                 map["PRODUCT LOCK"].orEmpty(),
-                maxBullets = 4
+                maxBullets = negMax
             )
-            map["REFERENCES"] = clipChars(map["REFERENCES"].orEmpty(), 90)
-            map["SETTING"] = clipChars(map["SETTING"].orEmpty(), 48)
+            map["REFERENCES"] = clipChars(map["REFERENCES"].orEmpty(), if (guard == 1) 90 else 70)
+            map["SETTING"] = clipWords(map["SETTING"].orEmpty(), if (guard == 1) 6 else 4)
+            val shotCap = if (guard == 1) 80 else 64
+            map["SHOT SEQUENCE"] = map["SHOT SEQUENCE"].orEmpty().lineSequence()
+                .map { line ->
+                    val t = line.trim()
+                    if (t.length <= shotCap) t else clipChars(t, shotCap)
+                }
+                .filter { it.isNotBlank() }
+                .joinToString("\n")
             out = REQUIRED_SECTIONS.joinToString("\n\n") { name ->
                 "$name\n${map[name].orEmpty().trim()}"
             }.trim() + "\n"
@@ -619,9 +631,26 @@ object GeminiVeoPromptCleanup {
 
     private fun pickLockDetails(details: List<String>, maxDetails: Int): List<String> {
         if (details.size <= maxDetails) return details
-        val head = (maxDetails + 1) / 2
-        val tail = maxDetails - head
-        return (details.take(head) + details.takeLast(tail)).distinctBy { it.lowercase() }
+        val first = details.first()
+        val ranked = details.drop(1).sortedByDescending { distinctiveness(it) }
+        return (listOf(first) + ranked).distinctBy { it.lowercase() }.take(maxDetails)
+    }
+
+    private fun distinctiveness(token: String): Int {
+        val t = token.lowercase()
+        val hits = listOf(
+            "lid", "ferrule", "rivet", "hanging", "handle", "bowl",
+            "tray", "frame", "collar", "bit", "drain", "plate", "latch"
+        ).count { key -> t.contains(key) }
+        return hits * 12 + minOf(t.length, 24)
+    }
+
+    private fun prioritizeDetailCsv(csv: String): String {
+        val parts = csv.split(',').map { it.trim().trimEnd('.') }.filter { it.isNotBlank() }
+        if (parts.size < 2) return csv.trim()
+        val first = parts.first()
+        val rest = parts.drop(1).sortedByDescending { distinctiveness(it) }
+        return (listOf(first) + rest).joinToString(", ")
     }
 
     private val PAN_OVERLAY_LEAKS = setOf("holzdeckel", "tiefe form")
@@ -717,7 +746,7 @@ object GeminiVeoPromptCleanup {
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .joinToString(" ")
-            enrichBareShotLine(mergeShotHeaderAndBody(header, body), snippets)
+            enrichBareShotLine(mergeShotHeaderAndBody(header, body), snippets, index)
         }.joinToString("\n")
     }
 
@@ -737,15 +766,14 @@ object GeminiVeoPromptCleanup {
         val prefix = GENERIC_SHOT_PREFIX.find(combined)
         val detail = if (prefix != null) {
             val tail = combined.substring(prefix.range.last + 1).trim().trimEnd('.')
-            if (tail.length >= 8) tail else combined
+            if (tail.length >= 8) prioritizeDetailCsv(tail) else combined
         } else {
-            combined
+            prioritizeDetailCsv(combined)
         }
         return "$label: $detail"
     }
 
-    private fun enrichBareShotLine(line: String, snippets: String): String {
-        if (snippets.isBlank()) return line
+    private fun enrichBareShotLine(line: String, snippets: String, index: Int): String {
         val colon = line.indexOf(':')
         val label = if (colon >= 0) line.substring(0, colon).trim() else line
         val after = if (colon >= 0) line.substring(colon + 1).trim() else ""
@@ -756,7 +784,14 @@ object GeminiVeoPromptCleanup {
             after.equals("FEATURE / DEMO", ignoreCase = true) ||
             after.equals("HERO / CTA", ignoreCase = true)
         if (!generic) return line
-        return "$label: $snippets"
+        val detail = when (index) {
+            0 -> snippets.ifBlank { "product visible with strongest verified detail" }
+            1 -> snippets.split(',').map { it.trim() }.filter { it.isNotBlank() }.take(2)
+                .joinToString(", ").ifBlank { "same unchanged product, full framing" }
+            2 -> "one hand, one verified action"
+            else -> "same product hero. End 8.0s"
+        }
+        return "$label: $detail"
     }
 
     private fun identitySnippets(lock: String, take: Int): String {
@@ -773,7 +808,8 @@ object GeminiVeoPromptCleanup {
             }
             .filter { it.length in 3..70 }
             .distinctBy { it.lowercase() }
-            .take(take)
+            .toList()
+            .let { pickLockDetails(it, take) }
             .joinToString(", ")
     }
 
@@ -861,12 +897,23 @@ object GeminiVeoPromptCleanup {
         val tokens = b.split(Regex("[^a-zA-Zа-яА-Я0-9]+")).filter { it.length >= 4 }
         val blob = identity.lowercase()
         val overlap = tokens.count { blob.contains(it) }
-        return when {
+        var score = when {
             overlap >= 2 -> overlap + 8
             overlap == 1 -> 4
             b.contains("morphing") || b.contains("marketplace") || b.contains("listing ui") -> 1
             else -> 0
         }
+        if (panIdentity && (
+                b.contains("wok") ||
+                    b.contains("wooden lid") ||
+                    b.contains("ferrule") ||
+                    b.contains("hanging ring") ||
+                    b.contains("shallower bowl")
+                )
+        ) {
+            score += 12
+        }
+        return score
     }
 
     private fun clipChars(text: String, max: Int): String {

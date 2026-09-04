@@ -15,6 +15,73 @@ import org.junit.Test
 class CleanupIdentityRegressionTest {
 
     @Test
+    fun panGeminiCopyKeepsLidFerruleAndPanOverlays() {
+        val model = Fixtures.panModel()
+        val repaired = FinalPromptValidator.localRepair(
+            StructuredResponse(
+                veoPrompt = Fixtures.validVeoPrompt(model),
+                voiceover = "Tiefer Topf, fester Holzdeckel, einfach kochen.",
+                title = "Tiefe Pfanne mit Holzdeckel",
+                hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop")
+            ),
+            model,
+            VoiceLanguage.DE,
+            true
+        )
+        val copy = ResultComposition.geminiPrompt(
+            storedPrompt = repaired.veoPrompt,
+            voiceover = repaired.voiceover,
+            title = repaired.title,
+            hashtags = repaired.hashtags,
+            marketplace = true,
+            tiktokShopMode = true
+        )
+        assertPanCopy(copy)
+    }
+
+    @Test
+    fun twoLinePanSurvivesCleanupWithoutLocalRepair() {
+        val model = Fixtures.panModel()
+        val copy = ResultComposition.geminiPrompt(
+            storedPrompt = twoLinePanShapedPrompt(model),
+            voiceover = "Tiefer Topf, fester Holzdeckel, einfach kochen.",
+            title = model.productIdentity,
+            hashtags = listOf("#a", "#b", "#c", "#d", "#TikTokShop"),
+            marketplace = true,
+            tiktokShopMode = true
+        )
+        assertPanCopy(copy)
+        val hook = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("0.0") }
+        assertTrue(
+            "hook must keep pan identity:\n$hook",
+            hook.contains("lid") || hook.contains("ferrule") || hook.contains("bowl")
+        )
+    }
+
+    private fun assertPanCopy(copy: String) {
+        assertTrue(
+            "too long: ${copy.length}\n$copy",
+            copy.length <= GeminiVeoPromptCleanup.MAX_COPIED_PROMPT_CHARS
+        )
+        val identity = section(copy, "PRODUCT LOCK") + "\n" + section(copy, "SHOT SEQUENCE")
+        assertTrue("missing wooden lid:\n$identity", identity.contains("wooden lid"))
+        assertTrue("missing ferrule:\n$identity", identity.contains("ferrule"))
+        assertTrue("missing bowl:\n$identity", identity.contains("bowl"))
+        val overlays = section(copy, "ON-SCREEN TEXT")
+        assertTrue("missing Holzdeckel:\n$overlays", overlays.contains("Holzdeckel"))
+        val negatives = section(copy, "NEGATIVE PROMPT")
+        assertTrue(
+            "pan negatives lost wok/lid/ferrule:\n$negatives",
+            negatives.contains("wok") ||
+                negatives.contains("wooden lid") ||
+                negatives.contains("ferrule")
+        )
+        val hook = section(copy, "SHOT SEQUENCE").lineSequence().first { it.contains("0.0") }
+        assertTrue(hook.contains(":"))
+        assertTrue(hook.length > "0.0–2.0s — HOOK".length)
+    }
+
+    @Test
     fun chairGeminiCopyKeepsChairIdentityAndDropsPanLeaks() {
         assertCopyKeepsProduct(
             model = Fixtures.fishingChairModel(),

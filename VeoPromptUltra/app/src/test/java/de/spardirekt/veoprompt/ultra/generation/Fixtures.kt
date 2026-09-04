@@ -4,6 +4,20 @@ import de.spardirekt.veoprompt.ultra.model.ProductModel
 
 object Fixtures {
 
+    fun panModel() = ProductModel(
+        productCategory = "cookware",
+        productIdentity = "Deep black pan with wooden lid",
+        visualSignature = listOf(
+            "deep rounded bowl",
+            "high sides",
+            "wooden handle",
+            "ferrule",
+            "rivets",
+            "hanging ring",
+            "wooden lid"
+        )
+    )
+
     fun fishingChairModel() = ProductModel(
         productCategory = "outdoor seating",
         productIdentity = "folding fishing chair",
