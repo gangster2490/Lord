@@ -2,6 +2,7 @@ package de.spardirekt.ugcagent.compliance
 
 data class ForbiddenHit(
     val pattern: String,
+    val label: String,
 )
 
 data class ComplianceResult(
@@ -12,36 +13,41 @@ data class ComplianceResult(
     val missingAdDisclosure: Boolean get() = !hasAdDisclosure
 }
 
+private data class ForbiddenRule(
+    val regex: Regex,
+    val label: String,
+)
+
 object ComplianceChecker {
-    val forbiddenPatterns: List<Regex> = listOf(
-        // Superlative / unbelegte Bestleistungen
-        Regex("(?i)\\bbeste[rsn]?\\b"),
-        Regex("(?i)\\beinzigartig\\b"),
-        Regex("(?i)\\bgarantiert\\b"),
-        Regex("(?i)\\b100%\\b"),
-        // Medizinische/Heilversprechen
-        Regex("(?i)\\bheilt\\b"),
-        Regex("(?i)\\bkuriert\\b"),
-        Regex("(?i)\\blindert\\s+schmerzen\\b"),
-        // UWG-relevante Lieferversprechen
-        Regex("(?i)\\bschnell\\s+geliefert\\b"),
-        Regex("(?i)\\bversandkostenfrei\\s+garantiert\\b"),
-        // Übertriebene Dringlichkeit
-        Regex("(?i)\\bnur\\s+heute\\b"),
-        Regex("(?i)\\blimitiert\\b"),
+    private val rules: List<ForbiddenRule> = listOf(
+        ForbiddenRule(Regex("(?i)\\bbeste[rsn]?\\b"), "beste"),
+        ForbiddenRule(Regex("(?i)\\beinzigartig\\b"), "einzigartig"),
+        ForbiddenRule(Regex("(?i)\\bgarantiert\\b"), "garantiert"),
+        ForbiddenRule(Regex("(?i)\\b100%\\b"), "100%"),
+        ForbiddenRule(Regex("(?i)\\bheilt\\b"), "heilt"),
+        ForbiddenRule(Regex("(?i)\\bkuriert\\b"), "kuriert"),
+        ForbiddenRule(Regex("(?i)\\blindert\\s+schmerzen\\b"), "lindert schmerzen"),
+        ForbiddenRule(Regex("(?i)\\bschnell\\s+geliefert\\b"), "schnell geliefert"),
+        ForbiddenRule(Regex("(?i)\\bversandkostenfrei\\s+garantiert\\b"), "versandkostenfrei garantiert"),
+        ForbiddenRule(Regex("(?i)\\bnur\\s+heute\\b"), "nur heute"),
+        ForbiddenRule(Regex("(?i)\\blimitiert\\b"), "limitiert"),
     )
+
+    val forbiddenPatterns: List<Regex> = rules.map { it.regex }
 
     private val adDisclosure = Regex("(?i)\\b(werbung|anzeige)\\b")
 
     fun checkCompliance(text: String): List<String> =
-        forbiddenPatterns.filter { it.containsMatchIn(text) }.map { it.pattern }
+        rules.filter { it.regex.containsMatchIn(text) }.map { it.regex.pattern }
 
     fun checkAdDisclosure(text: String): Boolean =
         adDisclosure.containsMatchIn(text)
 
     fun evaluate(prompt: String, caption: String = ""): ComplianceResult {
         val combined = listOf(prompt, caption).filter { it.isNotBlank() }.joinToString("\n")
-        val hits = checkCompliance(combined).map { ForbiddenHit(it) }
+        val hits = rules.filter { it.regex.containsMatchIn(combined) }.map {
+            ForbiddenHit(pattern = it.regex.pattern, label = it.label)
+        }
         return ComplianceResult(
             forbiddenHits = hits,
             hasAdDisclosure = checkAdDisclosure(combined),

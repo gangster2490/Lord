@@ -19,17 +19,17 @@
     "Reaktion mit leichtem Lachen",
   ];
   const FORBIDDEN = [
-    /\bbeste[rsn]?\b/i,
-    /\beinzigartig\b/i,
-    /\bgarantiert\b/i,
-    /\b100%\b/i,
-    /\bheilt\b/i,
-    /\bkuriert\b/i,
-    /\blindert\s+schmerzen\b/i,
-    /\bschnell\s+geliefert\b/i,
-    /\bversandkostenfrei\s+garantiert\b/i,
-    /\bnur\s+heute\b/i,
-    /\blimitiert\b/i,
+    { re: /\bbeste[rsn]?\b/i, label: "beste" },
+    { re: /\beinzigartig\b/i, label: "einzigartig" },
+    { re: /\bgarantiert\b/i, label: "garantiert" },
+    { re: /\b100%\b/i, label: "100%" },
+    { re: /\bheilt\b/i, label: "heilt" },
+    { re: /\bkuriert\b/i, label: "kuriert" },
+    { re: /\blindert\s+schmerzen\b/i, label: "lindert schmerzen" },
+    { re: /\bschnell\s+geliefert\b/i, label: "schnell geliefert" },
+    { re: /\bversandkostenfrei\s+garantiert\b/i, label: "versandkostenfrei garantiert" },
+    { re: /\bnur\s+heute\b/i, label: "nur heute" },
+    { re: /\blimitiert\b/i, label: "limitiert" },
   ];
 
   const state = {
@@ -295,7 +295,7 @@
 
   function localCompliance(prompt, caption) {
     const text = `${prompt}\n${caption}`;
-    const forbiddenHits = FORBIDDEN.filter((re) => re.test(text)).map((re) => re.source);
+    const forbiddenHits = FORBIDDEN.filter((item) => item.re.test(text)).map((item) => item.label);
     const hasAdDisclosure = /\b(werbung|anzeige)\b/i.test(text);
     return {
       forbiddenHits,
@@ -308,7 +308,7 @@
   function showCompliance(result) {
     const hits = result.forbiddenHits || [];
     const hitHtml = hits.length
-      ? hits.map((h) => `<span class="hit">${esc(h)}</span>`).join("")
+      ? hits.map((h) => `<span class="hit">${esc(h.label || h.pattern || h)}</span>`).join("")
       : `<div class="ok-box">${t("noForbidden")}</div>`;
     const disc = result.hasAdDisclosure
       ? `<div class="ok-box">${t("disclosureOk")}</div>`

@@ -2,7 +2,7 @@ package de.spardirekt.ugcagent.prompt
 
 object SystemPrompts {
 
-    const val VISION_ANALYSIS = """
+    val VISION_ANALYSIS = """
 Du analysierst 15-20 Fotos EINES EINZIGEN Produkts für ein TikTok-Video-Skript.
 
 KRITISCHE REGEL — KEINE HALLUZINATION:
@@ -37,7 +37,7 @@ Das Bild selbst übernimmt die visuelle Identität des Produkts als First-Frame 
 deine Aufgabe ist ausschließlich der Kontext, nicht das Aussehen.
 """.trimIndent()
 
-    const val VIDEO_PROMPT = """
+    val VIDEO_PROMPT = """
 Du generierst einen Video-Prompt für Veo/Kling basierend auf First-Frame-Foto
 eines Produkts (Anwendungsfall siehe JSON-Kontext oben).
 
@@ -84,7 +84,7 @@ OUTPUT: Nur der finale Kamera/Licht/Ton/Handlungs-Prompt für Veo, max. 80 Wört
 keine Produktbeschreibung, kein Marketing-Vokabular.
 """.trimIndent()
 
-    const val IMPROVE_PASS = """
+    val IMPROVE_PASS = """
 Du verfeinerst einen bestehenden Veo/Kling-Video-Prompt (Two-Pass-Self-Improvement).
 
 Behalte denselben Mikro-Moment, dasselbe Setting und dieselbe Handlung.

@@ -167,7 +167,9 @@ class NativeBridge(
     fun checkCompliance(prompt: String, caption: String) {
         val result = ComplianceChecker.evaluate(prompt, caption)
         val hits = JSONArray()
-        result.forbiddenHits.forEach { hits.put(it.pattern) }
+        result.forbiddenHits.forEach {
+            hits.put(JSONObject().put("pattern", it.pattern).put("label", it.label))
+        }
         emit(
             "compliance",
             JSONObject()

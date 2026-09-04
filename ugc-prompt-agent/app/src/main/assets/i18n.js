@@ -1,6 +1,6 @@
 const I18N = {
   de: {
-    brand: "UGC Agent",
+    brand: "Agent",
     settings: "Settings",
     tabHome: "Home",
     tabText: "Text",
@@ -80,7 +80,7 @@ const I18N = {
     promptNote: "FIRST-FRAME: Originalfoto verwenden. Produkt nicht neu beschreiben.",
   },
   ru: {
-    brand: "UGC Agent",
+    brand: "Agent",
     settings: "Настройки",
     tabHome: "Home",
     tabText: "Текст",
