@@ -783,10 +783,8 @@ object GeminiVeoPromptCleanup {
     }
 
     private fun composeHook(after: String, details: List<String>): String {
-        val csv = clipHookDetails(mergeShotDetails(after, details), 56).ifBlank { "product" }
-        val alreadyGood = after.contains("visible now", ignoreCase = true) &&
-            distinctiveKeysIn(csv).all { after.lowercase().contains(it) }
-        return if (alreadyGood) after.trimEnd('.') else "$csv visible now"
+        val csv = clipHookDetails(mergeShotDetails(after, details), 48).ifBlank { "product" }
+        return "$csv visible now"
     }
 
     private fun composeIdentity(after: String, details: List<String>): String {
@@ -817,7 +815,7 @@ object GeminiVeoPromptCleanup {
         if (!isHeroPlaceholder(after) && after.contains("8.0") && after.length >= 20) {
             return after.trimEnd('.')
         }
-        return "stable hero of the same unchanged product. End 8.0s"
+        return "stable hero of the same product. End 8.0s"
     }
 
     private fun isFeaturePlaceholder(after: String): Boolean {
@@ -854,7 +852,8 @@ object GeminiVeoPromptCleanup {
             .filter { it.length in 3..40 }
             .filterNot { part ->
                 val p = part.lowercase()
-                p.contains("verified") || p.contains("hero") || p.contains("framing") ||
+                p == "product" || p == "now" || p == "same" || p == "unchanged" ||
+                    p.contains("verified") || p.contains("hero") || p.contains("framing") ||
                     p.contains("visible") || p == "one hand" || p.startsWith("keep ")
             }
         return (fromAfter + details).distinctBy { it.lowercase() }.joinToString(", ")
@@ -1065,7 +1064,12 @@ object GeminiVeoPromptCleanup {
     private fun clipWords(text: String, maxWords: Int): String {
         val words = text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
         if (words.size <= maxWords) return text.trim()
-        return words.take(maxWords).joinToString(" ").trimEnd(',', ';', '.') + "."
+        val taken = words.take(maxWords).toMutableList()
+        val dangling = setOf("warm", "soft", "cold", "slight", "natural", "premium")
+        while (taken.size > 1 && taken.last().trimEnd(',', ';', '.').lowercase() in dangling) {
+            taken.removeAt(taken.lastIndex)
+        }
+        return taken.joinToString(" ").trimEnd(',', ';', '.') + "."
     }
 
     private fun stripLongDoctrine(text: String): String {
@@ -1369,6 +1373,6 @@ object GeminiVeoPromptCleanup {
         0.0–2.0s — HOOK: product visible now with strongest verified detail
         2.0–4.0s — IDENTITY: same product, full framing of verified parts
         4.0–6.0s — FEATURE / DEMO: one hand, one verified action
-        6.0–8.0s — HERO / CTA: stable hero of the same unchanged product. End 8.0s
+        6.0–8.0s — HERO / CTA: stable hero of the same product. End 8.0s
     """.trimIndent()
 }

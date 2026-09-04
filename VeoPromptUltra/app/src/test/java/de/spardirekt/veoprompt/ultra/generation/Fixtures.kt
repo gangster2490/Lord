@@ -116,7 +116,7 @@ SHOT SEQUENCE
 0.0–2.0s — HOOK: $hook
 2.0–4.0s — IDENTITY: $identity
 4.0–6.0s — FEATURE / DEMO: $feature
-6.0–8.0s — HERO / CTA: stable hero of the same unchanged product. End 8.0s
+6.0–8.0s — HERO / CTA: stable hero of the same product. End 8.0s
 
 ON-SCREEN TEXT
 ${overlays.joinToString("\n")}

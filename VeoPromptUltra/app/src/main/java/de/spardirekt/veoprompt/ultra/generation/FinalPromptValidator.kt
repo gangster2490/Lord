@@ -324,7 +324,7 @@ object FinalPromptValidator {
         0 -> if (fallback.isBlank()) "product visible now with strongest verified detail" else "$fallback visible now"
         1 -> if (fallback.isBlank()) "same product, full framing" else "same product, full framing — $fallback"
         2 -> "one hand, one verified action"
-        else -> "stable hero of the same unchanged product. End 8.0s"
+        else -> "stable hero of the same product. End 8.0s"
     }
 
     private val PAN_OVERLAY_LEAKS = setOf("holzdeckel", "tiefe form")
