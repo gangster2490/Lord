@@ -11,6 +11,8 @@ class ProductLockTest {
         assertTrue(out.contains("REFERENCE IMAGE OVERRIDES"))
         assertTrue(out.contains("Do not redesign"))
         assertTrue(out.contains("Do not generate a similar product"))
+        assertFalse(ProductLock.looksLikeProductRebuild(out))
+        assertFalse(ProductLock.allowsGenericSubstitution(out))
     }
 
     @Test
