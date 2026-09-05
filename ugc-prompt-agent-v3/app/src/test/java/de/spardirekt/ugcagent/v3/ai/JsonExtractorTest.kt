@@ -1,0 +1,51 @@
+package de.spardirekt.ugcagent.v3.ai
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class JsonExtractorTest {
+    @Test
+    fun stripsMarkdownFences() {
+        val obj = JsonExtractor.extractObject("```json\n{\"same_product\":true,\"confidence\":0.9}\n```")
+        assertTrue(obj.getBoolean("same_product"))
+        assertEquals(0.9, obj.getDouble("confidence"), 0.001)
+    }
+
+    @Test
+    fun fillsAnalysisDefaults() {
+        val obj = JsonExtractor.withDefaults(JsonExtractor.extractObject("{}"), JsonExtractor.analysisSchemaKeys())
+        JsonExtractor.analysisSchemaKeys().forEach { key ->
+            assertTrue(obj.has(key))
+        }
+    }
+
+    @Test
+    fun fillsConsistencyHardConflictDefaults() {
+        val obj = JsonExtractor.withDefaults(JsonExtractor.extractObject("{}"), JsonExtractor.consistencySchemaKeys())
+        assertTrue(obj.getBoolean("same_product"))
+        assertFalse(obj.getBoolean("hard_geometry_conflict"))
+        assertEquals(0, obj.getJSONArray("dominant_product_indices").length())
+        assertEquals(0, obj.getJSONArray("ignored_variation_types").length())
+    }
+
+    @Test
+    fun fillsFingerprintDefaults() {
+        val obj = JsonExtractor.withDefaults(JsonExtractor.extractObject("{}"), JsonExtractor.fingerprintSchemaKeys())
+        assertTrue(obj.getJSONArray("identity_critical_components").length() == 0)
+        assertEquals(0.0, obj.getDouble("confidence"), 0.0)
+    }
+
+    @Test
+    fun fillsActionRiskDefaults() {
+        val obj = JsonExtractor.withDefaults(JsonExtractor.extractObject("{}"), JsonExtractor.actionRiskSchemaKeys())
+        assertEquals("LOW", obj.getString("risk"))
+        assertEquals("LOW", obj.getString("motion_geometry_risk"))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsEmpty() {
+        JsonExtractor.extractObject("no json here")
+    }
+}

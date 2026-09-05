@@ -1,1 +1,6 @@
 .claude/
+ugc-prompt-agent-v3/.gradle/
+ugc-prompt-agent-v3/build/
+ugc-prompt-agent-v3/app/build/
+ugc-prompt-agent-v3/app/release.keystore
+
