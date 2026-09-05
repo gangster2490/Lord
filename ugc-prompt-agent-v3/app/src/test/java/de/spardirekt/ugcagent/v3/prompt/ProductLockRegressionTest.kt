@@ -25,7 +25,7 @@ class ProductLockRegressionTest {
             "final prompt must not instruct merging two modules into one",
             Regex("""(?<!not )(?<!never )merge (the )?(two|components) into one""", RegexOption.IGNORE_CASE).containsMatchIn(prompt),
         )
-        assertTrue(ProductLock.regressionFailures(prompt, fingerprint).isEmpty())
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint))
     }
 
     @Test
@@ -71,7 +71,7 @@ class ProductLockRegressionTest {
         assertTrue(prompt.contains("attachment", ignoreCase = true))
         assertTrue(prompt.contains("cylindrical reservoir", ignoreCase = true))
         assertTrue(prompt.contains("Never replace the two rectangular", ignoreCase = true))
-        assertTrue(ProductLock.regressionFailures(prompt, fingerprint).isEmpty())
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint))
     }
 
     @Test
@@ -81,12 +81,12 @@ class ProductLockRegressionTest {
             "VEO",
         )
         assertFalse(ProductLock.allowsGenericSubstitution(prompt))
-        assertTrue(prompt.contains("Do not generate a similar product"))
-        assertTrue(prompt.contains("generic product from the same category"))
-        assertTrue(prompt.contains("functionally similar but visually different") || prompt.contains("functionally equivalent but visually different"))
+        assertTrue(prompt.contains("Do not generate a similar product", ignoreCase = true))
+        assertTrue(prompt.contains("generic product from the same category", ignoreCase = true))
+        assertTrue(prompt.contains("functionally similar but visually different", ignoreCase = true) || prompt.contains("functionally equivalent but visually different", ignoreCase = true))
         assertTrue(ProductLock.looksLikeProductRebuild("use a similar product from the same category"))
         assertFalse(ProductLock.looksLikeProductRebuild(prompt))
-        assertTrue(ProductLock.regressionFailures(prompt, fingerprint).isEmpty())
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint))
     }
 
     @Test

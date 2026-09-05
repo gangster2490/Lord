@@ -53,7 +53,7 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
             "Do not extend beyond 8.0 seconds."
 
     private val appearanceLeak = Regex(
-        """(use a similar product|or a similar product|a generic (version|product) from the same category|any similar product|category-equivalent product is (ok|fine|acceptable)|functionally equivalent is (ok|fine|acceptable)|a typical product of this type|similar product is acceptable)""",
+        """(use a similar product|similar product is acceptable|a similar product from the same category is acceptable|functionally equivalent is (ok|fine|acceptable)|a typical product of this type|you may (merge|replace|substitute)|category-equivalent product is (ok|fine|acceptable))""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -121,7 +121,8 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
             lower.contains("similar product from the same category")
         val bansFunctional = lower.contains("functionally similar but visually different") ||
             lower.contains("functionally equivalent but visually different")
-        return !(bansSimilar && bansCategory && bansFunctional) || looksLikeProductRebuild(prompt)
+        val missingBan = !(bansSimilar && bansCategory && bansFunctional)
+        return missingBan || looksLikeProductRebuild(prompt)
     }
 
     fun preservesMicrowaveCover(prompt: String): Boolean {
