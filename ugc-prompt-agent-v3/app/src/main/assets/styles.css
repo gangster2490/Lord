@@ -56,3 +56,7 @@ textarea { min-height: 160px; }
 pre { white-space: pre-wrap; word-break: break-word; font-size: 13px; color: var(--text); }
 .list button { width: 100%; text-align: left; margin-bottom: 8px; }
 .busy { opacity: .7; pointer-events: none; }
+.copy-actions button { flex: 1 1 calc(50% - 8px); min-height: 48px; }
+.copy-actions .primary-cta, .primary-cta { flex: 1 1 100%; min-height: 54px; font-size: 16px; }
+.lang-toggle button { flex: 1; min-height: 48px; }
+#pick { flex: 1; min-height: 48px; }

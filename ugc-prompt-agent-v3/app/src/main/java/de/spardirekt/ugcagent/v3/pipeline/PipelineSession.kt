@@ -44,6 +44,9 @@ class PipelineSession {
     var caption: String? = null
     var hashtags: MutableList<String> = mutableListOf()
     var compliance: JSONObject? = null
+    var details: String? = null
+    var autoRetried: Boolean = false
+    var forceStaticAction: Boolean = false
 
     fun rankedImages(): List<FirstFrameHeuristics.RankedImage> = images.map { image ->
         FirstFrameHeuristics.RankedImage(

@@ -39,4 +39,23 @@ class FirstFrameHeuristicsTest {
         val rec = FirstFrameHeuristics.recommendLocal(listOf(tiny, photo))
         assertEquals("photo", rec?.id)
     }
+
+    @Test
+    fun ranksProductPhotoAboveScreenshotLikeFrame() {
+        val shot = FirstFrameHeuristics.RankedImage(
+            "shot", 0, 1080, 2400, 40_000,
+            FirstFrameHeuristics.score(1080, 2400, 40_000),
+        )
+        val photo = FirstFrameHeuristics.RankedImage(
+            "photo", 1, 1200, 1600, 180_000,
+            FirstFrameHeuristics.score(1200, 1600, 180_000),
+        )
+        assertTrue(FirstFrameHeuristics.looksLikeScreenshot(1080, 2400, 40_000))
+        assertFalse(FirstFrameHeuristics.looksLikeScreenshot(1200, 1600, 180_000))
+        assertEquals("photo", FirstFrameHeuristics.recommendLocal(listOf(shot, photo))?.id)
+        val ai = org.json.JSONObject()
+            .put("marketplace_ui_over_product", true)
+            .put("reasons", org.json.JSONArray().put("text-only description page"))
+        assertTrue(FirstFrameHeuristics.rejectAsFirstFrame(ai))
+    }
 }

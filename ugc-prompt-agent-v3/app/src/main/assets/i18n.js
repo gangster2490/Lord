@@ -16,7 +16,7 @@ window.I18N = {
     prompt: "Prompt",
     compliance: "Compliance",
     export: "Export",
-    upload: "Bilder wählen",
+    upload: "Fotos hochladen",
     remove: "Entfernen",
     clear: "Alle außer First Frame löschen",
     analyse_need: "Für Analyse werden mindestens 3 Bilder benötigt.",
@@ -73,7 +73,7 @@ window.I18N = {
     action_risk: "Action Identity Risk",
     action_simplified: "Aktion vereinfacht — Produktidentität hat Vorrang.",
     fingerprint: "Product Identity Fingerprint",
-    start: "ANALYSE / START",
+    start: "START",
     pause: "Pause",
     resume: "Fortsetzen",
     warnings: "Hinweise",
@@ -93,7 +93,15 @@ window.I18N = {
     copy_prompt: "COPY PROMPT",
     copy_caption: "COPY CAPTION",
     copy_hashtags: "COPY HASHTAGS",
-    copy_all: "COPY ALL"
+    copy_all: "COPY ALL",
+    copy_details: "COPY DETAILS",
+    copy_video_prompt: "COPY VIDEO PROMPT",
+    copy_video_package: "COPY VIDEO PACKAGE",
+    details: "DETAILS",
+    video_prompt: "VIDEO PROMPT",
+    advanced_details: "ADVANCED DETAILS",
+    language: "Sprache",
+    start: "START"
   },
   ru: {
     app_eyebrow: "UGC Prompt Agent V3",
@@ -112,7 +120,7 @@ window.I18N = {
     prompt: "Промпт",
     compliance: "Compliance",
     export: "Экспорт",
-    upload: "Выбрать изображения",
+    upload: "Загрузить фото",
     remove: "Удалить",
     clear: "Очистить все, кроме First Frame",
     analyse_need: "Для анализа нужно минимум 3 изображения.",
@@ -169,7 +177,7 @@ window.I18N = {
     action_risk: "Action Identity Risk",
     action_simplified: "Действие упрощено — идентичность товара важнее креатива.",
     fingerprint: "Product Identity Fingerprint",
-    start: "АНАЛИЗ / START",
+    start: "START",
     pause: "Пауза",
     resume: "Продолжить",
     warnings: "Предупреждения",
@@ -189,6 +197,14 @@ window.I18N = {
     copy_prompt: "COPY PROMPT",
     copy_caption: "COPY CAPTION",
     copy_hashtags: "COPY HASHTAGS",
-    copy_all: "COPY ALL"
+    copy_all: "COPY ALL",
+    copy_details: "COPY DETAILS",
+    copy_video_prompt: "COPY VIDEO PROMPT",
+    copy_video_package: "COPY VIDEO PACKAGE",
+    details: "DETAILS",
+    video_prompt: "VIDEO PROMPT",
+    advanced_details: "ADVANCED DETAILS",
+    language: "Язык",
+    start: "START"
   }
 };

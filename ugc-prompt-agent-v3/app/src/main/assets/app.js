@@ -1,6 +1,6 @@
 (() => {
   const native = window.UgcNative;
-  const STEPS = ["photos", "check", "analyse", "firstFrame", "scene", "prompt", "compliance", "export"];
+    const STEPS = [];
   const state = {
     lang: "de",
     screen: "home",
@@ -59,7 +59,7 @@
       toast("Native bridge missing");
       return;
     }
-    const tracked = ["runConsistency","runAnalysis","runFirstFrameQuality","generateScene","newScene","generatePrompt","improvePrompt","newSpeech","generateCaption","runCompliance","testConnection","startPipeline","resumePipeline"];
+    const tracked = ["startPipeline","resumePipeline","testConnection"];
     if (tracked.indexOf(name) !== -1) state.lastOp = { name: name, args: args };
     native[name](...args);
   }
@@ -82,12 +82,8 @@
     const steps = $("steps");
     const homeNav = $("homeNav");
     const title = $("screenTitle");
-    const showSteps = STEPS.includes(state.screen);
-    steps.hidden = !showSteps;
-    homeNav.style.display = ["home", "history", "settings"].includes(state.screen) ? "flex" : "none";
-    if (showSteps) {
-      steps.innerHTML = STEPS.map((s, i) => `<li class="${s === state.screen ? "on" : ""}">${i + 1}. ${t(stepKey(s))}</li>`).join("");
-    }
+    steps.hidden = true;
+    homeNav.style.display = ["home", "history", "settings", "pause", "export"].includes(state.screen) ? "flex" : "none";
     title.textContent = titleFor(state.screen);
     pages.className = state.busy ? "busy" : "";
     const errorHtml = state.lastError ? `<section class="card"><p class="err">${escapeHtml(state.lastError.message || state.lastError.code || "error")}</p>${state.lastError.retryable && state.lastOp ? `<button id="retryOp">${t("retry")}</button>` : ""}</section>` : "";
@@ -127,7 +123,7 @@
       case "home": return homeHtml();
       case "history": return historyHtml();
       case "settings": return settingsHtml();
-      case "photos": return photosHtml();
+      case "photos": return homeHtml();
       case "check": return checkHtml();
       case "analyse": return analyseHtml();
       case "firstFrame": return firstFrameHtml();
@@ -141,13 +137,40 @@
   }
 
   function homeHtml() {
+    const images = state.data.images || [];
+    const enabled = !!state.data.analyseEnabled;
+    const lang = outputLang();
+    const stage = state.data.pipelineStage || (state.data.project && state.data.project.pipelineStage) || "";
+    const working = state.busy ? `<p class="warn">${t("busy")}${stage && stage !== "IDLE" ? " · " + escapeHtml(stage) : ""}</p>` : "";
     return `<section class="card">
       <p>${t("app_eyebrow")}</p>
+      ${working}
+      <div class="thumbs">${images.map((img) => `
+        <div class="thumb ${img.isFirstFrame ? "ff" : ""}" data-id="${img.id}">
+          <img src="${img.thumb}" alt="" />
+          <span class="badge">${img.width}×${img.height}</span>
+        </div>`).join("")}</div>
+      <p>${enabled ? "" : t("analyse_need")}</p>
       <div class="row">
-        <button id="goNew">${t("new_project")}</button>
-        <button id="goHistory" class="secondary">${t("history")}</button>
+        <button id="pick">${t("upload")}</button>
+        <button id="clear" class="secondary">${t("clear")}</button>
+      </div>
+      <label>${t("language")}</label>
+      <div class="row lang-toggle">
+        <button id="langDe" class="${lang === "DEUTSCH" ? "" : "secondary"}">Deutsch</button>
+        <button id="langRu" class="${lang === "РУССКИЙ" ? "" : "secondary"}">Русский</button>
+      </div>
+      <div class="row">
+        <button id="startPipe" class="primary-cta" ${enabled && !state.busy ? "" : "disabled"}>${t("start")}</button>
       </div>
     </section>`;
+  }
+
+  function outputLang() {
+    const p = state.data.project || {};
+    const s = state.data.settings || {};
+    const v = p.speechLanguage || s.speechLanguage || s.outputLanguage || "DEUTSCH";
+    return v === "РУССКИЙ" ? "РУССКИЙ" : "DEUTSCH";
   }
 
   function recId() {
@@ -321,7 +344,6 @@
       <div class="row">
         <button id="resumePipe">${t("resume")}</button>
         ${reason === "DIFFERENT_PRODUCTS" || reason === "LOW_CONSISTENCY" ? `<button id="anyway" class="secondary">${t("continue_anyway")}</button>` : ""}
-        ${reason === "LOW_FIRST_FRAME_CONFIDENCE" || reason === "NO_USABLE_FIRST_FRAME" ? `<button id="toFf" class="secondary">${t("change_ff")}</button>` : ""}
         <button id="toPhotos" class="secondary">${t("photos")}</button>
       </div>
     </section>`;
@@ -330,30 +352,43 @@
   function exportHtml() {
     const p = state.data.project || {};
     const prompt = state.data.activePrompt || "";
-    const ff = (state.data.images || []).find((i) => i.isFirstFrame);
-    const warnings = (state.data.warnings || p.warnings || []).join("\n");
+    const details = p.details || state.data.details || "";
+    const warnings = (state.data.warnings || p.warnings || []).filter(Boolean);
     const compliance = p.compliance || {};
+    const advanced = JSON.stringify({
+      consistency: p.consistency || {},
+      analysis: p.analysis || {},
+      fingerprint: p.identityFingerprint || {},
+      readiness: p.identityReadiness || {},
+      actionRisk: p.actionRisk || {},
+      firstFrame: p.firstFrameRecommendation || {},
+      compliance: compliance,
+    }, null, 2);
     return `<section class="card">
-      ${ff ? `<img src="${ff.thumb}" alt="" style="width:100%;border-radius:12px;margin-bottom:12px" />` : ""}
-      <div class="kv"><span>${t("speech_lang")}</span><span>${escapeHtml(p.speechLanguage || "")}</span></div>
-      <div class="kv"><span>${t("generator_label")}</span><span>${escapeHtml(p.targetGenerator || "")}</span></div>
-      <div class="kv"><span>${t("compliance_result")}</span><span>${escapeHtml(compliance.status || "-")}</span></div>
-      <h3>${t("prompt")}</h3><pre>${escapeHtml(prompt)}</pre>
-      <h3>${t("caption")}</h3><pre>${escapeHtml(p.caption || "")}</pre>
-      <h3>${t("hashtags")}</h3><pre>${escapeHtml((p.hashtags || []).join(" "))}</pre>
-      ${warnings ? `<h3>${t("warnings")}</h3><pre>${escapeHtml(warnings)}</pre>` : ""}
-      <div class="row">
-        <button id="cp">${t("copy_prompt")}</button>
+      <h3>${t("details")}</h3>
+      <pre id="detailsBox">${escapeHtml(details)}</pre>
+      <h3>${t("video_prompt")}</h3>
+      <pre id="promptBox">${escapeHtml(prompt)}</pre>
+      <h3>${t("caption")}</h3>
+      <pre>${escapeHtml(p.caption || "")}</pre>
+      <h3>${t("hashtags")}</h3>
+      <pre>${escapeHtml((p.hashtags || []).join(" "))}</pre>
+      <h3>${t("compliance_result")}</h3>
+      <p class="${compliance.status === "PASS" ? "ok" : compliance.status === "BLOCK" ? "err" : "warn"}">${escapeHtml(compliance.status || "-")}</p>
+      ${warnings.length ? `<h3>${t("warnings")}</h3><pre>${escapeHtml(warnings.join("\n"))}</pre>` : ""}
+      <div class="row copy-actions">
+        <button id="cpkg" class="primary-cta">${t("copy_video_package")}</button>
+        <button id="cd">${t("copy_details")}</button>
+        <button id="cp">${t("copy_video_prompt")}</button>
         <button id="cc">${t("copy_caption")}</button>
         <button id="ch">${t("copy_hashtags")}</button>
-        <button id="ca">${t("copy_all")}</button>
-        <button id="chgFf" class="secondary">${t("change_ff")}</button>
-        <button id="newScene" class="secondary">${t("new_scene")}</button>
-        <button id="newSpeech" class="secondary">${t("new_speech")}</button>
-        <button id="improve" class="secondary">${t("improve")}</button>
-        <button id="save" class="secondary">${t("save_project")}</button>
-        <button id="share" class="secondary">${t("share_project")}</button>
+        <button id="ca" class="secondary">${t("copy_all")}</button>
       </div>
+      <div class="row">
+        <button id="adv" class="secondary">${t("advanced_details")}</button>
+        <button id="save" class="secondary">${t("save_project")}</button>
+      </div>
+      <pre id="advBox" class="hidden">${escapeHtml(advanced)}</pre>
     </section>`;
   }
 
@@ -440,17 +475,18 @@
       };
     });
     if (screen === "home") {
-      $("goNew").onclick = () => { call("newProject"); show("photos"); };
-      $("goHistory").onclick = () => { call("listHistory"); show("history"); };
-    }
-    if (screen === "photos") {
       $("pick").onclick = () => call("startPickImages");
       $("clear").onclick = () => call("clearImages");
-      const start = $("startPipe");
-      if (start) start.onclick = () => ensurePrivacy(() => call("startPipeline"));
-      $("toCheck").onclick = () => { ensurePrivacy(() => { call("runConsistency"); show("check"); }); };
+      $("langDe").onclick = () => {
+        state.lang = "de";
+        call("saveSettings", JSON.stringify({ outputLanguage: "DEUTSCH", appLanguage: "de" }));
+      };
+      $("langRu").onclick = () => {
+        state.lang = "ru";
+        call("saveSettings", JSON.stringify({ outputLanguage: "РУССКИЙ", appLanguage: "ru" }));
+      };
+      $("startPipe").onclick = () => ensurePrivacy(() => call("startPipeline"));
       document.querySelectorAll(".thumb[data-id]").forEach((el) => {
-        el.onclick = () => call("setFirstFrame", el.getAttribute("data-id"));
         el.ondblclick = () => call("removeImage", el.getAttribute("data-id"));
       });
     }
@@ -492,25 +528,23 @@
     if (screen === "pause") {
       $("resumePipe").onclick = () => call("resumePipeline");
       const anyway = $("anyway"); if (anyway) anyway.onclick = () => call("continueAnyway");
-      const toFf = $("toFf"); if (toFf) toFf.onclick = () => show("firstFrame");
-      $("toPhotos").onclick = () => show("photos");
+      $("toPhotos").onclick = () => show("home");
     }
     if (screen === "export") {
       const p = state.data.project || {};
       const prompt = state.data.activePrompt || "";
+      const details = p.details || state.data.details || "";
+      $("cpkg").onclick = () => call("copyVideoPackage");
+      $("cd").onclick = () => call("copyText", details);
       $("cp").onclick = () => call("copyText", prompt);
       $("cc").onclick = () => call("copyText", p.caption || "");
       $("ch").onclick = () => call("copyText", (p.hashtags || []).join(" "));
-      $("ca").onclick = () => call("copyText", [prompt, p.caption || "", (p.hashtags || []).join(" ")].join("\n\n"));
-      $("chgFf").onclick = () => show("firstFrame");
-      $("newScene").onclick = () => call("newScene");
-      $("newSpeech").onclick = () => call("newSpeech");
-      $("improve").onclick = () => call("improvePrompt");
+      $("ca").onclick = () => call("copyText", state.data.videoPackage || [details, prompt, p.caption || "", (p.hashtags || []).join(" ")].join("\n\n"));
+      $("adv").onclick = () => $("advBox").classList.toggle("hidden");
       $("save").onclick = () => call("saveProjectNow");
-      $("share").onclick = () => call("shareProject");
     }
     if (screen === "history") {
-      document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => { call("openProject", b.getAttribute("data-open")); show("export"); });
+      document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => call("openProject", b.getAttribute("data-open")));
       document.querySelectorAll("[data-dup]").forEach((b) => b.onclick = () => call("duplicateProject", b.getAttribute("data-dup")));
       document.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => {
         modal(t("confirm_delete"), "", [
@@ -586,11 +620,13 @@
           event === "pipeline") {
         state.data = Object.assign(state.data, payload);
         if (payload.settings && payload.settings.appLanguage) state.lang = payload.settings.appLanguage;
-        if (event === "pipeline") {
+        if (event === "pipeline" || event === "ready" || event === "project") {
           const stage = (payload.project && payload.project.pipelineStage) || payload.pipelineStage || "";
           if (stage === "EXPORT_READY") state.screen = "export";
           else if (stage === "PAUSED" || stage === "ERROR") state.screen = "pause";
+          else state.screen = "home";
         }
+        if (event === "images" && state.screen !== "export" && state.screen !== "pause") state.screen = "home";
         render();
       }
       if (event === "history") {

@@ -75,6 +75,8 @@ class ProjectRecord(
     var finalIdentityLock: String? = null,
     var firstFrameAutoApplied: Boolean = false,
     var firstFrameUserChosen: Boolean = false,
+    var details: String? = null,
+    var forceStaticAction: Boolean = false,
 ) {
     fun touch() {
         updatedAt = System.currentTimeMillis()
@@ -117,6 +119,8 @@ class ProjectRecord(
         .put("finalIdentityLock", finalIdentityLock)
         .put("firstFrameAutoApplied", firstFrameAutoApplied)
         .put("firstFrameUserChosen", firstFrameUserChosen)
+        .put("details", details)
+        .put("forceStaticAction", forceStaticAction)
 
     companion object {
         fun fromJson(obj: JSONObject): ProjectRecord {
@@ -159,6 +163,8 @@ class ProjectRecord(
                 finalIdentityLock = obj.optString("finalIdentityLock").ifBlank { null },
                 firstFrameAutoApplied = obj.optBoolean("firstFrameAutoApplied", false),
                 firstFrameUserChosen = obj.optBoolean("firstFrameUserChosen", false),
+                details = obj.optString("details").ifBlank { null },
+                forceStaticAction = obj.optBoolean("forceStaticAction", false),
             )
         }
 

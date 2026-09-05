@@ -29,6 +29,7 @@ class PipelineEngineTest {
         assertTrue(result.firstFrameAutoApplied)
         assertEquals(1, fake.calls.count { it == PipelineStage.CONSISTENCY_CHECK })
         assertTrue(fake.calls.contains(PipelineStage.PRODUCT_ANALYSIS))
+        assertTrue(result.details.orEmpty().contains("Produktkategorie"))
     }
 
     @Test
@@ -56,6 +57,113 @@ class PipelineEngineTest {
         assertTrue(fake.calls.count { it == PipelineStage.SCENE_GENERATION } >= 2)
     }
 
+    @Test
+    fun lowConsistencyIsWarningNotPause() {
+        val fake = FakePipelineAi()
+        fake.consistency = org.json.JSONObject()
+            .put("same_product", true)
+            .put("confidence", 0.41)
+            .put("conflicting_image_indices", org.json.JSONArray())
+            .put("reason", "color variants and repeated images")
+        val result = PipelineEngine(fake).start(sampleSession())
+        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertTrue(result.warnings.any { it.contains("Consistency warning") })
+        assertTrue(result.warnings.any { it.contains("Color/finish") })
+        assertTrue(result.details.orEmpty().contains("Produktkategorie"))
+        assertFalse(result.details.orEmpty().contains("{"))
+    }
+
+    @Test
+    fun differentProductGeometryStillPauses() {
+        val fake = FakePipelineAi()
+        fake.consistency = org.json.JSONObject()
+            .put("same_product", false)
+            .put("confidence", 0.2)
+            .put("conflicting_image_indices", org.json.JSONArray().put(2))
+            .put("reason", "different product geometry")
+        val result = PipelineEngine(fake).start(sampleSession())
+        assertEquals(PipelineStage.PAUSED, result.stage)
+        assertEquals(PauseReasons.DIFFERENT_PRODUCTS, result.pausedReason)
+    }
+
+    @Test
+    fun prefersProductPhotoOverScreenshotLikeFrame() {
+        val fake = FakePipelineAi()
+        fake.firstFrameIndex = 0
+        fake.firstFrameReasons = org.json.JSONArray().put("marketplace description page")
+        val session = sampleSession()
+        session.images = listOf(
+            PipelineImage("shot", 0, 1080, 2400, 40_000),
+            PipelineImage("photo", 1, 1200, 1600, 180_000),
+            PipelineImage("alt", 2, 900, 1200, 90_000),
+        )
+        val result = PipelineEngine(fake).start(session)
+        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals("photo", result.firstFrameId)
+        assertTrue(result.warnings.any { it.contains("screenshot") || it.contains("product photo") })
+    }
+
+    @Test
+    fun transientNetworkErrorRetriesOnceThenSucceeds() {
+        val fake = FakePipelineAi(
+            failAt = PipelineStage.CONSISTENCY_CHECK,
+            failWith = de.spardirekt.ugcagent.v3.ai.ProviderException.network(),
+            failTimes = 1,
+        )
+        val result = PipelineEngine(fake).start(sampleSession())
+        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals(2, fake.calls.count { it == PipelineStage.CONSISTENCY_CHECK })
+        assertTrue(result.autoRetried)
+        assertTrue(result.warnings.any { it.contains("automatic retry") })
+    }
+
+    @Test
+    fun transientNetworkErrorShowsErrorAfterOneRetry() {
+        val fake = FakePipelineAi(
+            failAt = PipelineStage.CONSISTENCY_CHECK,
+            failWith = de.spardirekt.ugcagent.v3.ai.ProviderException.network(),
+            failTimes = 2,
+        )
+        val session = sampleSession()
+        try {
+            PipelineEngine(fake).start(session)
+            org.junit.Assert.fail("expected network error")
+        } catch (e: de.spardirekt.ugcagent.v3.ai.ProviderException) {
+            assertEquals("NETWORK", e.code)
+        }
+        assertEquals(PipelineStage.ERROR, session.stage)
+        assertEquals(2, fake.calls.count { it == PipelineStage.CONSISTENCY_CHECK })
+    }
+
+    @Test
+    fun highReadinessContinuesWithStaticAction() {
+        val fake = FakePipelineAi()
+        fake.readinessRisk = "HIGH"
+        val result = PipelineEngine(fake).start(sampleSession())
+        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertTrue(result.forceStaticAction)
+        assertTrue(result.warnings.any { it.contains("HIGH") })
+        assertTrue(result.scene?.optString("rationale").orEmpty().contains("static"))
+    }
+
+    @Test
+    fun russianLanguageWritesRussianDetails() {
+        val session = sampleSession()
+        session.speechLanguage = "РУССКИЙ"
+        session.captionLanguage = "РУССКИЙ"
+        val result = PipelineEngine(FakePipelineAi()).start(session)
+        assertTrue(result.details.orEmpty().contains("Категория товара"))
+        val pack = de.spardirekt.ugcagent.v3.prompt.DetailsBuilder.videoPackage(
+            result.details.orEmpty(),
+            result.finalPrompt.orEmpty(),
+            result.caption.orEmpty(),
+            result.hashtags,
+        )
+        assertTrue(pack.startsWith(result.details.orEmpty().trim()))
+        assertTrue(pack.contains(result.finalPrompt.orEmpty().trim()))
+        assertTrue(pack.contains(result.caption.orEmpty().trim()))
+    }
+
     private fun sampleSession(): PipelineSession {
         val session = PipelineSession()
         session.hasApiKey = true
@@ -73,12 +181,19 @@ class PipelineEngineTest {
 
 class FakePipelineAi(
     var failAt: PipelineStage? = null,
+    var failWith: Exception? = null,
+    var failTimes: Int = 1,
     val calls: MutableList<PipelineStage> = mutableListOf(),
 ) : PipelineAi {
+    var consistency: JSONObject? = null
+    var firstFrameIndex: Int = 1
+    var firstFrameReasons: JSONArray = JSONArray().put("largest clean product")
+    var readinessRisk: String = "LOW"
+
     override fun consistencyCheck(): JSONObject {
         calls.add(PipelineStage.CONSISTENCY_CHECK)
         failIf(PipelineStage.CONSISTENCY_CHECK)
-        return JSONObject()
+        return consistency ?: JSONObject()
             .put("same_product", true)
             .put("confidence", 0.95)
             .put("conflicting_image_indices", JSONArray())
@@ -108,17 +223,17 @@ class FakePipelineAi(
             .put("score", 0.9)
             .put("missing_views", JSONArray())
             .put("ambiguous_components", JSONArray())
-            .put("generation_risk", "LOW")
+            .put("generation_risk", readinessRisk)
     }
 
     override fun recommendFirstFrame(): JSONObject {
         calls.add(PipelineStage.FIRST_FRAME)
         failIf(PipelineStage.FIRST_FRAME)
         return JSONObject()
-            .put("recommended_image_index", 1)
-            .put("reasons", JSONArray().put("largest clean product"))
-            .put("identity_components_visible", true)
-            .put("marketplace_ui_over_product", false)
+            .put("recommended_image_index", firstFrameIndex)
+            .put("reasons", firstFrameReasons)
+            .put("identity_components_visible", firstFrameIndex != 0)
+            .put("marketplace_ui_over_product", firstFrameIndex == 0)
             .put("confidence", 0.9)
     }
 
@@ -171,6 +286,9 @@ class FakePipelineAi(
     }
 
     private fun failIf(stage: PipelineStage) {
-        if (failAt == stage) throw RuntimeException("fail_$stage")
+        if (failAt == stage && failTimes > 0) {
+            failTimes--
+            throw failWith ?: RuntimeException("fail_$stage")
+        }
     }
 }

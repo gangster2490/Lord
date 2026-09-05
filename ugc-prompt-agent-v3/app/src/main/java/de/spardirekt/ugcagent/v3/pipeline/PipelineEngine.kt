@@ -1,10 +1,12 @@
 package de.spardirekt.ugcagent.v3.pipeline
 
 import de.spardirekt.ugcagent.v3.ai.PromptContext
+import de.spardirekt.ugcagent.v3.ai.ProviderException
 import de.spardirekt.ugcagent.v3.compliance.TikTokShopPolicyConfig
 import de.spardirekt.ugcagent.v3.data.ImageRules
 import de.spardirekt.ugcagent.v3.image.FirstFrameHeuristics
 import de.spardirekt.ugcagent.v3.prompt.ActionIdentity
+import de.spardirekt.ugcagent.v3.prompt.DetailsBuilder
 import de.spardirekt.ugcagent.v3.prompt.ProductIdentity
 import de.spardirekt.ugcagent.v3.prompt.ProductLock
 import org.json.JSONArray
@@ -18,6 +20,9 @@ class PipelineEngine(private val ai: PipelineAi) {
         session.completed.clear()
         session.repairApplied = false
         session.firstFrameAutoApplied = false
+        session.autoRetried = false
+        session.forceStaticAction = false
+        session.details = null
         session.stage = PipelineStage.IDLE
         session.resumeStage = PipelineStage.IMAGES_READY
         return advance(session)
@@ -49,10 +54,31 @@ class PipelineEngine(private val ai: PipelineAi) {
                 session.pausedReason = paused.reason
                 return session
             } catch (error: Exception) {
-                session.stage = PipelineStage.ERROR
-                session.resumeStage = stage
-                session.errorMessage = error.message ?: error.javaClass.simpleName
-                throw error
+                if (isTransient(error) && !session.autoRetried) {
+                    session.autoRetried = true
+                    session.warnings.add("Temporary provider error — automatic retry once.")
+                    try {
+                        runStage(session, stage)
+                        session.completed.add(stage)
+                        session.stage = stage
+                        session.resumeStage = nextAfter(stage)
+                    } catch (paused: PipelinePaused) {
+                        session.stage = PipelineStage.PAUSED
+                        session.resumeStage = paused.stage
+                        session.pausedReason = paused.reason
+                        return session
+                    } catch (retryError: Exception) {
+                        session.stage = PipelineStage.ERROR
+                        session.resumeStage = stage
+                        session.errorMessage = retryError.message ?: retryError.javaClass.simpleName
+                        throw retryError
+                    }
+                } else {
+                    session.stage = PipelineStage.ERROR
+                    session.resumeStage = stage
+                    session.errorMessage = error.message ?: error.javaClass.simpleName
+                    throw error
+                }
             }
         }
         session.stage = PipelineStage.EXPORT_READY
@@ -94,6 +120,10 @@ class PipelineEngine(private val ai: PipelineAi) {
         }
     }
 
+    private fun isTransient(error: Exception): Boolean {
+        return error is ProviderException && error.code in setOf("NETWORK", "TIMEOUT", "RATE_LIMIT")
+    }
+
     private fun imagesReady(session: PipelineSession) {
         if (!session.hasApiKey) {
             throw PipelinePaused(PauseReasons.NO_API_KEY, PipelineStage.IMAGES_READY)
@@ -108,15 +138,20 @@ class PipelineEngine(private val ai: PipelineAi) {
         session.consistency = result
         val same = result.optBoolean("same_product", true)
         val confidence = result.optDouble("confidence", 0.0)
+        val reason = result.optString("reason")
         if (!same && !session.consistencyOverride) {
             throw PipelinePaused(PauseReasons.DIFFERENT_PRODUCTS, PipelineStage.CONSISTENCY_CHECK)
         }
-        if (confidence < 0.8 && !session.consistencyOverride) {
-            throw PipelinePaused(PauseReasons.LOW_CONSISTENCY, PipelineStage.CONSISTENCY_CHECK)
-        }
         if (!same || confidence < 0.8) {
-            session.warnings.add("Consistency warning: ${result.optString("reason")}")
+            session.warnings.add("Consistency warning: ${reason.ifBlank { "low confidence or mixed references" }}")
         }
+        if (reason.contains("color", true) || reason.contains("finish", true) || reason.contains("variant", true)) {
+            session.warnings.add("Color/finish variants detected — selected First Frame wins.")
+        }
+        if (reason.contains("size", true) || reason.contains("dimension", true)) {
+            session.warnings.add("Size conflict in references — visual identity from the First Frame wins.")
+        }
+        warnDuplicates(session, result)
     }
 
     private fun analysis(session: PipelineSession) {
@@ -132,6 +167,14 @@ class PipelineEngine(private val ai: PipelineAi) {
         }
         val warning = result.optString("ambiguity_warning")
         if (warning.isNotBlank()) session.warnings.add(warning)
+        val textClaims = de.spardirekt.ugcagent.v3.ai.JsonExtractor.stringList(result, "text_claims")
+        if (textClaims.isNotEmpty()) {
+            session.warnings.add("Unverified seller/text claims kept separate from visual evidence.")
+        }
+        val dimensions = de.spardirekt.ugcagent.v3.ai.JsonExtractor.stringList(result, "dimensions")
+        if (dimensions.map { it.trim().lowercase() }.distinct().size > 1) {
+            session.warnings.add("Conflicting size/dimension text — not used as identity.")
+        }
     }
 
     private fun fingerprint(session: PipelineSession) {
@@ -144,7 +187,8 @@ class PipelineEngine(private val ai: PipelineAi) {
         val merged = ProductIdentity.mergeReadiness(local, ai.readiness(fingerprint))
         session.identityReadiness = merged
         if (merged.optString("generation_risk") == "HIGH") {
-            throw PipelinePaused(PauseReasons.READINESS_HIGH, PipelineStage.IDENTITY_READINESS)
+            session.forceStaticAction = true
+            session.warnings.add("Identity readiness HIGH — continuing with a static LOW-RISK action.")
         }
         if (merged.optString("generation_risk") == "MEDIUM") {
             session.warnings.add("Identity readiness MEDIUM — using a simpler evidenced action.")
@@ -155,11 +199,24 @@ class PipelineEngine(private val ai: PipelineAi) {
         val ranked = session.rankedImages()
         val local = FirstFrameHeuristics.recommendLocal(ranked)
         val aiRec = ai.recommendFirstFrame()
-        val chosen = FirstFrameHeuristics.mergeRecommendation(
+        val preferred = ranked.firstOrNull { image ->
+            val quality = FirstFrameHeuristics.check(image.width, image.height, image.compressedBytes)
+            quality.optBoolean("usable", false) && !FirstFrameHeuristics.looksLikeScreenshot(image.width, image.height, image.compressedBytes)
+        }
+        var chosen = FirstFrameHeuristics.mergeRecommendation(
             local?.id,
             aiRec.optInt("recommended_image_index", -1),
             ranked,
-        ) ?: throw PipelinePaused(PauseReasons.NO_USABLE_FIRST_FRAME, PipelineStage.FIRST_FRAME)
+        )
+        if (chosen != null && FirstFrameHeuristics.rejectAsFirstFrame(aiRec) && preferred != null) {
+            session.warnings.add("Skipped text/marketplace screenshot — using a clean product photo as First Frame.")
+            chosen = preferred
+        }
+        if (chosen != null && FirstFrameHeuristics.looksLikeScreenshot(chosen.width, chosen.height, chosen.compressedBytes) && preferred != null && preferred.id != chosen.id) {
+            session.warnings.add("Preferred a product photo over a screenshot-like frame.")
+            chosen = preferred
+        }
+        chosen = chosen ?: preferred ?: throw PipelinePaused(PauseReasons.NO_USABLE_FIRST_FRAME, PipelineStage.FIRST_FRAME)
         session.recommendedFirstFrameId = chosen.id
         val quality = FirstFrameHeuristics.merge(
             FirstFrameHeuristics.check(chosen.width, chosen.height, chosen.compressedBytes),
@@ -175,26 +232,33 @@ class PipelineEngine(private val ai: PipelineAi) {
             .put("marketplace_ui_over_product", aiRec.optBoolean("marketplace_ui_over_product", false))
             .put("source", "local+ai")
         session.firstFrameRecommendation = rec
-        val confidence = rec.optDouble("confidence", 0.0)
         if (!quality.optBoolean("usable", false)) {
-            throw PipelinePaused(PauseReasons.NO_USABLE_FIRST_FRAME, PipelineStage.FIRST_FRAME)
+            val fallback = preferred ?: ranked.firstOrNull {
+                FirstFrameHeuristics.check(it.width, it.height, it.compressedBytes).optBoolean("usable", false)
+            }
+            if (fallback == null) {
+                throw PipelinePaused(PauseReasons.NO_USABLE_FIRST_FRAME, PipelineStage.FIRST_FRAME)
+            }
+            chosen = fallback
+            session.recommendedFirstFrameId = chosen.id
         }
-        if (!session.firstFrameUserChosen && FirstFrameHeuristics.shouldPauseForLowConfidence(confidence, quality)) {
-            throw PipelinePaused(PauseReasons.LOW_FIRST_FRAME_CONFIDENCE, PipelineStage.FIRST_FRAME)
-        }
-        if (!session.firstFrameUserChosen && FirstFrameHeuristics.shouldAutoApply(confidence, quality)) {
-            session.firstFrameId = chosen.id
-            session.firstFrameAutoApplied = true
-        } else if (session.firstFrameId.isNullOrBlank()) {
-            session.firstFrameId = chosen.id
-            session.firstFrameAutoApplied = true
-        }
+        session.firstFrameId = chosen.id
+        session.firstFrameAutoApplied = !session.firstFrameUserChosen
     }
 
     private fun sceneAndRisk(session: PipelineSession) {
         val analysis = session.analysis ?: throw PipelinePaused(PauseReasons.ANALYSIS_MISSING, PipelineStage.SCENE_GENERATION)
         val fingerprint = session.identityFingerprint ?: JSONObject()
-        val generated = ai.generateScene(analysis, fingerprint, session.scene)
+        val generated = if (session.forceStaticAction) {
+            JSONObject()
+                .put("environment", analysis.optString("observed_context").ifBlank { "ordinary indoor setting" })
+                .put("camera_entry", "natural handheld smartphone")
+                .put("main_action", ActionIdentity.recommendedSafeAction(fingerprint))
+                .put("human_interaction", "simple contact")
+                .put("rationale", "static LOW-RISK fallback")
+        } else {
+            ai.generateScene(analysis, fingerprint, session.scene)
+        }
         val local = ActionIdentity.localCheck(generated.optString("main_action"), fingerprint)
         val merged = ActionIdentity.merge(local, ai.actionRisk(fingerprint, generated))
         var applied = ActionIdentity.applyIfHighRisk(generated, merged)
@@ -304,6 +368,20 @@ class PipelineEngine(private val ai: PipelineAi) {
         for (i in 0 until warnings.length()) {
             val text = warnings.optString(i)
             if (text.isNotBlank() && text !in session.warnings) session.warnings.add(text)
+        }
+        session.details = DetailsBuilder.build(session)
+    }
+
+    private fun warnDuplicates(session: PipelineSession, consistency: JSONObject) {
+        val groups = session.images.groupBy { image ->
+            "${image.width}x${image.height}:${image.compressedBytes / 8_000L}"
+        }.values.filter { it.size > 1 }
+        val remote = consistency.optJSONArray("duplicate_groups")
+        val remoteCount = if (remote == null) 0 else {
+            (0 until remote.length()).count { remote.optJSONArray(it)?.length() ?: 0 > 1 }
+        }
+        if (groups.isNotEmpty() || remoteCount > 0) {
+            session.warnings.add("Repeated images grouped — extras are treated as duplicates.")
         }
     }
 }

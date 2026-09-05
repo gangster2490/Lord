@@ -143,6 +143,12 @@ object MarketplaceFilter {
 
     fun containsMarketplaceUi(text: String): Boolean = patterns.any { it.containsMatchIn(text) }
 
+    fun stripFromText(text: String): String {
+        var next = text
+        patterns.forEach { next = it.replace(next, "") }
+        return next.replace(Regex("\n{3,}"), "\n\n").trim()
+    }
+
     fun ignoreInstructions(): String = buildString {
         appendLine("Ignore marketplace UI completely. It is not product information.")
         TikTokShopPolicyConfig.marketplaceIgnore.forEach { appendLine("- $it") }

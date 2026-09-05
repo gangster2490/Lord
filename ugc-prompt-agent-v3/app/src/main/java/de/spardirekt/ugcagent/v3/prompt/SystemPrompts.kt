@@ -30,11 +30,14 @@ Focus only on product identity.
 
 Do not invent properties.
 
+Group near-duplicate / repeated images into duplicate_groups. Repeated images are a warning, not a blocker.
+
 Return STRICT JSON only:
 {
   "same_product": true,
   "confidence": 0.0,
   "conflicting_image_indices": [],
+  "duplicate_groups": [],
   "reason": ""
 }
 
@@ -252,9 +255,12 @@ Score by:
 - adequate resolution
 - clean product photo preferred over infographic when available
 
+Never choose a text-only screenshot, description page, safety page or marketplace UI page when a usable product photo exists.
+Prefer a clean product photo over an infographic.
+If several color/finish variants exist, the selected First Frame is the source of truth.
+
 Do not generate a new image.
-If confidence is high the app will use the recommendation automatically; the user can change later.
-If confidence is low, pause and ask the user.
+The app will use the recommendation automatically.
 
 Image indices are 0-based in the given order.
 

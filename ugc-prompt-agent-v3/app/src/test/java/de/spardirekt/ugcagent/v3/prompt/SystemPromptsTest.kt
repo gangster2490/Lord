@@ -15,6 +15,7 @@ class SystemPromptsTest {
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("freeze-frame tail"))
         assertTrue(SystemPrompts.PRODUCT_ANALYSIS.contains("text_claims"))
         assertTrue(SystemPrompts.CONSISTENCY.contains("same_product"))
+        assertTrue(SystemPrompts.CONSISTENCY.contains("duplicate_groups"))
         assertTrue(SystemPrompts.PRODUCT_IDENTITY_FINGERPRINT.contains("identity_critical_components"))
     }
 }

@@ -64,7 +64,24 @@ object FirstFrameHeuristics {
         val area = width.toDouble() * height
         val minSide = min(width, height).toDouble()
         val bytesScore = (compressedBytes / 50_000.0).coerceAtMost(8.0)
-        return area / 1_000_000.0 + minSide / 100.0 + bytesScore
+        return area / 1_000_000.0 + minSide / 100.0 + bytesScore - screenshotPenalty(width, height, compressedBytes)
+    }
+
+    fun looksLikeScreenshot(width: Int, height: Int, compressedBytes: Long): Boolean {
+        val longest = max(width, height).toDouble()
+        val shortest = min(width, height).toDouble().coerceAtLeast(1.0)
+        val aspect = longest / shortest
+        return aspect >= 1.9 && compressedBytes < 90_000L
+    }
+
+    fun screenshotPenalty(width: Int, height: Int, compressedBytes: Long): Double {
+        var penalty = 0.0
+        if (looksLikeScreenshot(width, height, compressedBytes)) penalty += 12.0
+        val longest = max(width, height).toDouble()
+        val shortest = min(width, height).toDouble().coerceAtLeast(1.0)
+        if (longest / shortest >= 1.85) penalty += 3.0
+        if (compressedBytes < 25_000L) penalty += 4.0
+        return penalty
     }
 
     fun rank(images: List<RankedImage>): List<RankedImage> = images.sortedByDescending { it.score }
@@ -86,5 +103,16 @@ object FirstFrameHeuristics {
         quality.optBoolean("usable", false) && confidence >= AUTO_APPLY_CONFIDENCE
 
     fun shouldPauseForLowConfidence(confidence: Double, quality: JSONObject): Boolean =
-        !quality.optBoolean("usable", false) || confidence < PAUSE_CONFIDENCE
+        !quality.optBoolean("usable", false)
+
+    fun rejectAsFirstFrame(ai: JSONObject?): Boolean {
+        if (ai == null) return false
+        if (ai.optBoolean("marketplace_ui_over_product", false)) return true
+        if (!ai.optBoolean("identity_components_visible", true)) return true
+        val reasons = ai.optJSONArray("reasons")?.toString()?.lowercase() ?: ""
+        return reasons.contains("text-only") ||
+            reasons.contains("description page") ||
+            reasons.contains("safety page") ||
+            reasons.contains("infographic") && !reasons.contains("product")
+    }
 }

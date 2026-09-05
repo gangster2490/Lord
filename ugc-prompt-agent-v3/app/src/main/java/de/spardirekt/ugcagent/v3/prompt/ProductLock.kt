@@ -112,6 +112,7 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         body = stripInternalLeaks(body)
         body = stripJsonDumps(body)
         body = stripUnsupportedClaims(body)
+        body = de.spardirekt.ugcagent.v3.compliance.MarketplaceFilter.stripFromText(body)
         body = collapseDuplicateLockBlocks(body)
         body = ensure(body, lockOn, fingerprint)
         body = applyGenerator(body, generator)

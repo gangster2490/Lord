@@ -20,6 +20,7 @@ import de.spardirekt.ugcagent.v3.data.StoredImage
 import de.spardirekt.ugcagent.v3.image.FirstFrameHeuristics
 import de.spardirekt.ugcagent.v3.image.ImageProcessor
 import de.spardirekt.ugcagent.v3.prompt.ActionIdentity
+import de.spardirekt.ugcagent.v3.prompt.DetailsBuilder
 import de.spardirekt.ugcagent.v3.prompt.ProductIdentity
 import de.spardirekt.ugcagent.v3.prompt.ProductLock
 import de.spardirekt.ugcagent.v3.pipeline.PauseReasons
@@ -100,7 +101,16 @@ class NativeBridge(
                     }
                     project.recommendedFirstFrameId = FirstFrameHeuristics.recommendLocal(ranked)?.id
                 }
-                if (project.images.size in ImageRules.MIN..ImageRules.MAX && project.pipelineStage == "IDLE") {
+                if (project.pipelineStage == PipelineStage.EXPORT_READY.name || project.pipelineStage == PipelineStage.PAUSED.name) {
+                    project.completedStages.clear()
+                    project.pipelineStage = PipelineStage.IMAGES_READY.name
+                    project.pausedReason = null
+                    project.finalPrompt = null
+                    project.details = null
+                }
+                if (project.images.size in ImageRules.MIN..ImageRules.MAX &&
+                    (project.pipelineStage == "IDLE" || project.pipelineStage == PipelineStage.IMAGES_READY.name)
+                ) {
                     project.pipelineStage = PipelineStage.IMAGES_READY.name
                 }
                 persist()
@@ -114,6 +124,7 @@ class NativeBridge(
     @JavascriptInterface
     fun ready() {
         emit("ready", snapshot())
+        maybeAutoResume()
     }
 
     @JavascriptInterface
@@ -123,6 +134,14 @@ class NativeBridge(
     fun saveSettings(json: String) {
         val obj = JSONObject(json)
         if (obj.has("appLanguage")) settings.appLanguage = obj.getString("appLanguage")
+        if (obj.has("outputLanguage")) {
+            val lang = obj.getString("outputLanguage")
+            settings.speechLanguage = lang
+            settings.captionLanguage = lang
+            project.speechLanguage = lang
+            project.captionLanguage = lang
+            settings.appLanguage = if (lang.equals("РУССКИЙ", true)) "ru" else "de"
+        }
         if (obj.has("speechLanguage")) {
             settings.speechLanguage = obj.getString("speechLanguage")
             project.speechLanguage = settings.speechLanguage
@@ -414,6 +433,7 @@ class NativeBridge(
     fun openProject(id: String) {
         project = projects.load(id) ?: project
         emit("project", snapshot())
+        maybeAutoResume()
     }
 
     @JavascriptInterface
@@ -433,12 +453,58 @@ class NativeBridge(
 
     @JavascriptInterface
     fun startPipeline() = runOp("pipeline") {
-        runAutomaticPipeline(resume = false)
+        applyAutoDefaults()
+        val stage = PipelineStage.fromName(project.pipelineStage)
+        val resume = project.completedStages.isNotEmpty() &&
+            stage != PipelineStage.EXPORT_READY &&
+            stage != PipelineStage.IDLE
+        runAutomaticPipeline(resume = resume)
     }
 
     @JavascriptInterface
     fun resumePipeline() = runOp("pipeline") {
+        applyAutoDefaults()
         runAutomaticPipeline(resume = true)
+    }
+
+    @JavascriptInterface
+    fun copyVideoPackage() {
+        val pack = DetailsBuilder.videoPackage(
+            project.details.orEmpty(),
+            activePrompt(),
+            project.caption.orEmpty(),
+            project.hashtags,
+        )
+        copyText(pack)
+    }
+
+    private fun applyAutoDefaults() {
+        project.targetGenerator = settings.targetGenerator.ifBlank { "VEO" }
+        if (project.targetGenerator.isBlank()) project.targetGenerator = "VEO"
+        project.strictProductLock = true
+        val lang = if (project.speechLanguage.equals("РУССКИЙ", true) || settings.speechLanguage.equals("РУССКИЙ", true)) {
+            "РУССКИЙ"
+        } else {
+            "DEUTSCH"
+        }
+        project.speechLanguage = lang
+        project.captionLanguage = lang
+        settings.speechLanguage = lang
+        settings.captionLanguage = lang
+        project.provider = settings.provider.ifBlank { "OPENAI" }
+    }
+
+    private fun maybeAutoResume() {
+        val stage = PipelineStage.fromName(project.pipelineStage)
+        val can = project.images.size >= ImageRules.MIN && keys.has(project.provider) && project.completedStages.isNotEmpty()
+        val inProgress = can &&
+            stage != PipelineStage.EXPORT_READY &&
+            stage != PipelineStage.PAUSED &&
+            stage != PipelineStage.IDLE &&
+            stage != PipelineStage.ERROR
+        if (inProgress) {
+            resumePipeline()
+        }
     }
 
     private fun runAutomaticPipeline(resume: Boolean): JSONObject {
@@ -497,6 +563,9 @@ class NativeBridge(
         session.caption = project.caption
         session.hashtags = project.hashtags.toMutableList()
         session.compliance = project.compliance
+        session.details = project.details
+        session.autoRetried = false
+        session.forceStaticAction = project.forceStaticAction
         return session
     }
 
@@ -524,6 +593,8 @@ class NativeBridge(
         project.caption = session.caption?.let { Utf8Guard.repair(it) }
         project.hashtags = session.hashtags.map { Utf8Guard.repair(it) }.toMutableList()
         project.compliance = session.compliance
+        project.details = session.details?.let { Utf8Guard.repair(it) }
+        project.forceStaticAction = session.forceStaticAction
         project.improvedPrompt = null
     }
 
@@ -723,6 +794,8 @@ class NativeBridge(
             .put("pipelineError", project.pipelineError ?: "")
             .put("warnings", JSONArray(project.warnings))
             .put("finalIdentityLock", project.finalIdentityLock ?: "")
+            .put("details", project.details ?: "")
+            .put("videoPackage", DetailsBuilder.videoPackage(project.details.orEmpty(), activePrompt(), project.caption.orEmpty(), project.hashtags))
     }
 
     private fun payloadInfo(): JSONObject {
@@ -746,7 +819,7 @@ class NativeBridge(
 
     private fun emitError(error: Exception) {
         if (error is ProviderException) {
-            val retryable = error.code == "TIMEOUT" || error.code == "NETWORK" || error.code == "RATE_LIMIT"
+            val retryable = error.code == "TIMEOUT" || error.code == "NETWORK" || error.code == "RATE_LIMIT" || error.code == "MODEL_UNAVAILABLE"
             emitError(error.code, error.message ?: error.statusLabel, error.statusLabel, retryable)
         } else {
             emitError("GENERIC", error.message ?: "error")

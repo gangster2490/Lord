@@ -50,6 +50,7 @@ object JsonExtractor {
         "same_product",
         "confidence",
         "conflicting_image_indices",
+        "duplicate_groups",
         "reason",
     )
 
@@ -124,6 +125,7 @@ object JsonExtractor {
                     "usage_instructions",
                     "possible_actions",
                     "conflicting_image_indices",
+                    "duplicate_groups",
                     "warnings",
                     "blocked_reasons",
                     "claims_detected",

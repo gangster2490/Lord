@@ -42,6 +42,7 @@ class SettingsStore(context: Context) {
         .put("strictProductLock", strictProductLock)
         .put("provider", provider)
         .put("privacyAccepted", privacyAccepted)
+        .put("outputLanguage", speechLanguage)
         .put("policyVersion", de.spardirekt.ugcagent.v3.compliance.TikTokShopPolicyConfig.VERSION)
         .put("policyUpdated", de.spardirekt.ugcagent.v3.compliance.TikTokShopPolicyConfig.LAST_UPDATED)
 }
