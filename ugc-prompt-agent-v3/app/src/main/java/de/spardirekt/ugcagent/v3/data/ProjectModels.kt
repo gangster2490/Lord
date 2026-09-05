@@ -117,7 +117,6 @@ class ProjectRecord(
         .put("finalIdentityLock", finalIdentityLock)
         .put("firstFrameAutoApplied", firstFrameAutoApplied)
         .put("firstFrameUserChosen", firstFrameUserChosen)
-    }
 
     companion object {
         fun fromJson(obj: JSONObject): ProjectRecord {
