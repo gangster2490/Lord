@@ -9,8 +9,8 @@ import de.spardirekt.ugcagent.data.HistoryStore
 import de.spardirekt.ugcagent.data.ImageStore
 import de.spardirekt.ugcagent.data.SecureStore
 import de.spardirekt.ugcagent.data.SimilarityChecker
-import de.spardirekt.ugcagent.gemini.GeminiClient
-import de.spardirekt.ugcagent.gemini.GeminiException
+import de.spardirekt.ugcagent.openai.ApiException
+import de.spardirekt.ugcagent.openai.OpenAiClient
 import de.spardirekt.ugcagent.prompt.SceneIdea
 import de.spardirekt.ugcagent.prompt.ScenePool
 import kotlinx.coroutines.CoroutineScope
@@ -27,7 +27,7 @@ class NativeBridge(
     private val secureStore: SecureStore,
     private val historyStore: HistoryStore,
     private val imageStore: ImageStore,
-    private val gemini: GeminiClient,
+    private val openAi: OpenAiClient,
     private val onPickImages: () -> Unit,
     private val onCopy: (String) -> Unit,
 ) {
@@ -97,9 +97,9 @@ class NativeBridge(
                 val key = requireApiKey()
                 val images = imageStore.list()
                 if (images.size < ImageStore.MIN_IMAGES) {
-                    throw GeminiException("NEED_PHOTOS", "need_15_20")
+                    throw ApiException("NEED_PHOTOS", "need_15_20")
                 }
-                val analysis = withContext(Dispatchers.IO) { gemini.analyze(key, images) }
+                val analysis = withContext(Dispatchers.IO) { openAi.analyze(key, images) }
                 emit("analysis", analysis)
             } catch (t: Throwable) {
                 emitError("analysis", t)
@@ -123,10 +123,10 @@ class NativeBridge(
                 if (analysisJson.isNotBlank()) {
                     currentAnalysis = JSONObject(analysisJson)
                 }
-                val analysis = currentAnalysis ?: throw GeminiException("GENERIC", "no_analysis")
+                val analysis = currentAnalysis ?: throw ApiException("GENERIC", "no_analysis")
                 val first = requireFirstFrame()
                 val prompt = withContext(Dispatchers.IO) {
-                    gemini.buildPrompt(key, analysis, scene, first)
+                    openAi.buildPrompt(key, analysis, scene, first)
                 }
                 emit(
                     "prompt",
@@ -148,7 +148,7 @@ class NativeBridge(
                 val key = requireApiKey()
                 val scene = parseScene(sceneJson)
                 val improved = withContext(Dispatchers.IO) {
-                    gemini.improvePrompt(key, currentPrompt, scene)
+                    openAi.improvePrompt(key, currentPrompt, scene)
                 }
                 emit(
                     "prompt",
@@ -258,11 +258,11 @@ class NativeBridge(
     }
 
     private fun requireApiKey(): String =
-        secureStore.getApiKey() ?: throw GeminiException("NO_API_KEY", "missing_api_key")
+        secureStore.getApiKey() ?: throw ApiException("NO_API_KEY", "missing_api_key")
 
     private fun requireFirstFrame() =
         imageStore.get(firstFrameId ?: "") ?: imageStore.list().firstOrNull()
-            ?: throw GeminiException("NEED_PHOTOS", "no_first_frame")
+            ?: throw ApiException("NEED_PHOTOS", "no_first_frame")
 
     private fun parseScene(json: String): SceneIdea {
         val obj = JSONObject(json)
@@ -287,7 +287,7 @@ class NativeBridge(
     }
 
     private fun emitError(event: String, error: Throwable) {
-        val code = (error as? GeminiException)?.code ?: "GENERIC"
+        val code = (error as? ApiException)?.code ?: "GENERIC"
         emit(
             "error",
             JSONObject()

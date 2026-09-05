@@ -406,63 +406,68 @@ OUTPUT: nur der Prompt, max. 80 Wörter, Deutsch.`;
 
   const IMPROVE_PROMPT = `Verfeinere den Veo-Prompt. Keine Produktbeschreibung. Keine KI-Muster. Max 80 Wörter, 9:16, 8s, ein Clip. Nur der Prompt.`;
 
-  async function geminiBrowser(system, user, dataUrls, temperature) {
+  async function openaiBrowser(system, user, dataUrls, temperature, jsonMode) {
     const key = ($("api-key").value || localStorage.getItem("ugc_api_key") || "").trim();
     if (!key) {
       const err = new Error("NO_API_KEY");
       err.code = "NO_API_KEY";
       throw err;
     }
-    const parts = [{ text: system + "\n\n" + user }];
+    const userContent = [{ type: "text", text: user }];
     (dataUrls || []).forEach((url) => {
-      const data = url.split(",")[1];
-      if (data) parts.push({ inline_data: { mime_type: "image/jpeg", data } });
+      if (url) userContent.push({ type: "image_url", image_url: { url, detail: "original" } });
     });
-    const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
-    let last;
+    const models = ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-4o"];
     for (const model of models) {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: { temperature, maxOutputTokens: 1024 },
-          }),
+      const gpt5 = model.startsWith("gpt-5");
+      const body = {
+        model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userContent },
+        ],
+      };
+      if (jsonMode) body.response_format = { type: "json_object" };
+      if (gpt5) {
+        body.max_completion_tokens = 5000;
+        body.reasoning_effort = "medium";
+      } else {
+        body.temperature = temperature;
+        body.max_tokens = 1024;
+      }
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + key,
         },
-      );
+        body: JSON.stringify(body),
+      });
       const raw = await res.text();
       if (res.status === 429) {
         const e = new Error("RATE_LIMIT");
         e.code = "RATE_LIMIT";
         throw e;
       }
-      if (res.status === 400 || res.status === 401 || res.status === 403) {
+      if (res.status === 401 || res.status === 403) {
         const e = new Error("INVALID_API_KEY");
         e.code = "INVALID_API_KEY";
         throw e;
       }
-      if (res.status === 404) {
-        last = raw;
-        continue;
-      }
+      if (res.status === 404) continue;
       if (!res.ok) {
         const e = new Error("GENERIC");
         e.code = "GENERIC";
         throw e;
       }
       const json = JSON.parse(raw);
-      const text = (json.candidates || [])
-        .flatMap((c) => ((c.content || {}).parts || []).map((p) => p.text || ""))
-        .join("")
-        .trim();
-      if (!text) {
+      const text = (((json.choices || [])[0] || {}).message || {}).content || "";
+      if (!String(text).trim()) {
         const e = new Error("PARSE_ERROR");
         e.code = "PARSE_ERROR";
         throw e;
       }
-      return text;
+      return String(text).trim();
     }
     const e = new Error("GENERIC");
     e.code = "GENERIC";
@@ -614,11 +619,12 @@ OUTPUT: nur der Prompt, max. 80 Wörter, Deutsch.`;
     }
     try {
       if (state.browserImages.length < 15) throw Object.assign(new Error("NEED_PHOTOS"), { code: "NEED_PHOTOS" });
-      const text = await geminiBrowser(
+      const text = await openaiBrowser(
         VISION_PROMPT,
         "Analysiere diese Produktfotos. Nur JSON.",
         state.browserImages.map((i) => i.dataUrl),
         0.2,
+        true,
       );
       state.analysis = extractJson(text);
       renderAnalysis();
@@ -654,7 +660,7 @@ OUTPUT: nur der Prompt, max. 80 Wörter, Deutsch.`;
       const user = `Kontext-JSON: ${JSON.stringify(state.analysis)}
 Szene: ${state.selectedScene.opener} / ${state.selectedScene.environment} / ${state.selectedScene.action}
 First-Frame ist das Foto. Produkt nicht beschreiben.`;
-      state.prompt = await geminiBrowser(VIDEO_PROMPT, user, first ? [first.dataUrl] : [], 0.85);
+      state.prompt = await openaiBrowser(VIDEO_PROMPT, user, first ? [first.dataUrl] : [], 0.85, false);
       state.lastSceneKey = state.selectedScene.key;
       localStorage.setItem("ugc_last_scene", state.lastSceneKey);
       renderPrompt();
@@ -677,11 +683,12 @@ First-Frame ist das Foto. Produkt nicht beschreiben.`;
       return;
     }
     try {
-      state.prompt = await geminiBrowser(
+      state.prompt = await openaiBrowser(
         IMPROVE_PROMPT,
         `Aktueller Prompt:\n${state.prompt}\nSzene bleibt: ${state.selectedScene.opener}`,
         [],
         0.5,
+        false,
       );
       renderPrompt();
       renderExport();

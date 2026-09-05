@@ -104,6 +104,9 @@ object ImageCompressor {
     fun fileToBase64(file: File): String =
         Base64.encodeToString(file.readBytes(), Base64.NO_WRAP)
 
+    fun fileToDataUrl(file: File): String =
+        "data:image/jpeg;base64,${fileToBase64(file)}"
+
     private fun encode(bitmap: Bitmap, quality: Int): ByteArray {
         val out = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)

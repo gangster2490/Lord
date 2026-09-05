@@ -22,7 +22,7 @@ import de.spardirekt.ugcagent.bridge.NativeBridge
 import de.spardirekt.ugcagent.data.HistoryStore
 import de.spardirekt.ugcagent.data.ImageStore
 import de.spardirekt.ugcagent.data.SecureStore
-import de.spardirekt.ugcagent.gemini.GeminiClient
+import de.spardirekt.ugcagent.openai.OpenAiClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
             secureStore = secureStore,
             historyStore = historyStore,
             imageStore = imageStore,
-            gemini = GeminiClient(),
+            openAi = OpenAiClient(),
             onPickImages = {
                 pickImages.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),

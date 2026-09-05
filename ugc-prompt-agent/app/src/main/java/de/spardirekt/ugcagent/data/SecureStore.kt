@@ -59,7 +59,7 @@ class SecureStore(context: Context) {
 
     companion object {
         private const val PREFS_NAME = "ugc_agent_secure"
-        private const val KEY_API = "gemini_api_key"
+        private const val KEY_API = "openai_api_key"
         private const val KEY_LANG = "ui_language"
         private const val KEY_LAST_SCENE = "last_scene_key"
     }

@@ -1,14 +1,14 @@
 # UGC Prompt Agent
 
-Android-App (`de.spardirekt.ugcagent`) im WebView-Stil von LordApp / SDGEN: eine Activity, lokale HTML/JS-Oberfläche, Kotlin nur für Dateien, Kompression, Gemini-Calls und sichere Speicherung.
+Android-App (`de.spardirekt.ugcagent`) im WebView-Stil von LordApp / SDGEN: eine Activity, lokale HTML/JS-Oberfläche, Kotlin nur für Dateien, Kompression, OpenAI-Calls (GPT-5.6 Sol) und sichere Speicherung.
 
 Aus 15–20 Produktfotos entstehen natürlich wirkende Veo/Kling-Prompts für TikTok Shop DE — **ohne** Form, Farbe, Material oder Marke zu beschreiben. Das gewählte Originalfoto bleibt First-Frame.
 
 ## Flow
 
-1. **Settings** — eigener Gemini-API-Key (EncryptedSharedPreferences), Sprache DE/RU
+1. **Settings** — eigener OpenAI-API-Key (EncryptedSharedPreferences), Sprache DE/RU
 2. **Upload** — 15–20 Fotos, automatische Kompression (max. 1568px, JPEG ~85%)
-3. **Analyse** — Gemini Vision, nur funktionale Fakten + optional `ambiguity_warning`
+3. **Analyse** — GPT-5.6 Sol Vision, nur funktionale Fakten + optional `ambiguity_warning`
 4. **Similarity-Check** — First-Frame gegen die übrigen Fotos; bei Abweichung Warnung, kein Auto-Fix
 5. **Szenen** — 3–5 Ideen aus dem UGC-Pattern-Pool (nie dieselbe Kombination hintereinander)
 6. **Prompt-Builder** — 9:16, max. 8 Sekunden, ein Mikro-Moment; Button **Verbessern** (zweiter Pass)

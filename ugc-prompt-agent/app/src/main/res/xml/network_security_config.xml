@@ -6,6 +6,6 @@
         </trust-anchors>
     </base-config>
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">generativelanguage.googleapis.com</domain>
+        <domain includeSubdomains="true">api.openai.com</domain>
     </domain-config>
 </network-security-config>
