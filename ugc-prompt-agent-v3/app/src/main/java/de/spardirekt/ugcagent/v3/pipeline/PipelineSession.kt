@@ -47,15 +47,21 @@ class PipelineSession {
     var details: String? = null
     var autoRetried: Boolean = false
     var forceStaticAction: Boolean = false
+    var dominantImageIndices: List<Int> = emptyList()
+
+    fun isDominantIndex(index: Int): Boolean =
+        dominantImageIndices.isEmpty() || index in dominantImageIndices
 
     fun rankedImages(): List<FirstFrameHeuristics.RankedImage> = images.map { image ->
+        val base = FirstFrameHeuristics.score(image.width, image.height, image.compressedBytes)
+        val score = if (isDominantIndex(image.index)) base else base - 20.0
         FirstFrameHeuristics.RankedImage(
             id = image.id,
             index = image.index,
             width = image.width,
             height = image.height,
             compressedBytes = image.compressedBytes,
-            score = FirstFrameHeuristics.score(image.width, image.height, image.compressedBytes),
+            score = score,
         )
     }
 

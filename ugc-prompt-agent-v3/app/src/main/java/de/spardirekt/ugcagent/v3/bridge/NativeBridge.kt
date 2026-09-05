@@ -30,6 +30,7 @@ import de.spardirekt.ugcagent.v3.pipeline.PipelineImage
 import de.spardirekt.ugcagent.v3.pipeline.PipelinePaused
 import de.spardirekt.ugcagent.v3.pipeline.PipelineSession
 import de.spardirekt.ugcagent.v3.pipeline.PipelineStage
+import de.spardirekt.ugcagent.v3.pipeline.ProductConsistency
 import de.spardirekt.ugcagent.v3.security.SecureApiKeyStore
 import de.spardirekt.ugcagent.v3.text.Utf8Guard
 import org.json.JSONArray
@@ -566,6 +567,10 @@ class NativeBridge(
         session.details = project.details
         session.autoRetried = false
         session.forceStaticAction = project.forceStaticAction
+        session.dominantImageIndices = ProductConsistency.dominantIndices(
+            project.consistency ?: JSONObject(),
+            project.images.size,
+        )
         return session
     }
 

@@ -51,6 +51,9 @@ object JsonExtractor {
         "confidence",
         "conflicting_image_indices",
         "duplicate_groups",
+        "hard_geometry_conflict",
+        "dominant_product_indices",
+        "ignored_variation_types",
         "reason",
     )
 
@@ -126,6 +129,8 @@ object JsonExtractor {
                     "possible_actions",
                     "conflicting_image_indices",
                     "duplicate_groups",
+                    "dominant_product_indices",
+                    "ignored_variation_types",
                     "warnings",
                     "blocked_reasons",
                     "claims_detected",
@@ -147,7 +152,7 @@ object JsonExtractor {
                     "reasons",
                     -> obj.put(key, JSONArray())
                     "same_product", "usable", "identity_components_visible" -> obj.put(key, true)
-                    "marketplace_ui_over_product" -> obj.put(key, false)
+                    "marketplace_ui_over_product", "hard_geometry_conflict" -> obj.put(key, false)
                     "confidence", "score" -> obj.put(key, 0.0)
                     "recommended_image_index" -> obj.put(key, 0)
                     "risk", "generation_risk", "motion_geometry_risk" -> obj.put(key, "LOW")

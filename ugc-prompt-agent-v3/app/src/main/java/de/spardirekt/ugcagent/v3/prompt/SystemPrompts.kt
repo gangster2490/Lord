@@ -2,33 +2,38 @@ package de.spardirekt.ugcagent.v3.prompt
 
 object SystemPrompts {
     val CONSISTENCY = """
-You are validating a collection of reference images for one product.
+You are validating a collection of reference images for one product listing.
 
-The collection may include:
-- clean product photos
+The collection commonly includes mixed evidence of ONE product:
+- different viewpoints / camera angles
+- packaging images vs unpacked product
+- instruction cards
+- infographics / size cards / feature descriptions
+- close-ups of parts
+- usage demonstrations
 - lifestyle photos
 - marketplace screenshots
-- product infographics
-- instruction cards
-- size cards
-- feature descriptions
+- background, lighting, cropping, food or people changes
 
-Determine whether the images refer to the same physical product or the same exact product model.
+These are NOT different products.
 
-Ignore:
-- background
-- lighting
-- camera angle
-- cropping
-- food
-- people
-- marketplace UI
-- phone interface
-- seller information
+Compare identity-critical visible geometry FIRST:
+- overall silhouette
+- component count
+- attachment layout
+- distinctive visible parts
 
-Focus only on product identity.
+Ignore: background, lighting, camera angle, cropping, food, people, marketplace UI, phone UI, seller information, packaging artwork that shows the same item.
 
-Do not invent properties.
+same_product must stay true when images are viewpoints, packaging, instructions, infographics, close-ups, usage demos or background changes of one item.
+
+hard_geometry_conflict = true ONLY when two or more physically different products with incompatible identity-critical geometry are CLEARLY present.
+
+If unsure, or confidence is below a hard conflict, do NOT mark a hard conflict. Identify the dominant product identity instead.
+
+Color/finish variants of the same model are not a hard geometry conflict.
+
+Do not invent properties. Do not guess a hard conflict.
 
 Group near-duplicate / repeated images into duplicate_groups. Repeated images are a warning, not a blocker.
 
@@ -38,12 +43,15 @@ Return STRICT JSON only:
   "confidence": 0.0,
   "conflicting_image_indices": [],
   "duplicate_groups": [],
+  "hard_geometry_conflict": false,
+  "dominant_product_indices": [],
+  "ignored_variation_types": [],
   "reason": ""
 }
 
 confidence must be between 0 and 1.
-
-Do not guess.
+dominant_product_indices = 0-based indices of images that show the dominant product identity.
+ignored_variation_types examples: viewpoint, packaging, instruction card, infographic, close-up, usage demonstration, background.
 """.trimIndent()
 
     val PRODUCT_ANALYSIS = """

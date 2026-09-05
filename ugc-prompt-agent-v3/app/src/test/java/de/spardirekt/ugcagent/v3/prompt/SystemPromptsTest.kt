@@ -16,6 +16,9 @@ class SystemPromptsTest {
         assertTrue(SystemPrompts.PRODUCT_ANALYSIS.contains("text_claims"))
         assertTrue(SystemPrompts.CONSISTENCY.contains("same_product"))
         assertTrue(SystemPrompts.CONSISTENCY.contains("duplicate_groups"))
+        assertTrue(SystemPrompts.CONSISTENCY.contains("hard_geometry_conflict"))
+        assertTrue(SystemPrompts.CONSISTENCY.contains("identity-critical visible geometry"))
+        assertTrue(SystemPrompts.CONSISTENCY.contains("packaging"))
         assertTrue(SystemPrompts.PRODUCT_IDENTITY_FINGERPRINT.contains("identity_critical_components"))
     }
 }

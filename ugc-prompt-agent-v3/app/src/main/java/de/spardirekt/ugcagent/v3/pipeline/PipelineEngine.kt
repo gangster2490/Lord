@@ -23,6 +23,7 @@ class PipelineEngine(private val ai: PipelineAi) {
         session.autoRetried = false
         session.forceStaticAction = false
         session.details = null
+        session.dominantImageIndices = emptyList()
         session.stage = PipelineStage.IDLE
         session.resumeStage = PipelineStage.IMAGES_READY
         return advance(session)
@@ -139,11 +140,17 @@ class PipelineEngine(private val ai: PipelineAi) {
         val same = result.optBoolean("same_product", true)
         val confidence = result.optDouble("confidence", 0.0)
         val reason = result.optString("reason")
-        if (!same && !session.consistencyOverride) {
+        session.dominantImageIndices = ProductConsistency.dominantIndices(result, session.images.size)
+        if (ProductConsistency.shouldPauseForDifferentProducts(result) && !session.consistencyOverride) {
             throw PipelinePaused(PauseReasons.DIFFERENT_PRODUCTS, PipelineStage.CONSISTENCY_CHECK)
         }
-        if (!same || confidence < 0.8) {
+        if (!same || confidence < ProductConsistency.HARD_CONFLICT_THRESHOLD) {
+            session.warnings.add(ProductConsistency.autoSelectWarning(result))
+        } else if (confidence < 0.8) {
             session.warnings.add("Consistency warning: ${reason.ifBlank { "low confidence or mixed references" }}")
+        }
+        if (ProductConsistency.looksLikeEvidenceVariation(result)) {
+            session.warnings.add("Mixed evidence views (packaging, instructions, close-ups, usage, backgrounds) kept as one product.")
         }
         if (reason.contains("color", true) || reason.contains("finish", true) || reason.contains("variant", true)) {
             session.warnings.add("Color/finish variants detected — selected First Frame wins.")
@@ -200,6 +207,11 @@ class PipelineEngine(private val ai: PipelineAi) {
         val local = FirstFrameHeuristics.recommendLocal(ranked)
         val aiRec = ai.recommendFirstFrame()
         val preferred = ranked.firstOrNull { image ->
+            val quality = FirstFrameHeuristics.check(image.width, image.height, image.compressedBytes)
+            val usablePhoto = quality.optBoolean("usable", false) &&
+                !FirstFrameHeuristics.looksLikeScreenshot(image.width, image.height, image.compressedBytes)
+            usablePhoto && session.isDominantIndex(image.index)
+        } ?: ranked.firstOrNull { image ->
             val quality = FirstFrameHeuristics.check(image.width, image.height, image.compressedBytes)
             quality.optBoolean("usable", false) && !FirstFrameHeuristics.looksLikeScreenshot(image.width, image.height, image.compressedBytes)
         }

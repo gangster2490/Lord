@@ -1,6 +1,7 @@
 package de.spardirekt.ugcagent.v3.ai
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,6 +19,15 @@ class JsonExtractorTest {
         JsonExtractor.analysisSchemaKeys().forEach { key ->
             assertTrue(obj.has(key))
         }
+    }
+
+    @Test
+    fun fillsConsistencyHardConflictDefaults() {
+        val obj = JsonExtractor.withDefaults(JsonExtractor.extractObject("{}"), JsonExtractor.consistencySchemaKeys())
+        assertTrue(obj.getBoolean("same_product"))
+        assertFalse(obj.getBoolean("hard_geometry_conflict"))
+        assertEquals(0, obj.getJSONArray("dominant_product_indices").length())
+        assertEquals(0, obj.getJSONArray("ignored_variation_types").length())
     }
 
     @Test

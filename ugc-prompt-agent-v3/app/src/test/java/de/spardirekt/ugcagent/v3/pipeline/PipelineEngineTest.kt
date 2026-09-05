@@ -67,7 +67,7 @@ class PipelineEngineTest {
             .put("reason", "color variants and repeated images")
         val result = PipelineEngine(fake).start(sampleSession())
         assertEquals(PipelineStage.EXPORT_READY, result.stage)
-        assertTrue(result.warnings.any { it.contains("Consistency warning") })
+        assertTrue(result.warnings.any { it.contains("Dominant product identity") || it.contains("Consistency warning") })
         assertTrue(result.warnings.any { it.contains("Color/finish") })
         assertTrue(result.details.orEmpty().contains("Produktkategorie"))
         assertFalse(result.details.orEmpty().contains("{"))
@@ -78,12 +78,45 @@ class PipelineEngineTest {
         val fake = FakePipelineAi()
         fake.consistency = org.json.JSONObject()
             .put("same_product", false)
-            .put("confidence", 0.2)
+            .put("confidence", 0.94)
+            .put("hard_geometry_conflict", true)
             .put("conflicting_image_indices", org.json.JSONArray().put(2))
-            .put("reason", "different product geometry")
+            .put("reason", "two physically different products with incompatible geometry")
         val result = PipelineEngine(fake).start(sampleSession())
         assertEquals(PipelineStage.PAUSED, result.stage)
         assertEquals(PauseReasons.DIFFERENT_PRODUCTS, result.pausedReason)
+    }
+
+    @Test
+    fun mixedEvidenceViewsDoNotPause() {
+        val fake = FakePipelineAi()
+        fake.consistency = org.json.JSONObject()
+            .put("same_product", false)
+            .put("confidence", 0.97)
+            .put("hard_geometry_conflict", false)
+            .put("ignored_variation_types", org.json.JSONArray().put("viewpoint").put("packaging").put("infographic").put("usage demonstration"))
+            .put("dominant_product_indices", org.json.JSONArray().put(1).put(2))
+            .put("reason", "different viewpoints, packaging image, instruction card, close-up and background change")
+        val result = PipelineEngine(fake).start(sampleSession())
+        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals(listOf(1, 2), result.dominantImageIndices)
+        assertTrue(result.warnings.any { it.contains("Dominant product identity") || it.contains("Mixed evidence") })
+    }
+
+    @Test
+    fun lowConfidenceHardConflictAutoSelectsDominantAndContinues() {
+        val fake = FakePipelineAi()
+        fake.consistency = org.json.JSONObject()
+            .put("same_product", false)
+            .put("confidence", 0.2)
+            .put("hard_geometry_conflict", true)
+            .put("conflicting_image_indices", org.json.JSONArray().put(2))
+            .put("dominant_product_indices", org.json.JSONArray().put(0).put(1))
+            .put("reason", "different product geometry")
+        val result = PipelineEngine(fake).start(sampleSession())
+        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals(listOf(0, 1), result.dominantImageIndices)
+        assertTrue(result.warnings.any { it.contains("Dominant product identity") })
     }
 
     @Test
