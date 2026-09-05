@@ -110,7 +110,7 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
                 )
             } catch (e: ApiException) {
                 lastError = e
-                if (e.code == "NOT_FOUND") continue
+                if (e.code == "NOT_FOUND" || e.code == "UNSUPPORTED") continue
                 throw e
             }
         }
@@ -127,9 +127,53 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
         maxTokens: Int,
         jsonMode: Boolean,
     ): String {
+        var jsonModeNow = jsonMode
+        var useReasoningEffort = true
+        var rateLimitRetried = false
+
+        while (true) {
+            try {
+                return requestOnce(
+                    apiKey = apiKey,
+                    model = model,
+                    system = system,
+                    userText = userText,
+                    images = images,
+                    temperature = temperature,
+                    maxTokens = maxTokens,
+                    jsonMode = jsonModeNow,
+                    useReasoningEffort = useReasoningEffort,
+                )
+            } catch (e: ApiException) {
+                when {
+                    OpenAiErrorRules.isRateLimited(e.code, e.message.orEmpty()) && !rateLimitRetried -> {
+                        rateLimitRetried = true
+                        Thread.sleep(RATE_LIMIT_BACKOFF_MS)
+                    }
+                    OpenAiErrorRules.isUnsupported("${e.code} ${e.message}") &&
+                        (jsonModeNow || useReasoningEffort) -> {
+                        jsonModeNow = false
+                        useReasoningEffort = false
+                    }
+                    else -> throw e
+                }
+            }
+        }
+    }
+
+    private fun requestOnce(
+        apiKey: String,
+        model: String,
+        system: String,
+        userText: String,
+        images: List<StoredImage>,
+        temperature: Double,
+        maxTokens: Int,
+        jsonMode: Boolean,
+        useReasoningEffort: Boolean,
+    ): String {
         val userContent = JSONArray()
         userContent.put(JSONObject().put("type", "text").put("text", userText))
-        val detail = if (model.startsWith("gpt-5.6")) "original" else "high"
         images.forEach { image ->
             userContent.put(
                 JSONObject()
@@ -138,7 +182,7 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
                         "image_url",
                         JSONObject()
                             .put("url", ImageCompressor.fileToDataUrl(image.file))
-                            .put("detail", detail),
+                            .put("detail", IMAGE_DETAIL),
                     ),
             )
         }
@@ -153,7 +197,9 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
         }
         if (gpt5) {
             payload.put("max_completion_tokens", (maxTokens + 4_000).coerceAtMost(16_384))
-            payload.put("reasoning_effort", if (model.contains("luna")) "low" else "medium")
+            if (useReasoningEffort) {
+                payload.put("reasoning_effort", if (model.contains("luna")) "low" else "medium")
+            }
         } else {
             payload.put("temperature", temperature)
             payload.put("max_tokens", maxTokens)
@@ -172,16 +218,14 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
                 when (response.code) {
                     200 -> parseText(raw)
                     400 -> {
-                        if (raw.contains("too large", ignoreCase = true) ||
-                            raw.contains("context_length", ignoreCase = true) ||
-                            raw.contains("image", ignoreCase = true) && raw.contains("limit", ignoreCase = true)
-                        ) {
+                        if (OpenAiErrorRules.isImageTooLarge(raw)) {
                             throw ApiException("IMAGE_TOO_LARGE", raw)
                         }
-                        if (raw.contains("model", ignoreCase = true) &&
-                            (raw.contains("not found", ignoreCase = true) || raw.contains("does not exist", ignoreCase = true))
-                        ) {
+                        if (OpenAiErrorRules.isMissingModel(raw)) {
                             throw ApiException("NOT_FOUND", raw)
+                        }
+                        if (OpenAiErrorRules.isUnsupported(raw)) {
+                            throw ApiException("UNSUPPORTED", raw)
                         }
                         throw ApiException("GENERIC", raw)
                     }
@@ -201,14 +245,7 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
     }
 
     private fun parseText(raw: String): String {
-        val json = JSONObject(raw)
-        val choices = json.optJSONArray("choices") ?: throw ApiException("PARSE_ERROR", raw)
-        if (choices.length() == 0) throw ApiException("PARSE_ERROR", raw)
-        val text = choices.getJSONObject(0)
-            .optJSONObject("message")
-            ?.optString("content")
-            ?.trim()
-            .orEmpty()
+        val text = OpenAiResponseParser.messageText(raw)
         if (text.isEmpty()) throw ApiException("PARSE_ERROR", raw)
         return text
     }
@@ -228,6 +265,8 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
     companion object {
         const val DEFAULT_MODEL = "gpt-5.6-sol"
         val MODELS = listOf("gpt-5.6-sol", "gpt-5.6-terra", "gpt-4o")
+        const val IMAGE_DETAIL = "high"
+        private const val RATE_LIMIT_BACKOFF_MS = 900L
         private val JSON = "application/json; charset=utf-8".toMediaType()
         private const val CHAT_URL = "https://api.openai.com/v1/chat/completions"
 

@@ -415,63 +415,97 @@ OUTPUT: nur der Prompt, max. 80 Wörter, Deutsch.`;
     }
     const userContent = [{ type: "text", text: user }];
     (dataUrls || []).forEach((url) => {
-      if (url) userContent.push({ type: "image_url", image_url: { url, detail: "original" } });
+      if (url) userContent.push({ type: "image_url", image_url: { url, detail: "high" } });
     });
     const models = ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-4o"];
     for (const model of models) {
-      const gpt5 = model.startsWith("gpt-5");
-      const body = {
-        model,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userContent },
-        ],
-      };
-      if (jsonMode) body.response_format = { type: "json_object" };
-      if (gpt5) {
-        body.max_completion_tokens = 5000;
-        body.reasoning_effort = "medium";
-      } else {
-        body.temperature = temperature;
-        body.max_tokens = 1024;
+      let jsonModeNow = jsonMode;
+      let useReasoningEffort = true;
+      let rateLimitRetried = false;
+      while (true) {
+        const gpt5 = model.startsWith("gpt-5");
+        const body = {
+          model,
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: userContent },
+          ],
+        };
+        if (jsonModeNow) body.response_format = { type: "json_object" };
+        if (gpt5) {
+          body.max_completion_tokens = 5000;
+          if (useReasoningEffort) body.reasoning_effort = "medium";
+        } else {
+          body.temperature = temperature;
+          body.max_tokens = 1024;
+        }
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + key,
+          },
+          body: JSON.stringify(body),
+        });
+        const raw = await res.text();
+        if (res.status === 429 && !rateLimitRetried) {
+          rateLimitRetried = true;
+          await new Promise((resolve) => setTimeout(resolve, 900));
+          continue;
+        }
+        if (res.status === 429) {
+          const e = new Error("RATE_LIMIT");
+          e.code = "RATE_LIMIT";
+          throw e;
+        }
+        if (res.status === 401 || res.status === 403) {
+          const e = new Error("INVALID_API_KEY");
+          e.code = "INVALID_API_KEY";
+          throw e;
+        }
+        if (res.status === 404) break;
+        if (!res.ok) {
+          const unsupported =
+            /unsupported_parameter|unknown_parameter|reasoning_effort|response_format/i.test(raw) &&
+            /unsupported|unknown|invalid/i.test(raw);
+          if (unsupported && (jsonModeNow || useReasoningEffort)) {
+            jsonModeNow = false;
+            useReasoningEffort = false;
+            continue;
+          }
+          const e = new Error("GENERIC");
+          e.code = "GENERIC";
+          throw e;
+        }
+        const json = JSON.parse(raw);
+        const text = flattenMessageContent((((json.choices || [])[0] || {}).message || {}).content);
+        if (!text) {
+          const e = new Error("PARSE_ERROR");
+          e.code = "PARSE_ERROR";
+          throw e;
+        }
+        return text;
       }
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + key,
-        },
-        body: JSON.stringify(body),
-      });
-      const raw = await res.text();
-      if (res.status === 429) {
-        const e = new Error("RATE_LIMIT");
-        e.code = "RATE_LIMIT";
-        throw e;
-      }
-      if (res.status === 401 || res.status === 403) {
-        const e = new Error("INVALID_API_KEY");
-        e.code = "INVALID_API_KEY";
-        throw e;
-      }
-      if (res.status === 404) continue;
-      if (!res.ok) {
-        const e = new Error("GENERIC");
-        e.code = "GENERIC";
-        throw e;
-      }
-      const json = JSON.parse(raw);
-      const text = (((json.choices || [])[0] || {}).message || {}).content || "";
-      if (!String(text).trim()) {
-        const e = new Error("PARSE_ERROR");
-        e.code = "PARSE_ERROR";
-        throw e;
-      }
-      return String(text).trim();
     }
     const e = new Error("GENERIC");
     e.code = "GENERIC";
     throw e;
+  }
+
+  function flattenMessageContent(content) {
+    if (content == null) return "";
+    if (Array.isArray(content)) {
+      return content
+        .map((part) => {
+          if (typeof part === "string") return part;
+          if (part && typeof part.text === "string") return part.text;
+          return "";
+        })
+        .join("")
+        .trim();
+    }
+    const value = String(content).trim();
+    return value.toLowerCase() === "null" ? "" : value;
   }
 
   function extractJson(text) {
