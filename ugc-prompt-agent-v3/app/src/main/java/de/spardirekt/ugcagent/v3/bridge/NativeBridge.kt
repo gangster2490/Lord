@@ -31,6 +31,7 @@ import de.spardirekt.ugcagent.v3.pipeline.PipelinePaused
 import de.spardirekt.ugcagent.v3.pipeline.PipelineSession
 import de.spardirekt.ugcagent.v3.pipeline.PipelineStage
 import de.spardirekt.ugcagent.v3.pipeline.ProductConsistency
+import de.spardirekt.ugcagent.v3.pipeline.StartGate
 import de.spardirekt.ugcagent.v3.security.SecureApiKeyStore
 import de.spardirekt.ugcagent.v3.text.Utf8Guard
 import org.json.JSONArray
@@ -102,7 +103,10 @@ class NativeBridge(
                     }
                     project.recommendedFirstFrameId = FirstFrameHeuristics.recommendLocal(ranked)?.id
                 }
-                if (project.pipelineStage == PipelineStage.EXPORT_READY.name || project.pipelineStage == PipelineStage.PAUSED.name) {
+                if (project.pipelineStage == PipelineStage.READY.name ||
+                    project.pipelineStage == PipelineStage.EXPORT_READY.name ||
+                    project.pipelineStage == PipelineStage.PAUSED.name
+                ) {
                     project.completedStages.clear()
                     project.pipelineStage = PipelineStage.IMAGES_READY.name
                     project.pausedReason = null
@@ -457,6 +461,7 @@ class NativeBridge(
         applyAutoDefaults()
         val stage = PipelineStage.fromName(project.pipelineStage)
         val resume = project.completedStages.isNotEmpty() &&
+            stage != PipelineStage.READY &&
             stage != PipelineStage.EXPORT_READY &&
             stage != PipelineStage.IDLE
         runAutomaticPipeline(resume = resume)
@@ -471,7 +476,6 @@ class NativeBridge(
     @JavascriptInterface
     fun copyVideoPackage() {
         val pack = DetailsBuilder.videoPackage(
-            project.details.orEmpty(),
             activePrompt(),
             project.caption.orEmpty(),
             project.hashtags,
@@ -499,6 +503,7 @@ class NativeBridge(
         val stage = PipelineStage.fromName(project.pipelineStage)
         val can = project.images.size >= ImageRules.MIN && keys.has(project.provider) && project.completedStages.isNotEmpty()
         val inProgress = can &&
+            stage != PipelineStage.READY &&
             stage != PipelineStage.EXPORT_READY &&
             stage != PipelineStage.PAUSED &&
             stage != PipelineStage.IDLE &&
@@ -567,6 +572,9 @@ class NativeBridge(
         session.details = project.details
         session.autoRetried = false
         session.forceStaticAction = project.forceStaticAction
+        session.hook = project.hook.orEmpty()
+        session.evidence = project.evidence
+        session.selfCheck = project.selfCheck
         session.dominantImageIndices = ProductConsistency.dominantIndices(
             project.consistency ?: JSONObject(),
             project.images.size,
@@ -600,6 +608,9 @@ class NativeBridge(
         project.compliance = session.compliance
         project.details = session.details?.let { Utf8Guard.repair(it) }
         project.forceStaticAction = session.forceStaticAction
+        project.hook = session.hook.ifBlank { null }?.let { Utf8Guard.repair(it) }
+        project.evidence = session.evidence
+        project.selfCheck = session.selfCheck
         project.improvedPrompt = null
     }
 
@@ -780,6 +791,7 @@ class NativeBridge(
                     .put("isFirstFrame", image.id == project.firstFrameId),
             )
         }
+        val gate = startDebug()
         return JSONObject()
             .put("project", project.toJson())
             .put("images", images)
@@ -788,6 +800,8 @@ class NativeBridge(
             .put("policyVersion", TikTokShopPolicyConfig.VERSION)
             .put("policyUpdated", TikTokShopPolicyConfig.LAST_UPDATED)
             .put("analyseEnabled", de.spardirekt.ugcagent.v3.data.ImageRules.canAnalyse(project.images.size))
+            .put("startDebug", gate)
+            .put("startEnabled", gate.optBoolean("startEnabled"))
             .put("payload", payloadInfo())
             .put("activePrompt", activePrompt())
             .put("minImagesMessage", de.spardirekt.ugcagent.v3.data.ImageRules.needMoreMessage())
@@ -800,7 +814,31 @@ class NativeBridge(
             .put("warnings", JSONArray(project.warnings))
             .put("finalIdentityLock", project.finalIdentityLock ?: "")
             .put("details", project.details ?: "")
-            .put("videoPackage", DetailsBuilder.videoPackage(project.details.orEmpty(), activePrompt(), project.caption.orEmpty(), project.hashtags))
+            .put("videoPackage", DetailsBuilder.videoPackage(activePrompt(), project.caption.orEmpty(), project.hashtags))
+            .put("copyAll", DetailsBuilder.copyAll(project.details.orEmpty(), activePrompt(), project.caption.orEmpty(), project.hashtags))
+            .put("hook", project.hook ?: "")
+    }
+
+    private fun startDebug(): JSONObject {
+        val debug = StartGate.evaluate(
+            imageCount = project.images.size,
+            language = if (project.speechLanguage.equals("РУССКИЙ", true)) "РУССКИЙ" else "DEUTSCH",
+            stage = project.pipelineStage,
+            pausedReason = project.pausedReason,
+            busy = false,
+            minImages = ImageRules.MIN,
+            maxImages = ImageRules.MAX,
+        )
+        de.spardirekt.ugcagent.v3.ai.AppLog.event(
+            "START_GATE",
+            project.provider,
+            null,
+            if (debug.optBoolean("startEnabled")) 1 else 0,
+            0,
+            project.images.size,
+            0,
+        )
+        return debug
     }
 
     private fun payloadInfo(): JSONObject {

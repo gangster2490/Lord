@@ -18,7 +18,9 @@ object ActionIdentity {
         Regex("""disassemble|unscrew|look inside""", RegexOption.IGNORE_CASE),
         Regex("""invent(ed)? (a )?(hinge|reservoir|compartment|mechanism)""", RegexOption.IGNORE_CASE),
         Regex("""open(ing)? (a )?(hidden|unseen)""", RegexOption.IGNORE_CASE),
-        Regex("""unfold|detach the base|internal water path""", RegexOption.IGNORE_CASE),
+        Regex("""fold(ing)?|unfold""", RegexOption.IGNORE_CASE),
+        Regex("""\b(open(ing)?|rotat(e|ing)|pull(ing)?|detach(ing)?|disassemble)\b""", RegexOption.IGNORE_CASE),
+        Regex("""changing mechanism|lift(ing)? (a |the )?(structural|upper|top)""", RegexOption.IGNORE_CASE),
     )
 
     private val mediumRisk = listOf(

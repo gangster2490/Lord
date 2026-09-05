@@ -11,8 +11,8 @@ class ImageRulesTest {
         assertFalse(ImageRules.canAnalyse(0))
         assertFalse(ImageRules.canAnalyse(2))
         assertTrue(ImageRules.canAnalyse(3))
-        assertTrue(ImageRules.canAnalyse(20))
-        assertFalse(ImageRules.canAnalyse(21))
+        assertTrue(ImageRules.canAnalyse(15))
+        assertFalse(ImageRules.canAnalyse(16))
         assertEquals("Для анализа нужно минимум 3 изображения.", ImageRules.needMoreMessage())
     }
 }

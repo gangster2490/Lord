@@ -66,7 +66,16 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         "The spoken line must finish before the 8.0-second endpoint."
 
     const val SCENE_TIMING_BUDGET =
-        "Preferred timing budget for one continuous clip: 0.0–1.0 s establish the existing First Frame; 1.0–6.5 s one main action; 6.5–8.0 s natural completion / brief settle. Not three shots. No extra scenes or CTA segments."
+        "Preferred timing budget for one continuous clip: 0.0–1.5 s STRONG HOOK; 1.5–6.5 s one LOW-RISK product moment; 6.5–8.0 s natural settle. Speech begins around 0.3–0.8 s. Not three shots. No extra scenes or CTA segments."
+
+    const val CAMERA_LOCK =
+        "Natural handheld smartphone. Slight tremor and tiny human drift are allowed. No orbit, dramatic push-in, aggressive zoom, cinematic crane, or major angle change that hides identity-critical geometry."
+
+    const val HUMAN_LOCK =
+        "One anatomically correct hand with five fingers. Natural UGC movement only. No presenter gestures, excessive pointing, aggressive gripping, extra hands, or covering identity-critical parts."
+
+    const val LIGHTING_LOCK =
+        "Ordinary home daylight or normal indoor light. Natural reflections. Slightly imperfect real UGC. No studio-commercial lighting, glossy advertising look, fake glow, or showroom perfection."
 
     const val FIRST_FRAME_WINS =
         "If references conflict in color or finish, the selected First Frame is the primary source of truth. SELECTED FIRST FRAME WINS."
@@ -96,7 +105,9 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         if (ProductIdentity.hasFinishConflict(fingerprint) || looksLikeFinishConflict(body)) {
             body = ensureContains(body, FIRST_FRAME_WINS, "SELECTED FIRST FRAME WINS")
         }
-        body = body.replace(Regex("maximum 8(\\.0)? seconds", RegexOption.IGNORE_CASE), "exactly 8.0 seconds")
+        body = ensureContains(body, CAMERA_LOCK, "Natural handheld smartphone")
+        body = ensureContains(body, HUMAN_LOCK, "five fingers")
+        body = ensureContains(body, LIGHTING_LOCK, "Ordinary home daylight")
         body = collapseDuplicateLockBlocks(body)
         return body.trim()
     }
@@ -141,7 +152,7 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         val gen = generator.uppercase()
         if (gen == "VEO") {
             cleaned = ensureContains(cleaned, VEO_DURATION_LOCK, "freeze-frame tail")
-            cleaned = ensureContains(cleaned, SCENE_TIMING_BUDGET, "0.0–1.0 s")
+            cleaned = ensureContains(cleaned, SCENE_TIMING_BUDGET, "0.0–1.5 s")
             if (!cleaned.contains("Target generator:", ignoreCase = true)) {
                 cleaned = "Target generator: Veo. Vertical 9:16. One continuous clip.\n\n$cleaned"
             }
@@ -331,6 +342,14 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
             Regex("(?im)^.*\\bgarantiert\\b.*$"),
             Regex("(?im)^.*\\bheilt\\b.*$"),
             Regex("(?im)^.*medically proven.*$"),
+            Regex("(?im)^.*\\bbest\\b.*$"),
+            Regex("(?im)^.*\\bperfect\\b.*$"),
+            Regex("(?im)^.*\\balways\\b.*$"),
+            Regex("(?im)^.*\\bnever\\b.*$"),
+            Regex("(?im)^.*bpa[- ]?free.*$"),
+            Regex("(?im)^.*anti[- ]?scratch.*$"),
+            Regex("(?im)^.*revolutionary.*$"),
+            Regex("(?im)^.*game[- ]changing.*$"),
         )
         var next = body
         banned.forEach { next = it.replace(next, "") }

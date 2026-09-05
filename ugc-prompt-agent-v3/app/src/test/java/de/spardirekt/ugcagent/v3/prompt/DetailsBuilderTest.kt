@@ -34,16 +34,20 @@ class DetailsBuilderTest {
     }
 
     @Test
-    fun videoPackageOrderIsDetailsPromptCaptionHashtags() {
+    fun videoPackageOrderIsPromptCaptionHashtags() {
         val pack = DetailsBuilder.videoPackage(
-            "DETAILS LINE",
             "VIDEO PROMPT LINE",
             "CAPTION LINE",
             listOf("#one", "#two"),
         )
         assertEquals(
-            "DETAILS LINE\n\nVIDEO PROMPT LINE\n\nCAPTION LINE\n\n#one #two",
+            "VIDEO PROMPT LINE\n\nCAPTION LINE\n\n#one #two",
             pack,
+        )
+        val all = DetailsBuilder.copyAll("DETAILS LINE", "VIDEO PROMPT LINE", "CAPTION LINE", listOf("#one", "#two"))
+        assertEquals(
+            "DETAILS LINE\n\nVIDEO PROMPT LINE\n\nCAPTION LINE\n\n#one #two",
+            all,
         )
     }
 

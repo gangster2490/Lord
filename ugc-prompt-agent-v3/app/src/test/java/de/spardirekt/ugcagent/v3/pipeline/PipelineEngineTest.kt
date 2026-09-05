@@ -17,12 +17,13 @@ class PipelineEngineTest {
         val engine = PipelineEngine(fake)
         val session = sampleSession()
         val result = engine.start(session)
-        assertEquals(PipelineStage.EXPORT_READY, result.stage)
-        assertTrue(result.completed.contains(PipelineStage.CONSISTENCY_CHECK))
-        assertTrue(result.completed.contains(PipelineStage.IDENTITY_FINGERPRINT))
-        assertTrue(result.completed.contains(PipelineStage.FIRST_FRAME))
-        assertTrue(result.completed.contains(PipelineStage.PROMPT_QUALITY_CHECK))
-        assertTrue(result.completed.contains(PipelineStage.CAPTION))
+        assertEquals(PipelineStage.READY, result.stage)
+        assertTrue(result.completed.contains(PipelineStage.EVIDENCE_VALIDATION))
+        assertTrue(result.completed.contains(PipelineStage.IDENTITY_EXTRACTION))
+        assertTrue(result.completed.contains(PipelineStage.FIRST_FRAME_SELECTION))
+        assertTrue(result.completed.contains(PipelineStage.FINAL_QUALITY_CHECK))
+        assertTrue(result.completed.contains(PipelineStage.CAPTION_GENERATION))
+        assertTrue(result.completed.contains(PipelineStage.HOOK_GENERATION))
         assertTrue(result.repairApplied)
         assertTrue(result.finalPrompt.orEmpty().contains("FINAL IDENTITY LOCK"))
         assertEquals("b", result.firstFrameId)
@@ -30,11 +31,12 @@ class PipelineEngineTest {
         assertEquals(1, fake.calls.count { it == PipelineStage.CONSISTENCY_CHECK })
         assertTrue(fake.calls.contains(PipelineStage.PRODUCT_ANALYSIS))
         assertTrue(result.details.orEmpty().contains("Produktkategorie"))
+        assertTrue(result.hook.isNotBlank())
     }
 
     @Test
     fun testM_resumeAfterFailureDoesNotRestartCompletedStages() {
-        val fake = FakePipelineAi(failAt = PipelineStage.ACTION_RISK)
+        val fake = FakePipelineAi(failAt = PipelineStage.MOTION_RISK_SELECTION)
         val engine = PipelineEngine(fake)
         val session = sampleSession()
         try {
@@ -42,16 +44,16 @@ class PipelineEngineTest {
         } catch (_: RuntimeException) {
         }
         assertEquals(PipelineStage.ERROR, session.stage)
-        assertTrue(session.completed.contains(PipelineStage.CONSISTENCY_CHECK))
+        assertTrue(session.completed.contains(PipelineStage.EVIDENCE_VALIDATION))
         assertTrue(session.completed.contains(PipelineStage.PRODUCT_ANALYSIS))
-        assertTrue(session.completed.contains(PipelineStage.IDENTITY_FINGERPRINT))
-        assertFalse(session.completed.contains(PipelineStage.SCENE_GENERATION))
+        assertTrue(session.completed.contains(PipelineStage.IDENTITY_EXTRACTION))
+        assertFalse(session.completed.contains(PipelineStage.MOTION_RISK_SELECTION))
         val firstConsistency = fake.calls.count { it == PipelineStage.CONSISTENCY_CHECK }
         val firstAnalysis = fake.calls.count { it == PipelineStage.PRODUCT_ANALYSIS }
         assertEquals(1, firstConsistency)
         fake.failAt = null
         val resumed = engine.resume(session)
-        assertEquals(PipelineStage.EXPORT_READY, resumed.stage)
+        assertEquals(PipelineStage.READY, resumed.stage)
         assertEquals(firstConsistency, fake.calls.count { it == PipelineStage.CONSISTENCY_CHECK })
         assertEquals(firstAnalysis, fake.calls.count { it == PipelineStage.PRODUCT_ANALYSIS })
         assertTrue(fake.calls.count { it == PipelineStage.SCENE_GENERATION } >= 2)
@@ -66,7 +68,7 @@ class PipelineEngineTest {
             .put("conflicting_image_indices", org.json.JSONArray())
             .put("reason", "color variants and repeated images")
         val result = PipelineEngine(fake).start(sampleSession())
-        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals(PipelineStage.READY, result.stage)
         assertTrue(result.warnings.any { it.contains("Dominant product identity") || it.contains("Consistency warning") })
         assertTrue(result.warnings.any { it.contains("Color/finish") })
         assertTrue(result.details.orEmpty().contains("Produktkategorie"))
@@ -98,7 +100,7 @@ class PipelineEngineTest {
             .put("dominant_product_indices", org.json.JSONArray().put(1).put(2))
             .put("reason", "different viewpoints, packaging image, instruction card, close-up and background change")
         val result = PipelineEngine(fake).start(sampleSession())
-        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals(PipelineStage.READY, result.stage)
         assertEquals(listOf(1, 2), result.dominantImageIndices)
         assertTrue(result.warnings.any { it.contains("Dominant product identity") || it.contains("Mixed evidence") })
     }
@@ -114,7 +116,7 @@ class PipelineEngineTest {
             .put("dominant_product_indices", org.json.JSONArray().put(0).put(1))
             .put("reason", "different product geometry")
         val result = PipelineEngine(fake).start(sampleSession())
-        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals(PipelineStage.READY, result.stage)
         assertEquals(listOf(0, 1), result.dominantImageIndices)
         assertTrue(result.warnings.any { it.contains("Dominant product identity") })
     }
@@ -131,7 +133,7 @@ class PipelineEngineTest {
             PipelineImage("alt", 2, 900, 1200, 90_000),
         )
         val result = PipelineEngine(fake).start(session)
-        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals(PipelineStage.READY, result.stage)
         assertEquals("photo", result.firstFrameId)
         assertTrue(result.warnings.any { it.contains("screenshot") || it.contains("product photo") })
     }
@@ -144,7 +146,7 @@ class PipelineEngineTest {
             failTimes = 1,
         )
         val result = PipelineEngine(fake).start(sampleSession())
-        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals(PipelineStage.READY, result.stage)
         assertEquals(2, fake.calls.count { it == PipelineStage.CONSISTENCY_CHECK })
         assertTrue(result.autoRetried)
         assertTrue(result.warnings.any { it.contains("automatic retry") })
@@ -173,7 +175,7 @@ class PipelineEngineTest {
         val fake = FakePipelineAi()
         fake.readinessRisk = "HIGH"
         val result = PipelineEngine(fake).start(sampleSession())
-        assertEquals(PipelineStage.EXPORT_READY, result.stage)
+        assertEquals(PipelineStage.READY, result.stage)
         assertTrue(result.forceStaticAction)
         assertTrue(result.warnings.any { it.contains("HIGH") })
         assertTrue(result.scene?.optString("rationale").orEmpty().contains("static"))
@@ -187,14 +189,20 @@ class PipelineEngineTest {
         val result = PipelineEngine(FakePipelineAi()).start(session)
         assertTrue(result.details.orEmpty().contains("Категория товара"))
         val pack = de.spardirekt.ugcagent.v3.prompt.DetailsBuilder.videoPackage(
+            result.finalPrompt.orEmpty(),
+            result.caption.orEmpty(),
+            result.hashtags,
+        )
+        assertFalse(pack.contains("Категория товара"))
+        assertTrue(pack.contains(result.finalPrompt.orEmpty().trim()))
+        assertTrue(pack.contains(result.caption.orEmpty().trim()))
+        val all = de.spardirekt.ugcagent.v3.prompt.DetailsBuilder.copyAll(
             result.details.orEmpty(),
             result.finalPrompt.orEmpty(),
             result.caption.orEmpty(),
             result.hashtags,
         )
-        assertTrue(pack.startsWith(result.details.orEmpty().trim()))
-        assertTrue(pack.contains(result.finalPrompt.orEmpty().trim()))
-        assertTrue(pack.contains(result.caption.orEmpty().trim()))
+        assertTrue(all.startsWith(result.details.orEmpty().trim()))
     }
 
     private fun sampleSession(): PipelineSession {
@@ -278,6 +286,7 @@ class FakePipelineAi(
         calls.add(PipelineStage.SCENE_GENERATION)
         failIf(PipelineStage.ACTION_RISK)
         failIf(PipelineStage.SCENE_GENERATION)
+        failIf(PipelineStage.MOTION_RISK_SELECTION)
         return JSONObject()
             .put("environment", "ordinary kitchen")
             .put("camera_entry", "handheld smartphone")

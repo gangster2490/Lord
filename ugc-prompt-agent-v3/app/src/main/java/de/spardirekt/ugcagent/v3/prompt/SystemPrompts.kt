@@ -138,9 +138,9 @@ Prefer actions in this order:
 Avoid pouring, filling, or opening unless the exact geometry is confirmed across multiple references.
 Use one continuous micro-moment that naturally fits inside exactly 8.0 seconds.
 Preferred timing budget, still ONE continuous clip not three shots:
-- 0.0–1.0 s: establish the existing First Frame / natural start
-- 1.0–6.5 s: one main action
-- 6.5–8.0 s: natural completion / brief settle
+- 0.0–1.5 s: STRONG HOOK, speech begins around 0.3–0.8 s
+- 1.5–6.5 s: one LOW-RISK product moment
+- 6.5–8.0 s: natural settle
 Do not create extra scenes, CTA segments, intro, outro or freeze-frame tail.
 
 If an identity-critical component is structurally important and its exact movement is uncertain, do not animate that component.
@@ -412,13 +412,15 @@ Include exactly: No spoken dialogue.
 
 If German:
 The person speaks naturally in German.
-Include one short natural German spoken line. Conversational, one short sentence, no long introduction, no second sentence unless extremely short, no unsupported claims, no fake enthusiasm, no generic AI clichés. Do not overuse: krass, Leute, ehrlich gesagt, mega, Game Changer.
-The spoken line must finish before the 8.0-second endpoint. No speech continuing after the main action ends.
+Include one short natural German spoken HOOK. Conversational problem/curiosity/friction in the first 1.5 seconds, one short sentence, no long introduction, no second sentence unless extremely short, no unsupported claims, no fake enthusiasm, no generic AI clichés. Do not overuse: krass, Leute, ehrlich gesagt, mega, Game Changer.
+Do not use purely descriptive hooks such as where a handle is placed.
+The spoken hook begins around 0.3–0.8 seconds and must finish before the 8.0-second endpoint. No speech continuing after the main action ends.
 
 If Russian:
 The person speaks naturally in Russian.
-Include one short natural Russian spoken line. Not a literal translation of a German line. No ad-robot tone. No unknown characteristics. One short sentence; no long introduction; no speech after the main action ends.
-The spoken line must finish before the 8.0-second endpoint.
+Include one short natural Russian spoken HOOK, not a literal translation of a German line. Problem, curiosity or relatable friction in the first 1.5 seconds. No ad-robot tone. No unknown characteristics. One short sentence; no long introduction; no speech after the main action ends.
+Do not use weak descriptive lines such as "Ручка удобно расположена сбоку."
+The spoken hook begins around 0.3–0.8 seconds and must finish before the 8.0-second endpoint.
 
 Speech may refer to action, situation, convenience, reaction. Never certifications, performance, medical, material, durability, guarantees, unknown functions.
 

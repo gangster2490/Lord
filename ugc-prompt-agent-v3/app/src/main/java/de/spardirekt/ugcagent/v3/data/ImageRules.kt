@@ -2,7 +2,7 @@ package de.spardirekt.ugcagent.v3.data
 
 object ImageRules {
     const val MIN = 3
-    const val MAX = 20
+    const val MAX = 15
     const val RECOMMENDED_MIN = 5
     const val RECOMMENDED_MAX = 10
 

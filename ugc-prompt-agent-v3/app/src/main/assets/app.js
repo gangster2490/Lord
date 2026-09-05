@@ -136,9 +136,37 @@
     }
   }
 
+  function canStart() {
+    const debug = state.data.startDebug || {};
+    const images = (state.data.images || []).length;
+    const lang = outputLang();
+    const stage = state.data.pipelineStage || (state.data.project && state.data.project.pipelineStage) || "";
+    const paused = state.data.pausedReason || (state.data.project && state.data.project.pausedReason) || "";
+    const hard = paused === "DIFFERENT_PRODUCTS" && (stage === "PAUSED");
+    const imagesOk = images >= 3 && images <= 15;
+    const languageOk = lang === "DEUTSCH" || lang === "РУССКИЙ";
+    const enabled = typeof debug.startEnabled === "boolean"
+      ? !!debug.startEnabled
+      : (imagesOk && languageOk && !hard);
+    const result = enabled && !state.busy;
+    console.log("START conditions", {
+      imageCount: images,
+      imagesOk: imagesOk,
+      language: lang,
+      languageOk: languageOk,
+      stage: stage,
+      pausedReason: paused,
+      hardConflict: hard,
+      busy: state.busy,
+      startEnabled: result,
+      native: debug,
+    });
+    return result;
+  }
+
   function homeHtml() {
     const images = state.data.images || [];
-    const enabled = !!state.data.analyseEnabled;
+    const enabled = canStart();
     const lang = outputLang();
     const stage = state.data.pipelineStage || (state.data.project && state.data.project.pipelineStage) || "";
     const working = state.busy ? `<p class="warn">${t("busy")}${stage && stage !== "IDLE" ? " · " + escapeHtml(stage) : ""}</p>` : "";
@@ -157,11 +185,11 @@
       </div>
       <label>${t("language")}</label>
       <div class="row lang-toggle">
-        <button id="langDe" class="${lang === "DEUTSCH" ? "" : "secondary"}">Deutsch</button>
         <button id="langRu" class="${lang === "РУССКИЙ" ? "" : "secondary"}">Русский</button>
+        <button id="langDe" class="${lang === "DEUTSCH" ? "" : "secondary"}">Deutsch</button>
       </div>
       <div class="row">
-        <button id="startPipe" class="primary-cta" ${enabled && !state.busy ? "" : "disabled"}>${t("start")}</button>
+        <button id="startPipe" class="primary-cta" ${enabled ? "" : "disabled"}>${t("start")}</button>
       </div>
     </section>`;
   }
@@ -360,22 +388,18 @@
       analysis: p.analysis || {},
       fingerprint: p.identityFingerprint || {},
       readiness: p.identityReadiness || {},
+      evidence: p.evidence || {},
       actionRisk: p.actionRisk || {},
       firstFrame: p.firstFrameRecommendation || {},
+      hook: p.hook || state.data.hook || "",
+      hookScore: p.hookScore,
+      selfCheck: p.selfCheck || {},
       compliance: compliance,
+      warnings: warnings,
+      startDebug: state.data.startDebug || {},
+      duplicateGroups: (p.consistency && p.consistency.duplicate_groups) || [],
     }, null, 2);
     return `<section class="card">
-      <h3>${t("details")}</h3>
-      <pre id="detailsBox">${escapeHtml(details)}</pre>
-      <h3>${t("video_prompt")}</h3>
-      <pre id="promptBox">${escapeHtml(prompt)}</pre>
-      <h3>${t("caption")}</h3>
-      <pre>${escapeHtml(p.caption || "")}</pre>
-      <h3>${t("hashtags")}</h3>
-      <pre>${escapeHtml((p.hashtags || []).join(" "))}</pre>
-      <h3>${t("compliance_result")}</h3>
-      <p class="${compliance.status === "PASS" ? "ok" : compliance.status === "BLOCK" ? "err" : "warn"}">${escapeHtml(compliance.status || "-")}</p>
-      ${warnings.length ? `<h3>${t("warnings")}</h3><pre>${escapeHtml(warnings.join("\n"))}</pre>` : ""}
       <div class="row copy-actions">
         <button id="cpkg" class="primary-cta">${t("copy_video_package")}</button>
         <button id="cd">${t("copy_details")}</button>
@@ -385,9 +409,18 @@
         <button id="ca" class="secondary">${t("copy_all")}</button>
       </div>
       <div class="row">
+        <button id="save">${t("save_project")}</button>
         <button id="adv" class="secondary">${t("advanced_details")}</button>
-        <button id="save" class="secondary">${t("save_project")}</button>
       </div>
+      <h3>${t("details")}</h3>
+      <pre id="detailsBox">${escapeHtml(details)}</pre>
+      <h3>${t("video_prompt")}</h3>
+      <pre id="promptBox">${escapeHtml(prompt)}</pre>
+      <h3>${t("caption")}</h3>
+      <pre>${escapeHtml(p.caption || "")}</pre>
+      <h3>${t("hashtags")}</h3>
+      <pre>${escapeHtml((p.hashtags || []).join(" "))}</pre>
+      <p class="${compliance.status === "PASS" ? "ok" : compliance.status === "BLOCK" ? "err" : "warn"}">${t("compliance_result")}: ${escapeHtml(compliance.status || "-")}</p>
       <pre id="advBox" class="hidden">${escapeHtml(advanced)}</pre>
     </section>`;
   }
@@ -539,7 +572,7 @@
       $("cp").onclick = () => call("copyText", prompt);
       $("cc").onclick = () => call("copyText", p.caption || "");
       $("ch").onclick = () => call("copyText", (p.hashtags || []).join(" "));
-      $("ca").onclick = () => call("copyText", state.data.videoPackage || [details, prompt, p.caption || "", (p.hashtags || []).join(" ")].join("\n\n"));
+      $("ca").onclick = () => call("copyText", state.data.copyAll || [details, prompt, p.caption || "", (p.hashtags || []).join(" ")].join("\n\n"));
       $("adv").onclick = () => $("advBox").classList.toggle("hidden");
       $("save").onclick = () => call("saveProjectNow");
     }
@@ -622,7 +655,7 @@
         if (payload.settings && payload.settings.appLanguage) state.lang = payload.settings.appLanguage;
         if (event === "pipeline" || event === "ready" || event === "project") {
           const stage = (payload.project && payload.project.pipelineStage) || payload.pipelineStage || "";
-          if (stage === "EXPORT_READY") state.screen = "export";
+          if (stage === "EXPORT_READY" || stage === "READY") state.screen = "export";
           else if (stage === "PAUSED" || stage === "ERROR") state.screen = "pause";
           else state.screen = "home";
         }

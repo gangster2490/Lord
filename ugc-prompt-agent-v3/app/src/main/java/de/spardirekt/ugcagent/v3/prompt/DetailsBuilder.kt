@@ -53,7 +53,15 @@ object DetailsBuilder {
         return MarketplaceFilter.stripFromText(body.trim())
     }
 
-    fun videoPackage(details: String, prompt: String, caption: String, hashtags: List<String>): String {
+    fun videoPackage(prompt: String, caption: String, hashtags: List<String>): String {
+        return listOf(
+            prompt.trim(),
+            caption.trim(),
+            hashtags.joinToString(" ").trim(),
+        ).filter { it.isNotBlank() }.joinToString("\n\n")
+    }
+
+    fun copyAll(details: String, prompt: String, caption: String, hashtags: List<String>): String {
         return listOf(
             details.trim(),
             prompt.trim(),
@@ -73,6 +81,9 @@ object DetailsBuilder {
         return lower.contains("uncertain_hidden") ||
             lower.contains("ambiguity_warning") ||
             lower.contains("confidence") && lower.contains("0.") ||
-            lower.contains("hidden geometry")
+            lower.contains("hidden geometry") ||
+            lower.contains("dominant product identity") ||
+            lower.contains("repeated images grouped") ||
+            lower.contains("prompt quality")
     }
 }

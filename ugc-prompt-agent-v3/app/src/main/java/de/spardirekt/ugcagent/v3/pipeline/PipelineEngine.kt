@@ -32,7 +32,7 @@ class PipelineEngine(private val ai: PipelineAi) {
     fun resume(session: PipelineSession): PipelineSession {
         session.pausedReason = null
         session.errorMessage = null
-        if (session.stage == PipelineStage.EXPORT_READY) return session
+        if (session.stage == PipelineStage.READY || session.stage == PipelineStage.EXPORT_READY) return session
         val from = session.resumeStage
             ?: session.stage.takeUnless { it == PipelineStage.PAUSED || it == PipelineStage.ERROR }
             ?: PipelineStage.IMAGES_READY
@@ -82,7 +82,7 @@ class PipelineEngine(private val ai: PipelineAi) {
                 }
             }
         }
-        session.stage = PipelineStage.EXPORT_READY
+        session.stage = PipelineStage.READY
         session.resumeStage = null
         session.pausedReason = null
         return session
@@ -97,26 +97,29 @@ class PipelineEngine(private val ai: PipelineAi) {
     private fun runStage(session: PipelineSession, stage: PipelineStage) {
         when (stage) {
             PipelineStage.IMAGES_READY -> imagesReady(session)
-            PipelineStage.CONSISTENCY_CHECK -> consistency(session)
             PipelineStage.PRODUCT_ANALYSIS -> analysis(session)
-            PipelineStage.IDENTITY_FINGERPRINT -> fingerprint(session)
-            PipelineStage.IDENTITY_READINESS -> readiness(session)
-            PipelineStage.FIRST_FRAME -> firstFrame(session)
-            PipelineStage.ACTION_RISK, PipelineStage.SCENE_GENERATION -> {
-                if (session.scene == null || !session.completed.contains(PipelineStage.SCENE_GENERATION)) {
-                    sceneAndRisk(session)
-                }
-                session.completed.add(PipelineStage.ACTION_RISK)
-                session.completed.add(PipelineStage.SCENE_GENERATION)
+            PipelineStage.IDENTITY_EXTRACTION, PipelineStage.IDENTITY_FINGERPRINT -> fingerprint(session)
+            PipelineStage.EVIDENCE_VALIDATION, PipelineStage.CONSISTENCY_CHECK, PipelineStage.IDENTITY_READINESS -> {
+                consistency(session)
+                readiness(session)
+                session.evidence = de.spardirekt.ugcagent.v3.prompt.EvidenceModel.classify(session.analysis)
             }
-            PipelineStage.FINAL_IDENTITY_LOCK -> {
+            PipelineStage.FIRST_FRAME_SELECTION, PipelineStage.FIRST_FRAME -> firstFrame(session)
+            PipelineStage.MOTION_RISK_SELECTION, PipelineStage.ACTION_RISK, PipelineStage.SCENE_GENERATION, PipelineStage.FINAL_IDENTITY_LOCK -> {
+                sceneAndRisk(session)
                 session.finalIdentityLock = ProductIdentity.finalIdentityLockBlock(session.identityFingerprint)
             }
-            PipelineStage.PROMPT_GENERATION -> prompt(session)
-            PipelineStage.PROMPT_QUALITY_CHECK -> quality(session)
-            PipelineStage.COMPLIANCE -> compliance(session)
-            PipelineStage.CAPTION -> caption(session)
-            PipelineStage.EXPORT_READY -> Unit
+            PipelineStage.HOOK_GENERATION -> hook(session)
+            PipelineStage.VEO_PROMPT_GENERATION, PipelineStage.PROMPT_GENERATION -> prompt(session)
+            PipelineStage.CAPTION_GENERATION, PipelineStage.CAPTION -> caption(session)
+            PipelineStage.HASHTAG_GENERATION -> hashtags(session)
+            PipelineStage.FINAL_QUALITY_CHECK, PipelineStage.PROMPT_QUALITY_CHECK, PipelineStage.COMPLIANCE -> {
+                quality(session)
+                compliance(session)
+                selfCheck(session)
+                session.details = DetailsBuilder.build(session)
+            }
+            PipelineStage.READY, PipelineStage.EXPORT_READY -> Unit
             else -> Unit
         }
     }
@@ -142,7 +145,7 @@ class PipelineEngine(private val ai: PipelineAi) {
         val reason = result.optString("reason")
         session.dominantImageIndices = ProductConsistency.dominantIndices(result, session.images.size)
         if (ProductConsistency.shouldPauseForDifferentProducts(result) && !session.consistencyOverride) {
-            throw PipelinePaused(PauseReasons.DIFFERENT_PRODUCTS, PipelineStage.CONSISTENCY_CHECK)
+            throw PipelinePaused(PauseReasons.DIFFERENT_PRODUCTS, PipelineStage.EVIDENCE_VALIDATION)
         }
         if (!same || confidence < ProductConsistency.HARD_CONFLICT_THRESHOLD) {
             session.warnings.add(ProductConsistency.autoSelectWarning(result))
@@ -228,7 +231,7 @@ class PipelineEngine(private val ai: PipelineAi) {
             session.warnings.add("Preferred a product photo over a screenshot-like frame.")
             chosen = preferred
         }
-        chosen = chosen ?: preferred ?: throw PipelinePaused(PauseReasons.NO_USABLE_FIRST_FRAME, PipelineStage.FIRST_FRAME)
+        chosen = chosen ?: preferred ?: throw PipelinePaused(PauseReasons.NO_USABLE_FIRST_FRAME, PipelineStage.FIRST_FRAME_SELECTION)
         session.recommendedFirstFrameId = chosen.id
         val quality = FirstFrameHeuristics.merge(
             FirstFrameHeuristics.check(chosen.width, chosen.height, chosen.compressedBytes),
@@ -249,7 +252,7 @@ class PipelineEngine(private val ai: PipelineAi) {
                 FirstFrameHeuristics.check(it.width, it.height, it.compressedBytes).optBoolean("usable", false)
             }
             if (fallback == null) {
-                throw PipelinePaused(PauseReasons.NO_USABLE_FIRST_FRAME, PipelineStage.FIRST_FRAME)
+                throw PipelinePaused(PauseReasons.NO_USABLE_FIRST_FRAME, PipelineStage.FIRST_FRAME_SELECTION)
             }
             chosen = fallback
             session.recommendedFirstFrameId = chosen.id
@@ -259,7 +262,7 @@ class PipelineEngine(private val ai: PipelineAi) {
     }
 
     private fun sceneAndRisk(session: PipelineSession) {
-        val analysis = session.analysis ?: throw PipelinePaused(PauseReasons.ANALYSIS_MISSING, PipelineStage.SCENE_GENERATION)
+        val analysis = session.analysis ?: throw PipelinePaused(PauseReasons.ANALYSIS_MISSING, PipelineStage.MOTION_RISK_SELECTION)
         val fingerprint = session.identityFingerprint ?: JSONObject()
         val generated = if (session.forceStaticAction) {
             JSONObject()
@@ -277,7 +280,7 @@ class PipelineEngine(private val ai: PipelineAi) {
         val safer = merged.optString("recommended_safe_action")
         val stillUnsafe = ActionIdentity.selectedActionIsUnsafe(applied) || ActionIdentity.isHighMotionAction(applied.optString("main_action"))
         if (stillUnsafe || (merged.optString("risk") == "HIGH" && ActionIdentity.isUnsafeAction(safer))) {
-            throw PipelinePaused(PauseReasons.ONLY_HIGH_RISK, PipelineStage.ACTION_RISK)
+            throw PipelinePaused(PauseReasons.ONLY_HIGH_RISK, PipelineStage.MOTION_RISK_SELECTION)
         }
         if (merged.optString("risk") == "MEDIUM" && !ActionIdentity.geometryClearlySupported(merged, fingerprint)) {
             applied = ActionIdentity.applyIfHighRisk(
@@ -313,7 +316,20 @@ class PipelineEngine(private val ai: PipelineAi) {
         prompt = ProductLock.ensure(prompt, session.strictProductLock, fingerprint)
         prompt = ProductLock.applyGenerator(prompt, session.targetGenerator)
         prompt = ProductLock.ensureSpeechTiming(prompt, session.speechLanguage)
+        if (session.hook.isNotBlank() && !prompt.contains(session.hook.take(18))) {
+            prompt = prompt.trimEnd() + "\n\n" + de.spardirekt.ugcagent.v3.prompt.HookEngine.speechBlock(session.hook, session.speechLanguage)
+        }
         session.finalPrompt = prompt
+    }
+
+    private fun hook(session: PipelineSession) {
+        val raw = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
+        session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.ensureStrong(raw, session.analysis, session.speechLanguage)
+        session.hookScore = de.spardirekt.ugcagent.v3.prompt.HookEngine.qualityScore(session.hook, session.speechLanguage)
+        if (session.hookScore < 0.6) {
+            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
+            session.hookScore = de.spardirekt.ugcagent.v3.prompt.HookEngine.qualityScore(session.hook, session.speechLanguage)
+        }
     }
 
     private fun quality(session: PipelineSession) {
@@ -329,8 +345,19 @@ class PipelineEngine(private val ai: PipelineAi) {
             )
             session.repairApplied = true
         }
-        session.finalPrompt = prompt
-        ProductLock.regressionFailures(prompt, fingerprint, session.targetGenerator, session.speechLanguage).forEach {
+        prompt = de.spardirekt.ugcagent.v3.prompt.EvidenceModel.omitUnverified(prompt)
+        if (session.hook.isNotBlank() && de.spardirekt.ugcagent.v3.prompt.HookEngine.isWeak(session.hook, session.speechLanguage)) {
+            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
+            prompt = prompt.trimEnd() + "\n\n" + de.spardirekt.ugcagent.v3.prompt.HookEngine.speechBlock(session.hook, session.speechLanguage)
+        }
+        session.finalPrompt = ProductLock.repairOnce(
+            prompt,
+            fingerprint,
+            session.targetGenerator,
+            session.speechLanguage,
+            session.strictProductLock,
+        )
+        ProductLock.regressionFailures(session.finalPrompt.orEmpty(), fingerprint, session.targetGenerator, session.speechLanguage).forEach {
             session.warnings.add("Prompt quality: $it")
         }
     }
@@ -340,7 +367,7 @@ class PipelineEngine(private val ai: PipelineAi) {
         val result = ai.checkCompliance(prompt, session.analysis, session.caption.orEmpty(), session.hashtags)
         session.compliance = result
         if (result.optString("status") == "BLOCK") {
-            throw PipelinePaused(PauseReasons.COMPLIANCE_BLOCK, PipelineStage.COMPLIANCE)
+            throw PipelinePaused(PauseReasons.COMPLIANCE_BLOCK, PipelineStage.FINAL_QUALITY_CHECK)
         }
         val warnings = result.optJSONArray("warnings") ?: JSONArray()
         for (i in 0 until warnings.length()) {
@@ -363,25 +390,48 @@ class PipelineEngine(private val ai: PipelineAi) {
             finalIdentityLock = session.finalIdentityLock.orEmpty(),
         )
         val result = ai.generateCaption(ctx)
-        session.caption = result.optString("caption")
+        var caption = de.spardirekt.ugcagent.v3.prompt.EvidenceModel.omitUnverified(result.optString("caption"))
+        if (session.captionLanguage.equals("DEUTSCH", true) || session.speechLanguage.equals("DEUTSCH", true)) {
+            caption = de.spardirekt.ugcagent.v3.compliance.ComplianceEngine.addWerbung(caption)
+        }
+        session.caption = caption
         val tags = result.optJSONArray("hashtags") ?: JSONArray()
         session.hashtags = MutableList(tags.length()) { tags.optString(it) }
-        val reviewed = ai.checkCompliance(
-            session.finalPrompt.orEmpty(),
-            session.analysis,
-            session.caption.orEmpty(),
-            session.hashtags,
-        )
-        session.compliance = reviewed
-        if (reviewed.optString("status") == "BLOCK") {
-            throw PipelinePaused(PauseReasons.COMPLIANCE_BLOCK, PipelineStage.CAPTION)
+            .map { it.trim() }
+            .filter { it.isNotBlank() && !de.spardirekt.ugcagent.v3.prompt.EvidenceModel.isBanned(it) }
+            .toMutableList()
+    }
+
+    private fun hashtags(session: PipelineSession) {
+        val tags = session.hashtags.map { it.trim() }.filter { it.isNotBlank() }.distinct().toMutableList()
+        if (tags.size < 4) {
+            val extras = if (session.speechLanguage.equals("РУССКИЙ", true)) {
+                listOf("#tiktokshop", "#обзор", "#кухня", "#ugc")
+            } else {
+                listOf("#tiktokshop", "#alltag", "#küche", "#ugc")
+            }
+            extras.forEach { if (tags.size < 6 && it !in tags) tags.add(it) }
         }
-        val warnings = reviewed.optJSONArray("warnings") ?: JSONArray()
-        for (i in 0 until warnings.length()) {
-            val text = warnings.optString(i)
-            if (text.isNotBlank() && text !in session.warnings) session.warnings.add(text)
+        session.hashtags = tags.take(6).toMutableList()
+    }
+
+    private fun selfCheck(session: PipelineSession) {
+        val prompt = session.finalPrompt.orEmpty()
+        val checks = JSONObject()
+            .put("first_frame", session.firstFrameId != null)
+            .put("identity_lock", prompt.contains("FINAL IDENTITY LOCK", ignoreCase = true))
+            .put("one_lock_section", Regex("FINAL IDENTITY LOCK:", RegexOption.IGNORE_CASE).findAll(prompt).count() <= 1)
+            .put("exact_8s", ProductLock.veoHasExactDuration(prompt) || session.targetGenerator != "VEO")
+            .put("speech_end", session.speechLanguage.equals("OFF", true) || ProductLock.hasSpeechEndTiming(prompt))
+            .put("hook", session.hook.isNotBlank() && !de.spardirekt.ugcagent.v3.prompt.HookEngine.isWeak(session.hook, session.speechLanguage))
+            .put("caption", session.caption.orEmpty().isNotBlank())
+            .put("hashtags", de.spardirekt.ugcagent.v3.prompt.EvidenceModel.hashtagCountOk(session.hashtags))
+            .put("no_hard_error", session.pausedReason == null)
+        session.selfCheck = checks
+        if (!checks.optBoolean("hook")) {
+            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
         }
-        session.details = DetailsBuilder.build(session)
+        if (!checks.optBoolean("hashtags")) hashtags(session)
     }
 
     private fun warnDuplicates(session: PipelineSession, consistency: JSONObject) {

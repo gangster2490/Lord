@@ -77,6 +77,9 @@ class ProjectRecord(
     var firstFrameUserChosen: Boolean = false,
     var details: String? = null,
     var forceStaticAction: Boolean = false,
+    var hook: String? = null,
+    var evidence: JSONObject? = null,
+    var selfCheck: JSONObject? = null,
 ) {
     fun touch() {
         updatedAt = System.currentTimeMillis()
@@ -121,6 +124,9 @@ class ProjectRecord(
         .put("firstFrameUserChosen", firstFrameUserChosen)
         .put("details", details)
         .put("forceStaticAction", forceStaticAction)
+        .put("hook", hook)
+        .put("evidence", evidence)
+        .put("selfCheck", selfCheck)
 
     companion object {
         fun fromJson(obj: JSONObject): ProjectRecord {
@@ -165,6 +171,9 @@ class ProjectRecord(
                 firstFrameUserChosen = obj.optBoolean("firstFrameUserChosen", false),
                 details = obj.optString("details").ifBlank { null },
                 forceStaticAction = obj.optBoolean("forceStaticAction", false),
+                hook = obj.optString("hook").ifBlank { null },
+                evidence = obj.optJSONObject("evidence"),
+                selfCheck = obj.optJSONObject("selfCheck"),
             )
         }
 
