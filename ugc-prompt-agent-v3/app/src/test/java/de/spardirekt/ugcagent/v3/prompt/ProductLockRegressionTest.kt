@@ -101,15 +101,15 @@ class ProductLockRegressionTest {
     }
 
     @Test
-    fun firstFrameRecommendationDoesNotAutoReplace() {
+    fun firstFrameHighConfidenceIsAutoApplied() {
         val small = FirstFrameHeuristics.RankedImage("a", 0, 400, 400, 20_000, FirstFrameHeuristics.score(400, 400, 20_000))
         val large = FirstFrameHeuristics.RankedImage("b", 1, 1200, 1600, 180_000, FirstFrameHeuristics.score(1200, 1600, 180_000))
         val rec = FirstFrameHeuristics.recommendLocal(listOf(small, large))
         assertEquals("b", rec?.id)
-        val merged = FirstFrameHeuristics.mergeRecommendation("a", 1, listOf(small, large))
-        assertEquals("b", merged?.id)
-        val userKept = "a"
-        assertTrue(userKept != rec?.id)
+        val quality = FirstFrameHeuristics.check(1200, 1600, 180_000)
+        assertTrue(FirstFrameHeuristics.shouldAutoApply(quality.getDouble("confidence"), quality))
+        val tinyQuality = FirstFrameHeuristics.check(120, 90, 2_000)
+        assertTrue(FirstFrameHeuristics.shouldPauseForLowConfidence(tinyQuality.getDouble("confidence"), tinyQuality))
     }
 
     @Test
@@ -118,7 +118,7 @@ class ProductLockRegressionTest {
         assertTrue(SystemPrompts.ACTION_IDENTITY_RISK_CHECK.contains("recommended_safe_action"))
         assertTrue(SystemPrompts.PRODUCT_IDENTITY_READINESS.contains("generation_risk"))
         assertTrue(SystemPrompts.FIRST_FRAME_RECOMMENDATION.contains("recommended_image_index"))
-        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("STRUCTURAL IDENTITY LOCK"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("FINAL IDENTITY LOCK"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("exactly 8.0 seconds"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("functionally equivalent but visually different"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("MOVING COMPONENT LOCK"))
@@ -192,5 +192,59 @@ class ProductLockRegressionTest {
         val bad = "Continue with an outro and freeze-frame tail plus additional hold after the main moment."
         assertTrue(ProductLock.allowsExtraTail(bad))
         org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint, "VEO", "OFF"))
+    }
+
+    @Test
+    fun testI_utf8CyrillicUnicodeIsPreservedAndMojibakeRepaired() {
+        val original = de.spardirekt.ugcagent.v3.text.Utf8Guard.SAMPLE_RU
+        assertTrue(original.contains("«"))
+        assertTrue(original.contains("тарелку"))
+        val broken = de.spardirekt.ugcagent.v3.text.Utf8Guard.simulateLatin1Mojibake(original)
+        assertTrue(de.spardirekt.ugcagent.v3.text.Utf8Guard.looksBroken(broken))
+        assertFalse(broken.contains("тарелку"))
+        val repaired = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(broken)
+        assertEquals(original, repaired)
+        val prompt = ProductLock.repairOnce("SPEECH:\n$broken", fingerprint, "VEO", "РУССКИЙ", true)
+        assertTrue(prompt.contains("тарелку") || prompt.contains(original) || !de.spardirekt.ugcagent.v3.text.Utf8Guard.looksBroken(prompt))
+        val encoded = java.util.Base64.getEncoder().encodeToString(org.json.JSONObject().put("line", original).toString().toByteArray(Charsets.UTF_8))
+        val latin1 = String(java.util.Base64.getDecoder().decode(encoded), Charsets.ISO_8859_1)
+        val roundTrip = String(latin1.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
+        assertTrue(roundTrip.contains(original))
+    }
+
+    @Test
+    fun testJ_finalPromptCleanupStripsUncertaintyAndDuplicateLock() {
+        val dirty = """
+            ${ProductLock.LOCK_TEXT}
+
+            STRUCTURAL IDENTITY LOCK:
+            Uncertain/hidden geometry — do not invent: fill opening
+            "uncertain_hidden_geometry": ["internal path"]
+            "ambiguity_warning": "finish conflict between photos"
+
+            ${ProductLock.LOCK_TEXT}
+
+            ACTION: grip the handle.
+        """.trimIndent()
+        val prompt = ProductLock.repairOnce(dirty, fingerprint, "VEO", "OFF", true)
+        assertFalse(ProductLock.leaksInternalAnalysis(prompt))
+        assertFalse(ProductLock.hasDuplicateProductLock(prompt))
+        assertTrue(prompt.contains("FINAL IDENTITY LOCK", ignoreCase = true))
+        assertEquals(1, Regex("REFERENCE IMAGE OVERRIDES", RegexOption.IGNORE_CASE).findAll(prompt).count())
+        assertFalse(prompt.contains("uncertain_hidden_geometry"))
+        assertFalse(prompt.contains("ambiguity_warning"))
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint, "VEO", "OFF"))
+    }
+
+    @Test
+    fun testK_finishConflictSelectedFirstFrameWins() {
+        val conflicted = ProductIdentity.microwaveCoverFingerprint()
+            .put("finish_conflict", "one image glossy white, another matte black")
+        val raw = "The lid looks white in one photo and black in another. Conflicting finish notes: pick both."
+        val prompt = ProductLock.repairOnce(raw, conflicted, "VEO", "OFF", true)
+        assertTrue(prompt.contains("SELECTED FIRST FRAME WINS"))
+        assertTrue(ProductIdentity.hasFinishConflict(conflicted))
+        assertFalse(prompt.contains("finish_conflict"))
+        assertFalse(ProductLock.leaksInternalAnalysis(prompt))
     }
 }

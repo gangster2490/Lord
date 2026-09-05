@@ -65,6 +65,16 @@ class ProjectRecord(
     var identityReadiness: JSONObject? = null,
     var firstFrameRecommendation: JSONObject? = null,
     var recommendedFirstFrameId: String? = null,
+    var pipelineStage: String = "IDLE",
+    var resumeStage: String? = null,
+    var pausedReason: String? = null,
+    var pipelineError: String? = null,
+    var warnings: MutableList<String> = mutableListOf(),
+    var completedStages: MutableList<String> = mutableListOf(),
+    var repairApplied: Boolean = false,
+    var finalIdentityLock: String? = null,
+    var firstFrameAutoApplied: Boolean = false,
+    var firstFrameUserChosen: Boolean = false,
 ) {
     fun touch() {
         updatedAt = System.currentTimeMillis()
@@ -97,6 +107,17 @@ class ProjectRecord(
         .put("identityReadiness", identityReadiness)
         .put("firstFrameRecommendation", firstFrameRecommendation)
         .put("recommendedFirstFrameId", recommendedFirstFrameId)
+        .put("pipelineStage", pipelineStage)
+        .put("resumeStage", resumeStage)
+        .put("pausedReason", pausedReason)
+        .put("pipelineError", pipelineError)
+        .put("warnings", JSONArray(warnings))
+        .put("completedStages", JSONArray(completedStages))
+        .put("repairApplied", repairApplied)
+        .put("finalIdentityLock", finalIdentityLock)
+        .put("firstFrameAutoApplied", firstFrameAutoApplied)
+        .put("firstFrameUserChosen", firstFrameUserChosen)
+    }
 
     companion object {
         fun fromJson(obj: JSONObject): ProjectRecord {
@@ -129,7 +150,22 @@ class ProjectRecord(
                 identityReadiness = obj.optJSONObject("identityReadiness"),
                 firstFrameRecommendation = obj.optJSONObject("firstFrameRecommendation"),
                 recommendedFirstFrameId = obj.optString("recommendedFirstFrameId").ifBlank { null },
+                pipelineStage = obj.optString("pipelineStage", "IDLE").ifBlank { "IDLE" },
+                resumeStage = obj.optString("resumeStage").ifBlank { null },
+                pausedReason = obj.optString("pausedReason").ifBlank { null },
+                pipelineError = obj.optString("pipelineError").ifBlank { null },
+                warnings = stringList(obj.optJSONArray("warnings")),
+                completedStages = stringList(obj.optJSONArray("completedStages")),
+                repairApplied = obj.optBoolean("repairApplied", false),
+                finalIdentityLock = obj.optString("finalIdentityLock").ifBlank { null },
+                firstFrameAutoApplied = obj.optBoolean("firstFrameAutoApplied", false),
+                firstFrameUserChosen = obj.optBoolean("firstFrameUserChosen", false),
             )
+        }
+
+        private fun stringList(arr: JSONArray?): MutableList<String> {
+            if (arr == null) return mutableListOf()
+            return MutableList(arr.length()) { arr.optString(it) }.filter { it.isNotBlank() }.toMutableList()
         }
     }
 }

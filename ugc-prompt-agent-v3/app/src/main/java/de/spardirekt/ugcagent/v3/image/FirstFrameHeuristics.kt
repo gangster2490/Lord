@@ -6,6 +6,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 object FirstFrameHeuristics {
+    const val AUTO_APPLY_CONFIDENCE = 0.75
+    const val PAUSE_CONFIDENCE = 0.55
+
     fun check(width: Int, height: Int, compressedBytes: Long): JSONObject {
         val warnings = JSONArray()
         var usable = true
@@ -72,4 +75,16 @@ object FirstFrameHeuristics {
         val fromAi = images.firstOrNull { it.index == aiIndex }
         return fromAi ?: images.firstOrNull { it.id == localId } ?: recommendLocal(images)
     }
+
+    fun recommendationConfidence(quality: JSONObject, ai: JSONObject?): Double {
+        val local = quality.optDouble("confidence", 0.0)
+        val remote = ai?.optDouble("confidence", local) ?: local
+        return min(local, if (remote > 0) remote else local)
+    }
+
+    fun shouldAutoApply(confidence: Double, quality: JSONObject): Boolean =
+        quality.optBoolean("usable", false) && confidence >= AUTO_APPLY_CONFIDENCE
+
+    fun shouldPauseForLowConfidence(confidence: Double, quality: JSONObject): Boolean =
+        !quality.optBoolean("usable", false) || confidence < PAUSE_CONFIDENCE
 }

@@ -68,28 +68,57 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
     const val SCENE_TIMING_BUDGET =
         "Preferred timing budget for one continuous clip: 0.0–1.0 s establish the existing First Frame; 1.0–6.5 s one main action; 6.5–8.0 s natural completion / brief settle. Not three shots. No extra scenes or CTA segments."
 
+    const val FIRST_FRAME_WINS =
+        "If references conflict in color or finish, the selected First Frame is the primary source of truth. SELECTED FIRST FRAME WINS."
+
     private val appearanceLeak = Regex(
         """(use a similar product|similar product is acceptable|a similar product from the same category is acceptable|functionally equivalent is (ok|fine|acceptable)|a typical product of this type|you may (merge|replace|substitute)|category-equivalent product is (ok|fine|acceptable))""",
         RegexOption.IGNORE_CASE,
     )
 
     fun ensure(prompt: String, lockOn: Boolean, fingerprint: JSONObject? = null): String {
-        var body = prompt.trim()
-        if (lockOn && !body.contains("REFERENCE IMAGE OVERRIDES", ignoreCase = true)) {
-            body = "$LOCK_TEXT\n\n$body"
+        var body = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(prompt.trim())
+        body = stripInternalLeaks(body)
+        if (lockOn) {
+            body = ensureProductLockOnce(body)
         }
-        body = insertBlock(body, "STRUCTURAL IDENTITY LOCK:", ProductIdentity.structuralLockBlock(fingerprint))
+        body = insertFinalIdentityLock(body, fingerprint)
         body = ensureContains(body, COMPONENT_COUNT_LOCK)
         body = ensureContains(body, GENERIC_SUBSTITUTION_BAN)
         body = insertBlock(body, "MOVING COMPONENT LOCK:", "MOVING COMPONENT LOCK:\n$MOVING_COMPONENT_LOCK")
         body = ensureContains(body, MOVING_COMPONENT_LOCK, "Identity-critical moving components must preserve")
         body = ensureContains(body, STATIC_WHEN_UNCERTAIN, "A static exact component is preferable")
-        body = ensureContains(body, ANTI_MORPH, "moving-part deformation")
+        body = ensureAntiMorphOnce(body)
         if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) {
             body = ensureContains(body, ProductIdentity.MICROWAVE_COVER_LOCK)
             body = ensureContains(body, ProductIdentity.MICROWAVE_VENT_STATIC, "keep it completely static")
         }
+        if (ProductIdentity.hasFinishConflict(fingerprint) || looksLikeFinishConflict(body)) {
+            body = ensureContains(body, FIRST_FRAME_WINS, "SELECTED FIRST FRAME WINS")
+        }
         body = body.replace(Regex("maximum 8(\\.0)? seconds", RegexOption.IGNORE_CASE), "exactly 8.0 seconds")
+        body = collapseDuplicateLockBlocks(body)
+        return body.trim()
+    }
+
+    fun repairOnce(
+        prompt: String,
+        fingerprint: JSONObject? = null,
+        generator: String = "VEO",
+        speechLanguage: String = "OFF",
+        lockOn: Boolean = true,
+    ): String {
+        var body = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(prompt)
+        body = stripInternalLeaks(body)
+        body = stripJsonDumps(body)
+        body = stripUnsupportedClaims(body)
+        body = collapseDuplicateLockBlocks(body)
+        body = ensure(body, lockOn, fingerprint)
+        body = applyGenerator(body, generator)
+        body = ensureSpeechTiming(body, speechLanguage)
+        body = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(body)
+        body = stripInternalLeaks(body)
+        body = collapseDuplicateLockBlocks(body)
         return body.trim()
     }
 
@@ -159,8 +188,8 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
 
     fun preservesMicrowaveCover(prompt: String): Boolean {
         val lower = prompt.lowercase()
-        return lower.contains("transparent dome") &&
-            lower.contains("green circular base ring") &&
+        return lower.contains("transparent") && lower.contains("dome") &&
+            lower.contains("green circular") && lower.contains("base ring") &&
             lower.contains("curved green") && lower.contains("handle") &&
             lower.contains("circular upper vent") &&
             lower.contains("rectangular") &&
@@ -221,7 +250,30 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         if (generator.equals("VEO", true) && !veoHasExactDuration(prompt)) failures.add("veo_exact_duration")
         if (!speechLanguage.equals("OFF", true) && !hasSpeechEndTiming(prompt)) failures.add("speech_end_timing")
         if (allowsExtraTail(prompt)) failures.add("extra_tail")
+        if (leaksInternalAnalysis(prompt)) failures.add("internal_analysis_leak")
+        if (hasDuplicateProductLock(prompt)) failures.add("duplicate_product_lock")
         return failures
+    }
+
+    fun leaksInternalAnalysis(prompt: String): Boolean {
+        val lower = prompt.lowercase()
+        return lower.contains("uncertain_hidden_geometry") ||
+            lower.contains("ambiguity_warning") ||
+            lower.contains("uncertain/hidden geometry") ||
+            lower.contains("hidden mechanism assumption") ||
+            Regex("\"text_claims\"\\s*:").containsMatchIn(prompt) ||
+            Regex("\"possible_pain_point\"\\s*:").containsMatchIn(prompt)
+    }
+
+    fun hasDuplicateProductLock(prompt: String): Boolean =
+        Regex("REFERENCE IMAGE OVERRIDES", RegexOption.IGNORE_CASE).findAll(prompt).count() > 1 ||
+            Regex("FINAL IDENTITY LOCK:", RegexOption.IGNORE_CASE).findAll(prompt).count() > 1
+
+    fun looksLikeFinishConflict(prompt: String): Boolean {
+        val lower = prompt.lowercase()
+        return lower.contains("conflicting finish") ||
+            lower.contains("finish_conflict") ||
+            (lower.contains("color") && lower.contains("finish") && (lower.contains("conflict") || lower.contains("disagree")))
     }
 
     fun wordCount(prompt: String): Int = prompt.split(Regex("\\s+")).filter { it.isNotBlank() }.size
@@ -235,5 +287,91 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         if (block.isBlank()) return body
         if (body.contains(header, ignoreCase = true)) return body
         return body.trimEnd() + "\n\n" + block.trim()
+    }
+
+    private fun ensureProductLockOnce(body: String): String {
+        return if (body.contains("REFERENCE IMAGE OVERRIDES", ignoreCase = true)) body else "$LOCK_TEXT\n\n$body"
+    }
+
+    private fun insertFinalIdentityLock(body: String, fingerprint: JSONObject?): String {
+        val block = ProductIdentity.finalIdentityLockBlock(fingerprint)
+        var next = Regex("(?is)STRUCTURAL IDENTITY LOCK:.*?(?=\n(?:FORMAT|REFERENCE|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|SPEECH|ANTI-MORPH|DURATION)\\b|$)")
+            .replace(body, "")
+            .trim()
+        return if (next.contains("FINAL IDENTITY LOCK:", ignoreCase = true)) next else next.trimEnd() + "\n\n" + block
+    }
+
+    private fun ensureAntiMorphOnce(body: String): String {
+        return if (body.contains("moving-part deformation", ignoreCase = true)) body else body.trimEnd() + "\n\nANTI-MORPH:\n$ANTI_MORPH"
+    }
+
+    private fun stripInternalLeaks(body: String): String {
+        var next = body
+        next = Regex("(?im)^.*uncertain_hidden_geometry.*$").replace(next, "")
+        next = Regex("(?im)^.*ambiguity_warning.*$").replace(next, "")
+        next = Regex("(?im)^.*Uncertain/hidden geometry.*$").replace(next, "")
+        next = Regex("(?im)^.*hidden mechanism assumption.*$").replace(next, "")
+        next = Regex("(?im)^.*unconfirmed attachment.*$").replace(next, "")
+        next = Regex("(?im)^.*conflicting finish notes?.*$").replace(next, "")
+        next = Regex("(?im)^.*exact dimensions?:.*$").replace(next, "")
+        return next.replace(Regex("\n{3,}"), "\n\n")
+    }
+
+    private fun stripJsonDumps(body: String): String {
+        return Regex("\\{[^{}]{0,8000}(\"(uncertain_hidden_geometry|ambiguity_warning|possible_pain_point|text_claims)\")[^{}]{0,8000}\\}")
+            .replace(body, "")
+            .replace(Regex("\n{3,}"), "\n\n")
+    }
+
+    private fun stripUnsupportedClaims(body: String): String {
+        val banned = listOf(
+            Regex("(?im)^.*\\b100%\\b.*$"),
+            Regex("(?im)^.*\\bguaranteed\\b.*$"),
+            Regex("(?im)^.*\\bgarantiert\\b.*$"),
+            Regex("(?im)^.*\\bheilt\\b.*$"),
+            Regex("(?im)^.*medically proven.*$"),
+        )
+        var next = body
+        banned.forEach { next = it.replace(next, "") }
+        return next.replace(Regex("\n{3,}"), "\n\n")
+    }
+
+    private fun collapseDuplicateLockBlocks(body: String): String {
+        var next = keepFirstBlock(body, Regex("(?is)The reference images define one exact physical product\\.[\\s\\S]*?REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION\\."))
+        next = keepFirstHeaderSection(next, "FINAL IDENTITY LOCK:")
+        next = keepFirstHeaderSection(next, "MOVING COMPONENT LOCK:")
+        next = keepFirstHeaderSection(next, "ANTI-MORPH")
+        next = keepFirstOccurrence(next, GENERIC_SUBSTITUTION_BAN)
+        next = keepFirstOccurrence(next, COMPONENT_COUNT_LOCK)
+        return next.replace(Regex("\n{3,}"), "\n\n").trim()
+    }
+
+    private fun keepFirstBlock(body: String, block: Regex): String {
+        val matches = block.findAll(body).toList()
+        if (matches.size <= 1) return body
+        var next = body
+        matches.drop(1).reversed().forEach { match ->
+            next = next.removeRange(match.range)
+        }
+        return next
+    }
+
+    private fun keepFirstHeaderSection(body: String, header: String): String {
+        val regex = Regex("(?is)${Regex.escape(header)}.*?(?=\n(?:FORMAT|REFERENCE|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|SPEECH|ANTI-MORPH|DURATION|Do not generate a similar)\\b|$)")
+        val matches = regex.findAll(body).toList()
+        if (matches.size <= 1) return body
+        var next = body
+        matches.drop(1).reversed().forEach { match ->
+            next = next.removeRange(match.range)
+        }
+        return next
+    }
+
+    private fun keepFirstOccurrence(body: String, block: String): String {
+        val first = body.indexOf(block, ignoreCase = true)
+        if (first < 0) return body
+        val second = body.indexOf(block, startIndex = first + block.length, ignoreCase = true)
+        if (second < 0) return body
+        return body.substring(0, second) + body.substring(second + block.length)
     }
 }

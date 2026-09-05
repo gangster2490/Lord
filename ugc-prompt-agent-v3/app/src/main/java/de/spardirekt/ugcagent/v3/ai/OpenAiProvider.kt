@@ -164,6 +164,7 @@ class OpenAiProvider(
         prompt = ProductLock.ensure(prompt, ctx.strictProductLock, fingerprint)
         prompt = ProductLock.applyGenerator(prompt, ctx.targetGenerator)
         prompt = ProductLock.ensureSpeechTiming(prompt, ctx.speechLanguage)
+        prompt = ProductLock.repairOnce(prompt, fingerprint, ctx.targetGenerator, ctx.speechLanguage, ctx.strictProductLock)
         return prompt
     }
 
@@ -172,7 +173,11 @@ class OpenAiProvider(
         appendLine("Strict product lock: ${ctx.strictProductLock}")
         appendLine("Speech: ${ctx.speechLanguage}")
         appendLine("Target generator: ${ctx.targetGenerator}")
-        appendLine("Product identity fingerprint JSON:")
+        appendLine("FINAL IDENTITY LOCK (copy only this concise lock into the prompt; never dump the full fingerprint):")
+        appendLine(ctx.finalIdentityLock.ifBlank { "Keep exactly the same single physical product." })
+        appendLine("Do not copy uncertain_hidden_geometry, ambiguity_warning, hidden mechanism assumptions, unconfirmed attachments, conflicting finish notes, exact dimensions unless required, repeated Product Lock blocks, or long internal analysis into the final prompt.")
+        appendLine("If references conflict in color or finish, SELECTED FIRST FRAME WINS.")
+        appendLine("Product identity fingerprint JSON is INTERNAL only:")
         appendLine(ctx.fingerprint)
         appendLine("Action identity risk JSON:")
         appendLine(ctx.actionRisk)

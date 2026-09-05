@@ -64,6 +64,11 @@ object TikTokShopPolicyConfig {
         "award-winning", "clinically tested",
     )
 
+    fun matchesRestrictedCategory(text: String): Boolean {
+        val lower = text.lowercase()
+        return restrictedCategoryKeywords.any { lower.contains(it) }
+    }
+
     val restrictedCategoryKeywords = listOf(
         "waffe", "weapon", "firearm", "ammunition",
         "tabak", "tobacco", "vape", "e-cigarette",

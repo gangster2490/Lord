@@ -59,7 +59,7 @@
       toast("Native bridge missing");
       return;
     }
-    const tracked = ["runConsistency","runAnalysis","runFirstFrameQuality","generateScene","newScene","generatePrompt","improvePrompt","newSpeech","generateCaption","runCompliance","testConnection"];
+    const tracked = ["runConsistency","runAnalysis","runFirstFrameQuality","generateScene","newScene","generatePrompt","improvePrompt","newSpeech","generateCaption","runCompliance","testConnection","startPipeline","resumePipeline"];
     if (tracked.indexOf(name) !== -1) state.lastOp = { name: name, args: args };
     native[name](...args);
   }
@@ -98,6 +98,10 @@
       const op = state.lastOp;
       state.lastError = null;
       if (!op) return;
+      if (op.name === "startPipeline") {
+        call("resumePipeline");
+        return;
+      }
       if (op.args && op.args.length === 1) call(op.name, op.args[0]);
       else if (op.args && op.args.length === 2) call(op.name, op.args[0], op.args[1]);
       else call(op.name);
@@ -113,6 +117,7 @@
       home: t("home_title"), history: t("history"), settings: t("settings"),
       photos: t("photos"), check: t("check"), analyse: t("analyse"), firstFrame: t("first_frame"),
       scene: t("scene"), prompt: t("prompt"), compliance: t("compliance"), export: t("export"),
+      pause: t("pause"),
     };
     return map[screen] || t("home_title");
   }
@@ -130,6 +135,7 @@
       case "prompt": return promptHtml();
       case "compliance": return complianceHtml();
       case "export": return exportHtml();
+      case "pause": return pauseHtml();
       default: return homeHtml();
     }
   }
@@ -173,7 +179,8 @@
         <button id="clear" class="secondary">${t("clear")}</button>
       </div>
       <div class="row">
-        <button id="toCheck" ${enabled ? "" : "disabled"}>${t("check")}</button>
+        <button id="startPipe" ${enabled ? "" : "disabled"}>${t("start")}</button>
+        <button id="toCheck" class="secondary" ${enabled ? "" : "disabled"}>${t("check")}</button>
       </div>
     </section>`;
   }
@@ -282,23 +289,68 @@
     </section>`;
   }
 
+  function pauseMessage(reason) {
+    const map = {
+      NEED_IMAGES: t("paused_need_images"),
+      DIFFERENT_PRODUCTS: t("paused_different_products"),
+      LOW_CONSISTENCY: t("paused_low_consistency"),
+      READINESS_HIGH: t("paused_readiness"),
+      NO_USABLE_FIRST_FRAME: t("paused_first_frame"),
+      LOW_FIRST_FRAME_CONFIDENCE: t("paused_first_frame"),
+      RESTRICTED_CATEGORY: t("paused_restricted"),
+      COMPLIANCE_BLOCK: t("paused_block"),
+      NO_API_KEY: t("paused_api"),
+      INVALID_API_KEY: t("paused_api"),
+      ONLY_HIGH_RISK: t("paused_high_risk"),
+    };
+    return map[reason] || reason || t("pause");
+  }
+
+  function pauseHtml() {
+    const p = state.data.project || {};
+    const reason = state.data.pausedReason || p.pausedReason || "";
+    const stage = state.data.pipelineStage || p.pipelineStage || "";
+    const warn = (state.data.warnings || p.warnings || []).join("\n");
+    const ru = readinessWarning();
+    return `<section class="card">
+      <h3>${t("pause")}</h3>
+      <p class="warn">${escapeHtml(pauseMessage(reason))}</p>
+      ${ru ? `<p class="warn">${escapeHtml(ru)}</p>` : ""}
+      <p>${t("pipeline_progress")}: ${escapeHtml(stage)}</p>
+      ${warn ? `<pre>${escapeHtml(warn)}</pre>` : ""}
+      <div class="row">
+        <button id="resumePipe">${t("resume")}</button>
+        ${reason === "DIFFERENT_PRODUCTS" || reason === "LOW_CONSISTENCY" ? `<button id="anyway" class="secondary">${t("continue_anyway")}</button>` : ""}
+        ${reason === "LOW_FIRST_FRAME_CONFIDENCE" || reason === "NO_USABLE_FIRST_FRAME" ? `<button id="toFf" class="secondary">${t("change_ff")}</button>` : ""}
+        <button id="toPhotos" class="secondary">${t("photos")}</button>
+      </div>
+    </section>`;
+  }
+
   function exportHtml() {
     const p = state.data.project || {};
     const prompt = state.data.activePrompt || "";
     const ff = (state.data.images || []).find((i) => i.isFirstFrame);
+    const warnings = (state.data.warnings || p.warnings || []).join("\n");
+    const compliance = p.compliance || {};
     return `<section class="card">
       ${ff ? `<img src="${ff.thumb}" alt="" style="width:100%;border-radius:12px;margin-bottom:12px" />` : ""}
+      <div class="kv"><span>${t("speech_lang")}</span><span>${escapeHtml(p.speechLanguage || "")}</span></div>
+      <div class="kv"><span>${t("generator_label")}</span><span>${escapeHtml(p.targetGenerator || "")}</span></div>
+      <div class="kv"><span>${t("compliance_result")}</span><span>${escapeHtml(compliance.status || "-")}</span></div>
       <h3>${t("prompt")}</h3><pre>${escapeHtml(prompt)}</pre>
       <h3>${t("caption")}</h3><pre>${escapeHtml(p.caption || "")}</pre>
-      <h3>${t("hashtags")}</h3><pre>${(p.hashtags || []).join(" ")}</pre>
-      <pre>${JSON.stringify(p.compliance || {}, null, 2)}</pre>
+      <h3>${t("hashtags")}</h3><pre>${escapeHtml((p.hashtags || []).join(" "))}</pre>
+      ${warnings ? `<h3>${t("warnings")}</h3><pre>${escapeHtml(warnings)}</pre>` : ""}
       <div class="row">
-        <button id="cap">${t("regenerate_caption")}</button>
-        <button id="cp" class="secondary">${t("copy_prompt")}</button>
-        <button id="cc" class="secondary">${t("copy_caption")}</button>
-        <button id="ch" class="secondary">${t("copy_hashtags")}</button>
-        <button id="ca" class="secondary">${t("copy_all")}</button>
-        <button id="sff" class="secondary">${t("share_ff")}</button>
+        <button id="cp">${t("copy_prompt")}</button>
+        <button id="cc">${t("copy_caption")}</button>
+        <button id="ch">${t("copy_hashtags")}</button>
+        <button id="ca">${t("copy_all")}</button>
+        <button id="chgFf" class="secondary">${t("change_ff")}</button>
+        <button id="newScene" class="secondary">${t("new_scene")}</button>
+        <button id="newSpeech" class="secondary">${t("new_speech")}</button>
+        <button id="improve" class="secondary">${t("improve")}</button>
         <button id="save" class="secondary">${t("save_project")}</button>
         <button id="share" class="secondary">${t("share_project")}</button>
       </div>
@@ -394,6 +446,8 @@
     if (screen === "photos") {
       $("pick").onclick = () => call("startPickImages");
       $("clear").onclick = () => call("clearImages");
+      const start = $("startPipe");
+      if (start) start.onclick = () => ensurePrivacy(() => call("startPipeline"));
       $("toCheck").onclick = () => { ensurePrivacy(() => { call("runConsistency"); show("check"); }); };
       document.querySelectorAll(".thumb[data-id]").forEach((el) => {
         el.onclick = () => call("setFirstFrame", el.getAttribute("data-id"));
@@ -435,15 +489,23 @@
       $("ign").onclick = () => call("ignoreDisclosure");
       $("toExport").onclick = () => show("export");
     }
+    if (screen === "pause") {
+      $("resumePipe").onclick = () => call("resumePipeline");
+      const anyway = $("anyway"); if (anyway) anyway.onclick = () => call("continueAnyway");
+      const toFf = $("toFf"); if (toFf) toFf.onclick = () => show("firstFrame");
+      $("toPhotos").onclick = () => show("photos");
+    }
     if (screen === "export") {
       const p = state.data.project || {};
       const prompt = state.data.activePrompt || "";
-      $("cap").onclick = () => call("regenerateCaption");
       $("cp").onclick = () => call("copyText", prompt);
       $("cc").onclick = () => call("copyText", p.caption || "");
       $("ch").onclick = () => call("copyText", (p.hashtags || []).join(" "));
       $("ca").onclick = () => call("copyText", [prompt, p.caption || "", (p.hashtags || []).join(" ")].join("\n\n"));
-      $("sff").onclick = () => call("shareFirstFrame");
+      $("chgFf").onclick = () => show("firstFrame");
+      $("newScene").onclick = () => call("newScene");
+      $("newSpeech").onclick = () => call("newSpeech");
+      $("improve").onclick = () => call("improvePrompt");
       $("save").onclick = () => call("saveProjectNow");
       $("share").onclick = () => call("shareProject");
     }
@@ -492,14 +554,43 @@
     return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  function repairMojibake(str) {
+    if (!str || typeof str !== "string") return str;
+    if (!/[ÃÂÐÑâ]/.test(str)) return str;
+    try {
+      const bytes = Uint8Array.from(str, (c) => c.charCodeAt(0) & 255);
+      const decoded = new TextDecoder("utf-8").decode(bytes);
+      if (decoded && /[А-яЁё«»]/.test(decoded)) return decoded;
+    } catch (e) {}
+    return str;
+  }
+
+  function repairPayload(value) {
+    if (typeof value === "string") return repairMojibake(value);
+    if (Array.isArray(value)) return value.map(repairPayload);
+    if (value && typeof value === "object") {
+      const out = {};
+      Object.keys(value).forEach((k) => { out[k] = repairPayload(value[k]); });
+      return out;
+    }
+    return value;
+  }
+
   window.UgcV3App = {
     onNativeEvent(event, payload) {
+      payload = repairPayload(payload || {});
       if (payload && payload.settings) state.data = Object.assign(state.data, payload);
       if (event === "ready" || event === "project" || event === "images" || event === "settings" ||
           event === "consistency" || event === "analysis" || event === "firstFrame" || event === "firstFrameQuality" ||
-          event === "scene" || event === "prompt" || event === "caption" || event === "compliance" || event === "saved") {
+          event === "scene" || event === "prompt" || event === "caption" || event === "compliance" || event === "saved" ||
+          event === "pipeline") {
         state.data = Object.assign(state.data, payload);
         if (payload.settings && payload.settings.appLanguage) state.lang = payload.settings.appLanguage;
+        if (event === "pipeline") {
+          const stage = (payload.project && payload.project.pipelineStage) || payload.pipelineStage || "";
+          if (stage === "EXPORT_READY") state.screen = "export";
+          else if (stage === "PAUSED" || stage === "ERROR") state.screen = "pause";
+        }
         render();
       }
       if (event === "history") {

@@ -21,7 +21,16 @@ import de.spardirekt.ugcagent.v3.image.FirstFrameHeuristics
 import de.spardirekt.ugcagent.v3.image.ImageProcessor
 import de.spardirekt.ugcagent.v3.prompt.ActionIdentity
 import de.spardirekt.ugcagent.v3.prompt.ProductIdentity
+import de.spardirekt.ugcagent.v3.prompt.ProductLock
+import de.spardirekt.ugcagent.v3.pipeline.PauseReasons
+import de.spardirekt.ugcagent.v3.pipeline.PipelineAi
+import de.spardirekt.ugcagent.v3.pipeline.PipelineEngine
+import de.spardirekt.ugcagent.v3.pipeline.PipelineImage
+import de.spardirekt.ugcagent.v3.pipeline.PipelinePaused
+import de.spardirekt.ugcagent.v3.pipeline.PipelineSession
+import de.spardirekt.ugcagent.v3.pipeline.PipelineStage
 import de.spardirekt.ugcagent.v3.security.SecureApiKeyStore
+import de.spardirekt.ugcagent.v3.text.Utf8Guard
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -90,6 +99,9 @@ class NativeBridge(
                         )
                     }
                     project.recommendedFirstFrameId = FirstFrameHeuristics.recommendLocal(ranked)?.id
+                }
+                if (project.images.size in ImageRules.MIN..ImageRules.MAX && project.pipelineStage == "IDLE") {
+                    project.pipelineStage = PipelineStage.IMAGES_READY.name
                 }
                 persist()
                 emit("images", snapshot())
@@ -210,6 +222,7 @@ class NativeBridge(
     fun setFirstFrame(id: String) {
         project.firstFrameId = id
         project.firstFrameQuality = null
+        project.firstFrameUserChosen = true
         persist()
         emit("firstFrame", snapshot())
     }
@@ -219,6 +232,11 @@ class NativeBridge(
         project.consistencyOverride = true
         persist()
         emit("consistency", snapshot())
+        if (project.pipelineStage == PipelineStage.PAUSED.name &&
+            (project.pausedReason == PauseReasons.DIFFERENT_PRODUCTS || project.pausedReason == PauseReasons.LOW_CONSISTENCY)
+        ) {
+            resumePipeline()
+        }
     }
 
     @JavascriptInterface
@@ -287,7 +305,14 @@ class NativeBridge(
         project.identityReadiness = ProductIdentity.mergeReadiness(localReady, aiReady)
         persist()
         val prompt = provider().generateVideoPrompt(apiKey(), imagesForPrompt(), ctx())
-        project.finalPrompt = prompt
+        project.finalPrompt = ProductLock.repairOnce(
+            prompt,
+            fingerprint,
+            project.targetGenerator,
+            project.speechLanguage,
+            project.strictProductLock,
+        )
+        project.repairApplied = true
         persist()
         snapshot()
     }
@@ -357,7 +382,7 @@ class NativeBridge(
     fun copyText(value: String) {
         activity.runOnUiThread {
             val clipboard = activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("ugc", value))
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("ugc", Utf8Guard.repair(value)))
             emit("copied", JSONObject().put("ok", true))
         }
     }
@@ -404,6 +429,129 @@ class NativeBridge(
         if (project.id == id) newProject()
         projects.delete(id)
         emit("history", JSONObject().put("items", projects.list()))
+    }
+
+    @JavascriptInterface
+    fun startPipeline() = runOp("pipeline") {
+        runAutomaticPipeline(resume = false)
+    }
+
+    @JavascriptInterface
+    fun resumePipeline() = runOp("pipeline") {
+        runAutomaticPipeline(resume = true)
+    }
+
+    private fun runAutomaticPipeline(resume: Boolean): JSONObject {
+        val cachedImages = apiImages()
+        val engine = PipelineEngine(LivePipelineAi(cachedImages))
+        val session = sessionFromProject()
+        val result = try {
+            if (resume) engine.resume(session) else engine.start(session)
+        } catch (paused: PipelinePaused) {
+            session.stage = PipelineStage.PAUSED
+            session.resumeStage = paused.stage
+            session.pausedReason = paused.reason
+            session
+        } catch (e: Exception) {
+            applySession(session)
+            persist()
+            throw e
+        }
+        applySession(result)
+        persist()
+        return snapshot()
+    }
+
+    private fun sessionFromProject(): PipelineSession {
+        val session = PipelineSession()
+        session.stage = PipelineStage.fromName(project.pipelineStage)
+        session.resumeStage = project.resumeStage?.let { PipelineStage.fromName(it) }
+        session.pausedReason = project.pausedReason
+        session.errorMessage = project.pipelineError
+        session.warnings = project.warnings.toMutableList()
+        session.completed = PipelineSession.parseCompleted(JSONArray(project.completedStages))
+        session.repairApplied = project.repairApplied
+        session.firstFrameAutoApplied = project.firstFrameAutoApplied
+        session.firstFrameUserChosen = project.firstFrameUserChosen
+        session.firstFrameId = project.firstFrameId
+        session.recommendedFirstFrameId = project.recommendedFirstFrameId
+        session.consistencyOverride = project.consistencyOverride
+        session.speechLanguage = project.speechLanguage
+        session.captionLanguage = project.captionLanguage
+        session.targetGenerator = project.targetGenerator
+        session.strictProductLock = project.strictProductLock
+        session.hasApiKey = keys.has(project.provider)
+        session.images = project.images.mapIndexed { index, image ->
+            PipelineImage(image.id, index, image.width, image.height, image.compressedBytes)
+        }
+        session.consistency = project.consistency
+        session.analysis = project.analysis
+        session.identityFingerprint = project.identityFingerprint
+        session.identityReadiness = project.identityReadiness
+        session.firstFrameQuality = project.firstFrameQuality
+        session.firstFrameRecommendation = project.firstFrameRecommendation
+        session.actionRisk = project.actionRisk
+        session.scene = project.scene
+        session.finalIdentityLock = project.finalIdentityLock
+        session.finalPrompt = project.finalPrompt
+        session.caption = project.caption
+        session.hashtags = project.hashtags.toMutableList()
+        session.compliance = project.compliance
+        return session
+    }
+
+    private fun applySession(session: PipelineSession) {
+        project.pipelineStage = session.stage.name
+        project.resumeStage = session.resumeStage?.name
+        project.pausedReason = session.pausedReason
+        project.pipelineError = session.errorMessage
+        project.warnings = session.warnings.toMutableList()
+        project.completedStages = session.completed.map { it.name }.toMutableList()
+        project.repairApplied = session.repairApplied
+        project.firstFrameAutoApplied = session.firstFrameAutoApplied
+        project.firstFrameId = session.firstFrameId ?: project.firstFrameId
+        project.recommendedFirstFrameId = session.recommendedFirstFrameId
+        project.consistency = session.consistency
+        project.analysis = session.analysis
+        project.identityFingerprint = session.identityFingerprint
+        project.identityReadiness = session.identityReadiness
+        project.firstFrameQuality = session.firstFrameQuality
+        project.firstFrameRecommendation = session.firstFrameRecommendation
+        project.actionRisk = session.actionRisk
+        project.scene = session.scene
+        project.finalIdentityLock = session.finalIdentityLock
+        project.finalPrompt = session.finalPrompt?.let { Utf8Guard.repair(it) }
+        project.caption = session.caption?.let { Utf8Guard.repair(it) }
+        project.hashtags = session.hashtags.map { Utf8Guard.repair(it) }.toMutableList()
+        project.compliance = session.compliance
+        project.improvedPrompt = null
+    }
+
+    private inner class LivePipelineAi(private val images: List<ApiImage>) : PipelineAi {
+        override fun consistencyCheck(): JSONObject = provider().consistencyCheck(apiKey(), images)
+        override fun analyseProduct(): JSONObject = provider().analyseProduct(apiKey(), images)
+        override fun fingerprint(): JSONObject = provider().productIdentityFingerprint(apiKey(), images)
+        override fun readiness(fingerprint: JSONObject): JSONObject =
+            provider().productIdentityReadiness(apiKey(), fingerprint, images)
+        override fun recommendFirstFrame(): JSONObject = provider().recommendFirstFrame(apiKey(), images)
+        override fun firstFrameQuality(imageIndex: Int): JSONObject {
+            val image = images.getOrNull(imageIndex) ?: images.first()
+            return provider().firstFrameQuality(apiKey(), image)
+        }
+        override fun generateScene(analysis: JSONObject, fingerprint: JSONObject, previous: JSONObject?): JSONObject =
+            provider().generateScene(apiKey(), analysis, images, previous, fingerprint)
+        override fun actionRisk(fingerprint: JSONObject, scene: JSONObject): JSONObject =
+            provider().actionIdentityRiskCheck(apiKey(), fingerprint, scene, images)
+        override fun generatePrompt(ctx: PromptContext): String = provider().generateVideoPrompt(apiKey(), imagesForPrompt(), ctx)
+        override fun checkCompliance(prompt: String, analysis: JSONObject?, caption: String, hashtags: List<String>): JSONObject {
+            val semantic = try {
+                provider().checkCompliance(apiKey(), ctx().copy(currentPrompt = prompt, analysis = analysis?.toString() ?: "{}"))
+            } catch (_: Exception) {
+                null
+            }
+            return ComplianceEngine.review(prompt, prompt, caption, hashtags, analysis, semantic)
+        }
+        override fun generateCaption(ctx: PromptContext): JSONObject = provider().generateCaption(apiKey(), ctx)
     }
 
     private fun runOp(event: String, block: () -> JSONObject) {
@@ -475,6 +623,7 @@ class NativeBridge(
         fingerprint = project.identityFingerprint?.toString() ?: "{}",
         actionRisk = project.actionRisk?.toString() ?: "{}",
         readiness = project.identityReadiness?.toString() ?: "{}",
+        finalIdentityLock = project.finalIdentityLock ?: ProductIdentity.finalIdentityLockBlock(project.identityFingerprint),
     )
 
     private fun ensureFingerprint() {
@@ -569,6 +718,11 @@ class NativeBridge(
             .put("recommendedFirstFrameId", project.recommendedFirstFrameId ?: "")
             .put("readinessWarningRu", ProductIdentity.warningFor(project.identityReadiness, "ru"))
             .put("readinessWarningDe", ProductIdentity.warningFor(project.identityReadiness, "de"))
+            .put("pipelineStage", project.pipelineStage)
+            .put("pausedReason", project.pausedReason ?: "")
+            .put("pipelineError", project.pipelineError ?: "")
+            .put("warnings", JSONArray(project.warnings))
+            .put("finalIdentityLock", project.finalIdentityLock ?: "")
     }
 
     private fun payloadInfo(): JSONObject {
@@ -611,8 +765,9 @@ class NativeBridge(
     }
 
     private fun emit(event: String, payload: JSONObject) {
-        val encoded = Base64.encodeToString(payload.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-        val js = "window.UgcV3App && window.UgcV3App.onNativeEvent('$event', JSON.parse(atob('$encoded')))"
+        val json = Utf8Guard.repair(Utf8Guard.repairJson(payload).toString())
+        val encoded = Base64.encodeToString(json.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        val js = "(function(){try{var b=atob('$encoded');var u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i)&255;var t=(typeof TextDecoder!=='undefined')?new TextDecoder('utf-8').decode(u):decodeURIComponent(escape(b));window.UgcV3App&&window.UgcV3App.onNativeEvent('$event',JSON.parse(t));}catch(e){}}())"
         webView.post { webView.evaluateJavascript(js, null) }
     }
 }

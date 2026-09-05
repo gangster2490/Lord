@@ -93,6 +93,7 @@ object JsonExtractor {
         "reasons",
         "identity_components_visible",
         "marketplace_ui_over_product",
+        "confidence",
     )
 
     fun complianceSchemaKeys(): List<String> = listOf(

@@ -8,7 +8,7 @@ object ActionIdentity {
         "the product remains stationary while the person interacts around it in one continuous micro-moment"
 
     const val MICROWAVE_SAFE_ACTION =
-        "cover already placed over food; one hand lightly grips the existing green handle; the circular upper component stays completely static"
+        "one hand grips the existing green handle, lifts the complete assembled cover as one rigid body, and places it over a plate; all individual components stay static relative to each other; the circular upper vent stays completely static"
 
     private val highRisk = listOf(
         Regex("""pour\s+(water|liquid)""", RegexOption.IGNORE_CASE),
@@ -58,8 +58,10 @@ object ActionIdentity {
             movingComponents.put("curved green carry handle")
             movingComponents.put("circular upper vent/control")
             if (text.contains("pour", ignoreCase = true)) {
-                risk = "HIGH"
-                reasons.put("Microwave-cover fill geometry is visually ambiguous; pouring water reconstructs the top structure.")
+                val fillUnambiguous = fingerprint?.optJSONArray("uncertain_hidden_geometry")?.length() == 0 &&
+                    (fingerprint.optDouble("confidence", 0.0) >= 0.9)
+                risk = if (fillUnambiguous) "MEDIUM" else "HIGH"
+                reasons.put("Microwave-cover fill geometry is visually ambiguous unless the exact fill opening is confirmed; pouring water reconstructs the top structure.")
             }
             if (movesCircularUpper.containsMatchIn(text)) {
                 motionRisk = "HIGH"
@@ -146,6 +148,14 @@ object ActionIdentity {
 
     fun recommendedSafeAction(fingerprint: JSONObject?): String {
         return if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) MICROWAVE_SAFE_ACTION else DEFAULT_SAFE_ACTION
+    }
+
+    fun geometryClearlySupported(risk: JSONObject, fingerprint: JSONObject?): Boolean {
+        if (risk.optString("risk") == "HIGH" || risk.optString("motion_geometry_risk") == "HIGH") return false
+        val uncertain = fingerprint?.optJSONArray("uncertain_hidden_geometry")
+        if (uncertain != null && uncertain.length() > 0) return false
+        val moving = risk.optJSONArray("geometry_that_must_move")
+        return moving == null || moving.length() == 0 || fingerprint?.optDouble("confidence", 0.0) ?: 0.0 >= 0.8
     }
 
     fun selectedActionIsUnsafe(scene: JSONObject): Boolean = isUnsafeAction(scene.optString("main_action"))

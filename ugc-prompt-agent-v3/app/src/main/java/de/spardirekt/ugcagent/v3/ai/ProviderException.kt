@@ -45,8 +45,9 @@ data class PromptContext(
     val targetGenerator: String,
     val strictProductLock: Boolean,
     val currentPrompt: String = "",
-    val firstFrameNote: String = "Start from the selected original First Frame. Use all uploaded reference images as supporting product-identity evidence.",
+    val firstFrameNote: String = "Start from the selected original First Frame. Other references are supporting identity evidence. First Frame is the primary source of truth.",
     val fingerprint: String = "{}",
     val actionRisk: String = "{}",
     val readiness: String = "{}",
+    val finalIdentityLock: String = "",
 )

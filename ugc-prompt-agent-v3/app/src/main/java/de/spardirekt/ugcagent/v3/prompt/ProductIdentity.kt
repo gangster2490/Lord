@@ -11,11 +11,12 @@ object ProductIdentity {
         "Es liegen nicht genug visuelle Informationen für eine sichere dynamische Szene vor. Empfohlen wird eine einfachere Aktion oder zusätzliche Fotos."
 
     const val MICROWAVE_COVER_LOCK =
-        "Keep the transparent dome, green circular base ring and curved green handle exactly as referenced.\n" +
-            "Preserve the separate circular upper vent and both separate rectangular transparent upper modules with their green caps in their original relative positions.\n" +
-            "Preserve the central clear dome seam/rib and visible base attachment layout.\n" +
+        "Keep the transparent low dome, green circular perimeter base ring and curved green handle exactly as referenced.\n" +
+            "Preserve the separate circular upper vent and exactly two separate square-capped rectangular transparent upper modules with their green caps in their original relative positions.\n" +
+            "Preserve the visible ribs/seams including the central clear dome seam/rib and the visible perimeter attachment details.\n" +
             "Do not replace, merge, remove or reinterpret any of these identity-critical components.\n" +
-            "Never replace the two rectangular upper modules or the circular vent with one cylindrical reservoir."
+            "Never replace the two rectangular upper modules or the circular vent with one cylindrical reservoir.\n" +
+            "Do not remove the circular vent, relocate the handle, merge the modules, or change their relative positions."
 
     const val MICROWAVE_VENT_STATIC =
         "If the scene does not require the circular upper component to move, keep it completely static.\n" +
@@ -63,6 +64,50 @@ object ProductIdentity {
         )
         .put("confidence", 0.86)
 
+    fun finalIdentityConstraints(fingerprint: JSONObject?): List<String> {
+        val out = mutableListOf<String>()
+        if (looksLikeMicrowaveCover(fingerprint)) {
+            out.add("transparent low dome with green circular perimeter base ring and curved green handle")
+            out.add("separate circular upper vent remains present and separate")
+            out.add("exactly two separate square-capped rectangular transparent upper modules with green caps")
+            out.add("original relative positions of the circular upper vent and both rectangular modules")
+            out.add("visible ribs/seams including the central clear dome seam/rib")
+            out.add("visible perimeter attachment layout")
+            out.add("never replace the two rectangular modules or the circular vent with one cylindrical reservoir")
+            out.add("do not remove the circular vent, relocate the handle, merge modules, or change relative positions")
+        }
+        val geometry = fingerprint?.optString("overall_geometry").orEmpty().trim()
+        if (geometry.isNotBlank()) out.add(geometry)
+        addVisibleItems(fingerprint, "identity_critical_components", out)
+        addVisibleItems(fingerprint, "component_count_constraints", out)
+        addVisibleItems(fingerprint, "component_layout", out)
+        addVisibleItems(fingerprint, "attachment_points", out, skipUnconfirmed = true)
+        addVisibleItems(fingerprint, "must_not_change", out)
+        return out.map { it.trim() }.filter { it.isNotBlank() && !isInternalLeak(it) }.distinctBy { it.lowercase() }.take(10)
+    }
+
+    fun finalIdentityLockBlock(fingerprint: JSONObject?): String {
+        val constraints = finalIdentityConstraints(fingerprint).let { items ->
+            if (items.size >= 5) items else (items + listOf(
+                "Keep exactly the same single physical product",
+                "Preserve exact component count, geometry and relative positions",
+                "Do not merge, split, remove, relocate, simplify or invent components",
+                "Do not generate a similar or generic category-equivalent product",
+                "Do not invent hidden structure",
+            )).distinctBy { it.lowercase() }.take(10)
+        }
+        return buildString {
+            appendLine("FINAL IDENTITY LOCK:")
+            constraints.forEachIndexed { index, line -> appendLine("${index + 1}. $line") }
+        }.trim()
+    }
+
+    fun hasFinishConflict(fingerprint: JSONObject?): Boolean {
+        val blob = fingerprint?.toString()?.lowercase() ?: return false
+        if (blob.contains("finish_conflict") || blob.contains("conflicting finish") || blob.contains("color/finish")) return true
+        return blob.contains("finish") && (blob.contains("conflict") || blob.contains("disagree") || blob.contains("differ"))
+    }
+
     fun looksLikeMicrowaveCover(fingerprint: JSONObject?): Boolean {
         if (fingerprint == null) return false
         val blob = fingerprint.toString().lowercase()
@@ -73,24 +118,25 @@ object ProductIdentity {
             blob.contains("green")
     }
 
-    fun structuralLockBlock(fingerprint: JSONObject?): String {
-        val lines = mutableListOf("STRUCTURAL IDENTITY LOCK:")
-        val geometry = fingerprint?.optString("overall_geometry").orEmpty().trim()
-        if (geometry.isNotBlank()) lines.add(geometry)
-        joinList(fingerprint, "identity_critical_components")?.let { lines.add("Identity-critical components: $it") }
-        joinList(fingerprint, "component_count_constraints")?.let { lines.add("Component count: $it") }
-        joinList(fingerprint, "component_layout")?.let { lines.add("Layout: $it") }
-        joinList(fingerprint, "attachment_points")?.let { lines.add("Attachment layout: $it") }
-        joinList(fingerprint, "must_not_change")?.let { lines.add("Must not change: $it") }
-        joinList(fingerprint, "uncertain_hidden_geometry")?.let {
-            lines.add("Uncertain/hidden geometry — do not invent: $it")
+    fun structuralLockBlock(fingerprint: JSONObject?): String = finalIdentityLockBlock(fingerprint)
+
+    private fun addVisibleItems(fingerprint: JSONObject?, key: String, out: MutableList<String>, skipUnconfirmed: Boolean = false) {
+        val arr = fingerprint?.optJSONArray(key) ?: return
+        for (i in 0 until arr.length()) {
+            val item = arr.optString(i).trim()
+            if (item.isBlank() || isInternalLeak(item)) continue
+            if (skipUnconfirmed && (item.contains("unconfirmed", true) || item.contains("hidden", true) || item.contains("uncertain", true))) continue
+            out.add(item)
         }
-        lines.add("Keep exactly the same single physical product throughout the entire video.")
-        if (looksLikeMicrowaveCover(fingerprint)) {
-            lines.add(MICROWAVE_COVER_LOCK)
-            lines.add(MICROWAVE_VENT_STATIC)
-        }
-        return lines.joinToString("\n")
+    }
+
+    private fun isInternalLeak(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("uncertain_hidden") ||
+            lower.contains("ambiguity_warning") ||
+            lower.contains("hidden mechanism") ||
+            lower.contains("unconfirmed attachment") ||
+            lower.contains("exact dimension")
     }
 
     fun localReadiness(fingerprint: JSONObject?): JSONObject {

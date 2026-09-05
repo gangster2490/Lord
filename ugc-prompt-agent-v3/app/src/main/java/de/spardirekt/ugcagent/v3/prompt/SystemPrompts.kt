@@ -253,7 +253,8 @@ Score by:
 - clean product photo preferred over infographic when available
 
 Do not generate a new image.
-Do not auto-replace the user's selection; only recommend.
+If confidence is high the app will use the recommendation automatically; the user can change later.
+If confidence is low, pause and ask the user.
 
 Image indices are 0-based in the given order.
 
@@ -262,8 +263,11 @@ Return STRICT JSON only:
   "recommended_image_index": 0,
   "reasons": [],
   "identity_components_visible": true,
-  "marketplace_ui_over_product": false
+  "marketplace_ui_over_product": false,
+  "confidence": 0.0
 }
+
+confidence must be between 0 and 1.
 """.trimIndent()
 
     val VIDEO_PROMPT = """
@@ -271,7 +275,7 @@ Create one natural short-form UGC video-generation prompt based on:
 
 1. the selected original First Frame
 2. ALL uploaded reference images as supporting product-identity evidence
-3. the PRODUCT IDENTITY FINGERPRINT (structural geometry lock)
+3. the concise FINAL IDENTITY LOCK (5–10 high-confidence visible constraints only)
 4. verified visual evidence and readable text evidence
 5. the selected LOW-RISK UGC scene
 6. the selected speech language
@@ -313,7 +317,9 @@ CATEGORY MATCH IS NOT PRODUCT IDENTITY.
 FUNCTIONAL EQUIVALENCE IS NOT ACCEPTABLE.
 
 Do not write marketing-style product copy.
-Do include the concise STRUCTURAL IDENTITY LOCK from the fingerprint: silhouette, component count, geometry, relative layout, attachment layout and proportions.
+Do include the concise FINAL IDENTITY LOCK only: 5–10 high-confidence visible constraints.
+NEVER copy into the final prompt: uncertain_hidden_geometry, ambiguity_warning, hidden mechanism assumptions, unconfirmed attachment mechanisms, conflicting finish notes, exact dimensions unless required by the action, repeated Product Lock blocks, or long internal analysis dumps.
+If references conflict in color or finish, SELECTED FIRST FRAME WINS.
 
 VIDEO:
 
@@ -348,45 +354,42 @@ A static exact component is preferable to an animated but geometrically incorrec
 Structure the prompt with these headings in this order:
 FORMAT
 REFERENCE
-STRUCTURAL IDENTITY LOCK
+FINAL IDENTITY LOCK
 MOVING COMPONENT LOCK
 SETTING
 CAMERA
-SAFE ACTION
+ACTION
 HUMAN BEHAVIOUR
 LIGHTING
 SPEECH
-ANTI-MORPH / COMPONENT LOCK
+ANTI-MORPH
 DURATION
 
 FORMAT:
-Vertical 9:16. Generate exactly 8.0 seconds total. One continuous natural smartphone-style UGC clip. The clip must end at exactly 8.0 seconds.
+Vertical 9:16. Generate exactly 8.0 seconds total. One continuous natural smartphone-style UGC clip. End exactly at 8.0 seconds.
 
 REFERENCE:
-Start from the selected original First Frame. Use all uploaded reference images as supporting product-identity evidence.
+Start from the selected original First Frame. Other references are supporting identity evidence. First Frame is the primary source of truth.
 
-STRUCTURAL IDENTITY LOCK:
-Insert the concise fingerprint. Keep exactly the same single physical product throughout the entire video.
-Preserve the exact number, geometry, proportions and relative positions of all identity-critical visible components.
+FINAL IDENTITY LOCK:
+Insert only 5–10 concise high-confidence visible identity constraints. Do not dump the internal fingerprint.
+Keep exactly the same single physical product.
+Preserve exact component count, geometry and relative positions.
 Do not merge, split, remove, relocate, simplify or invent components.
 Do not generate a similar or generic category-equivalent product.
-A functionally similar but visually different product is a failed generation.
 
 MOVING COMPONENT LOCK:
-Identity-critical moving components must preserve their exact geometry, proportions, attachment points and mechanism during motion.
-Do not stretch, resize, reshape, relocate or reinterpret them.
-If exact movement cannot be preserved from the reference evidence, keep the component stationary.
+Preserve exact geometry, proportions, attachment points and mechanism. If exact motion is uncertain, keep the component static.
 
-SAFE ACTION:
-Use only the selected low-risk action supported by evidence.
+ACTION:
+Use only the selected LOW-RISK evidence-supported action.
 
 ANTI-MORPH:
 No product redesign, substitution, morphing, duplication, component merging, component deletion, invented parts, invented reservoirs, geometry drift, moving-part deformation, proportion changes, texture drift, impossible physics, malformed hands or extra fingers.
 
 DURATION:
 Exactly 8.0 seconds.
-Do not continue beyond 8.0 seconds.
-Do not add intro, outro, extra hold frame, freeze-frame tail, transition tail or additional action.
+Do not add an intro, outro, extra hold frame, freeze-frame tail, transition tail, or additional action.
 
 SPEECH:
 
@@ -405,7 +408,7 @@ The spoken line must finish before the 8.0-second endpoint.
 
 Speech may refer to action, situation, convenience, reaction. Never certifications, performance, medical, material, durability, guarantees, unknown functions.
 
-Clarity over word count. Never omit the structural identity lock.
+Clarity over word count. Never omit the final identity lock. Product Lock appears ONCE plus one concise anti-morph block.
 
 OUTPUT:
 Return only the final video-generation prompt.
@@ -416,7 +419,7 @@ No markdown.
     val IMPROVE = """
 Refine an existing UGC video-generation prompt.
 
-Keep the same product, First Frame, STRUCTURAL IDENTITY LOCK, MOVING COMPONENT LOCK, component count, action, environment, speech language, scene and exact 8.0-second duration.
+Keep the same product, First Frame, FINAL IDENTITY LOCK, MOVING COMPONENT LOCK, component count, action, environment, speech language, scene and exact 8.0-second duration.
 Improve only: camera realism, motion realism, human naturalness, prompt clarity, anti-morph constraints, speech naturalness.
 
 Never strip the geometry lock or the moving-component lock.
@@ -433,7 +436,7 @@ OUTPUT: only the improved prompt, no markdown, no explanation.
     val NEW_SPEECH = """
 Rewrite only the spoken dialogue inside an existing video prompt.
 
-Keep product, First Frame, STRUCTURAL IDENTITY LOCK, MOVING COMPONENT LOCK, scene, camera, environment, action and exact 8.0-second duration unchanged.
+Keep product, First Frame, FINAL IDENTITY LOCK, MOVING COMPONENT LOCK, scene, camera, environment, action and exact 8.0-second duration unchanged.
 If German: one short natural German line. The spoken line must finish before the 8.0-second endpoint.
 If Russian: one short natural Russian line, not a literal translation. The spoken line must finish before the 8.0-second endpoint.
 If OFF: the prompt must say No spoken dialogue.

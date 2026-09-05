@@ -12,13 +12,13 @@ class ProjectStore(context: Context) {
 
     fun save(project: ProjectRecord) {
         project.touch()
-        File(dir(project.id), "project.json").writeText(project.toJson().toString())
+        File(dir(project.id), "project.json").writeText(project.toJson().toString(), Charsets.UTF_8)
     }
 
     fun load(id: String): ProjectRecord? {
         val file = File(dir(id), "project.json")
         if (!file.exists()) return null
-        return ProjectRecord.fromJson(JSONObject(file.readText()))
+        return ProjectRecord.fromJson(JSONObject(file.readText(Charsets.UTF_8)))
     }
 
     fun delete(id: String) {
@@ -32,11 +32,11 @@ class ProjectStore(context: Context) {
         val dest = dir(newId)
         File(root, id).copyRecursively(dest, overwrite = true)
         val rewritten = File(dest, "project.json")
-        val json = JSONObject(rewritten.readText())
+                val json = JSONObject(rewritten.readText(Charsets.UTF_8))
         json.put("id", newId)
         json.put("createdAt", System.currentTimeMillis())
         json.put("updatedAt", System.currentTimeMillis())
-        rewritten.writeText(json.toString())
+        rewritten.writeText(json.toString(), Charsets.UTF_8)
         return load(newId)
     }
 
@@ -45,7 +45,7 @@ class ProjectStore(context: Context) {
         root.listFiles()?.filter { it.isDirectory }?.sortedByDescending { File(it, "project.json").lastModified() }?.forEach { folder ->
             val file = File(folder, "project.json")
             if (file.exists()) {
-                val obj = JSONObject(file.readText())
+                val obj = JSONObject(file.readText(Charsets.UTF_8))
                 arr.put(
                     JSONObject()
                         .put("id", obj.optString("id"))
