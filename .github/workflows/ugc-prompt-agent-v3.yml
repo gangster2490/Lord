@@ -1,0 +1,123 @@
+name: UGC Prompt Agent V3
+
+on:
+  push:
+    branches: [main, 'cursor/**', 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ugc-prompt-agent-v3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Source audit
+        working-directory: .
+        run: |
+          set -e
+          ROOT="ugc-prompt-agent-v3/app/src/main"
+          fail() { echo "SOURCE AUDIT FAIL: $1"; exit 1; }
+          grep -R -n --include='*.js' --include='*.html' --include='*.kt' 'openaiBrowser(' "$ROOT" && fail "openaiBrowser" || true
+          grep -R -n --include='*.js' --include='*.html' --include='*.kt' 'geminiBrowser(' "$ROOT" && fail "geminiBrowser" || true
+          grep -R -n --include='*.js' --include='*.html' 'localStorage.getItem("ugc_api_key")' "$ROOT" && fail "localStorage key" || true
+          grep -R -n --include='*.js' --include='*.html' 'getApiKey(' "$ROOT" && fail "getApiKey in frontend" || true
+          grep -R -n --include='*.js' --include='*.html' 'getOpenAiKey(' "$ROOT" && fail "getOpenAiKey" || true
+          grep -R -n --include='*.js' --include='*.html' 'getGeminiKey(' "$ROOT" && fail "getGeminiKey" || true
+          grep -R -n --include='*.js' 'Authorization' "$ROOT/assets" && fail "Authorization in JS" || true
+          test -f "$ROOT/assets/index.html"
+          test -f "$ROOT/assets/app.js"
+          test -f "$ROOT/assets/styles.css"
+          grep -q 'INTERNET' "$ROOT/AndroidManifest.xml"
+          grep -q 'de.spardirekt.ugcagent.v3' "$ROOT/AndroidManifest.xml"
+          echo "SOURCE AUDIT PASS"
+
+      - name: Prepare release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          SECRET_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SECRET_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SECRET_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          KS="$GITHUB_WORKSPACE/ugc-prompt-agent-v3/app/release.keystore"
+          mkdir -p "$(dirname "$KS")"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
+            echo "Decoded KEYSTORE_BASE64 to $KS"
+            echo "KEYSTORE_PASSWORD=$SECRET_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=${SECRET_KEY_ALIAS:-ugcagentv3}" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=${SECRET_KEY_PASSWORD:-$SECRET_KEYSTORE_PASSWORD}" >> "$GITHUB_ENV"
+          else
+            echo "No KEYSTORE_BASE64 secret — generating CI keystore (not committed)."
+            keytool -genkeypair -v -storetype PKCS12 \
+              -keystore "$KS" \
+              -alias ugcagentv3 \
+              -storepass android -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=UGC Prompt Agent V3, OU=SparDirekt, O=SparDirekt, L=Berlin, ST=Berlin, C=DE"
+            echo "KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=ugcagentv3" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=android" >> "$GITHUB_ENV"
+          fi
+          echo "KEYSTORE_PATH=$KS" >> "$GITHUB_ENV"
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Assemble debug
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Assemble signed release
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Validate APKs
+        run: |
+          set -e
+          DEBUG_APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
+          RELEASE_APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
+          test -s "$DEBUG_APK"
+          test -s "$RELEASE_APK"
+          SIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort | tail -n 1)
+          if [ -z "$SIGNER" ]; then SIGNER=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort | tail -n 1); fi
+          "$SIGNER" verify --print-certs "$RELEASE_APK"
+          unzip -l "$DEBUG_APK" | grep -q 'assets/index.html'
+          unzip -l "$DEBUG_APK" | grep -q 'assets/app.js'
+          aapt=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort | tail -n 1)
+          "$aapt" dump badging "$RELEASE_APK" | grep -q "package: name='de.spardirekt.ugcagent.v3'"
+          "$aapt" dump permissions "$RELEASE_APK" | grep -q INTERNET
+          mkdir -p dist
+          cp "$DEBUG_APK" dist/ugc-prompt-agent-v3-debug.apk
+          cp "$RELEASE_APK" dist/ugc-prompt-agent-v3-release.apk
+          echo "APKs ready"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ugc-prompt-agent-v3-debug.apk
+          path: ugc-prompt-agent-v3/dist/ugc-prompt-agent-v3-debug.apk
+          retention-days: 30
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ugc-prompt-agent-v3-release.apk
+          path: ugc-prompt-agent-v3/dist/ugc-prompt-agent-v3-release.apk
+          retention-days: 30
