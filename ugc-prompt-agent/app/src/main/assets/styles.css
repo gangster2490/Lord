@@ -1,19 +1,19 @@
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{background:#0a0a0a;color:#f0f0f0;font-family:"Courier New",ui-monospace,monospace;min-height:100%}
+html,body{height:100%;overflow:hidden;background:#0a0a0a;color:#f0f0f0;font-family:"Courier New",ui-monospace,monospace}
 body{padding-bottom:env(safe-area-inset-bottom)}
-#app{max-width:860px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
-.header{background:#0d0d0d;border-bottom:1px solid #1e1e1e;padding:14px 16px;display:flex;align-items:center;gap:10px}
+#app{max-width:860px;margin:0 auto;height:100%;min-height:0;display:flex;flex-direction:column}
+.header{background:#0d0d0d;border-bottom:1px solid #1e1e1e;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}
 .logo{font-size:18px;font-weight:900;color:#36ff5c;letter-spacing:2px}
 .brand{font-weight:700;font-size:13px;letter-spacing:1px}
 .badge{font-size:10px;background:#1a7a2e;color:#36ff5c;padding:2px 8px;border-radius:4px;letter-spacing:1px}
 .header-spacer{flex:1}
 .icon-btn{background:transparent;border:1px solid #1e1e1e;color:#36ff5c;border-radius:6px;padding:6px 10px;cursor:pointer;font-family:inherit;font-size:11px;letter-spacing:1px}
 .icon-btn:hover{border-color:#36ff5c}
-.tabs{display:flex;border-bottom:1px solid #1e1e1e;background:#0d0d0d;overflow-x:auto}
+.tabs{display:flex;border-bottom:1px solid #1e1e1e;background:#0d0d0d;overflow-x:auto;flex-shrink:0}
 .tab{flex:1;min-width:72px;padding:12px 8px;text-align:center;font-size:10px;font-weight:700;letter-spacing:1px;cursor:pointer;color:#555;border:none;background:transparent;border-bottom:2px solid transparent;text-transform:uppercase;font-family:inherit}
 .tab.active{color:#36ff5c;border-bottom-color:#36ff5c}
 .page{display:none;padding:16px;flex-direction:column;gap:16px}
-.page.active{display:flex}
+.page.active{display:flex;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .card{background:#111;border:1px solid #1e1e1e;border-radius:10px;padding:18px}
 .card.warn{border-color:#c9a227}
 .card.danger{border-color:#ff4444}
@@ -52,9 +52,9 @@ body{padding-bottom:env(safe-area-inset-bottom)}
 .warn-box{background:#1a1600;border:1px solid #c9a227;color:#e6c35c}
 .err-box{background:#1a0000;border:1px solid #ff4444;color:#ff6666}
 .ok-box{background:#0d150e;border:1px solid #1a7a2e;color:#36ff5c}
-.overlay{position:fixed;inset:0;background:#000c;display:none;align-items:flex-start;justify-content:center;padding:48px 16px;z-index:20}
+.overlay{position:fixed;inset:0;background:#000c;display:none;align-items:flex-start;justify-content:center;padding:calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));z-index:20;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .overlay.open{display:flex}
-.overlay .card{width:min(480px,100%);max-height:calc(100vh - 96px);overflow:auto}
+.overlay .card{width:min(480px,100%);max-height:none}
 .history-item{border:1px solid #1e1e1e;border-radius:8px;padding:12px;margin-bottom:10px;display:flex;gap:10px}
 .history-item img{width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #1e1e1e}
 .history-item h4{font-size:12px;margin-bottom:4px}
