@@ -66,7 +66,8 @@ window.I18N = {
     confirm_delete: "Projekt wirklich löschen?",
     busy: "Bitte warten…",
     copied: "Kopiert",
-    not_configured: "Nicht konfiguriert"
+    not_configured: "Nicht konfiguriert",
+    retry: "Erneut versuchen"
   },
   ru: {
     app_eyebrow: "UGC Prompt Agent V3",
@@ -135,6 +136,7 @@ window.I18N = {
     confirm_delete: "Удалить проект?",
     busy: "Подождите…",
     copied: "Скопировано",
-    not_configured: "Не настроено"
+    not_configured: "Не настроено",
+    retry: "Повторить"
   }
 };

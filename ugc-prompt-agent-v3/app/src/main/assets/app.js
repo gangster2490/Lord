@@ -7,6 +7,8 @@
     data: {},
     busy: false,
     history: [],
+    lastOp: null,
+    lastError: null,
   };
 
   function t(key) {
@@ -57,6 +59,8 @@
       toast("Native bridge missing");
       return;
     }
+    const tracked = ["runConsistency","runAnalysis","runFirstFrameQuality","generateScene","newScene","generatePrompt","improvePrompt","newSpeech","generateCaption","runCompliance","testConnection"];
+    if (tracked.indexOf(name) !== -1) state.lastOp = { name: name, args: args };
     native[name](...args);
   }
 
@@ -86,8 +90,18 @@
     }
     title.textContent = titleFor(state.screen);
     pages.className = state.busy ? "busy" : "";
-    pages.innerHTML = htmlFor(state.screen);
+    const errorHtml = state.lastError ? `<section class="card"><p class="err">${escapeHtml(state.lastError.message || state.lastError.code || "error")}</p>${state.lastError.retryable && state.lastOp ? `<button id="retryOp">${t("retry")}</button>` : ""}</section>` : "";
+    pages.innerHTML = errorHtml + htmlFor(state.screen);
     bind(state.screen);
+    const retry = $("retryOp");
+    if (retry) retry.onclick = () => {
+      const op = state.lastOp;
+      state.lastError = null;
+      if (!op) return;
+      if (op.args && op.args.length === 1) call(op.name, op.args[0]);
+      else if (op.args && op.args.length === 2) call(op.name, op.args[0], op.args[1]);
+      else call(op.name);
+    };
   }
 
   function stepKey(s) {
@@ -471,10 +485,15 @@
       }
       if (event === "busy") {
         state.busy = !!payload.busy;
+        if (payload.busy) state.lastError = null;
         render();
       }
       if (event === "copied") toast(t("copied"));
-      if (event === "error") toast(payload.message || payload.code || "error");
+      if (event === "error") {
+        state.lastError = payload;
+        toast(payload.message || payload.code || "error");
+        render();
+      }
       if (event === "providerStatus") {
         state.data.providerStatus = payload;
         if (state.screen === "settings") render();

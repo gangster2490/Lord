@@ -17,6 +17,7 @@ import de.spardirekt.ugcagent.v3.data.ProjectRecord
 import de.spardirekt.ugcagent.v3.data.ProjectStore
 import de.spardirekt.ugcagent.v3.data.SettingsStore
 import de.spardirekt.ugcagent.v3.data.StoredImage
+import de.spardirekt.ugcagent.v3.image.FirstFrameHeuristics
 import de.spardirekt.ugcagent.v3.image.ImageProcessor
 import de.spardirekt.ugcagent.v3.security.SecureApiKeyStore
 import org.json.JSONArray
@@ -227,8 +228,10 @@ class NativeBridge(
     @JavascriptInterface
     fun runFirstFrameQuality() = runOp("firstFrameQuality") {
         val image = firstFrameImage() ?: throw ProviderException.generic("First Frame missing")
+        val local = FirstFrameHeuristics.check(image.width, image.height, image.compressedBytes)
         val api = apiImages().first { it.id == image.id }
-        project.firstFrameQuality = provider().firstFrameQuality(apiKey(), api)
+        val ai = provider().firstFrameQuality(apiKey(), api)
+        project.firstFrameQuality = FirstFrameHeuristics.merge(local, ai)
         persist()
         snapshot()
     }
@@ -497,14 +500,22 @@ class NativeBridge(
 
     private fun emitError(error: Exception) {
         if (error is ProviderException) {
-            emitError(error.code, error.message ?: error.statusLabel, error.statusLabel)
+            val retryable = error.code == "TIMEOUT" || error.code == "NETWORK" || error.code == "RATE_LIMIT"
+            emitError(error.code, error.message ?: error.statusLabel, error.statusLabel, retryable)
         } else {
             emitError("GENERIC", error.message ?: "error")
         }
     }
 
-    private fun emitError(code: String, message: String, status: String = "Provider Error") {
-        emit("error", JSONObject().put("code", code).put("message", message).put("status", status))
+    private fun emitError(code: String, message: String, status: String = "Provider Error", retryable: Boolean = false) {
+        emit(
+            "error",
+            JSONObject()
+                .put("code", code)
+                .put("message", message)
+                .put("status", status)
+                .put("retryable", retryable),
+        )
     }
 
     private fun emit(event: String, payload: JSONObject) {
