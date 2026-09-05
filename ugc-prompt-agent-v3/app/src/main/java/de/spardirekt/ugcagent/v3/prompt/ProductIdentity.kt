@@ -17,6 +17,10 @@ object ProductIdentity {
             "Do not replace, merge, remove or reinterpret any of these identity-critical components.\n" +
             "Never replace the two rectangular upper modules or the circular vent with one cylindrical reservoir."
 
+    const val MICROWAVE_VENT_STATIC =
+        "If the scene does not require the circular upper component to move, keep it completely static.\n" +
+            "If that circular upper component moves, its shape, diameter, thickness and attachment point must remain identical; the axis of movement must stay consistent; it must not rise, stretch, expand, collapse or turn into another mechanism."
+
     fun microwaveCoverFingerprint(): JSONObject = JSONObject()
         .put("overall_geometry", "transparent dome body with a green circular base ring and a curved green carry handle")
         .put(
@@ -84,6 +88,7 @@ object ProductIdentity {
         lines.add("Keep exactly the same single physical product throughout the entire video.")
         if (looksLikeMicrowaveCover(fingerprint)) {
             lines.add(MICROWAVE_COVER_LOCK)
+            lines.add(MICROWAVE_VENT_STATIC)
         }
         return lines.joinToString("\n")
     }

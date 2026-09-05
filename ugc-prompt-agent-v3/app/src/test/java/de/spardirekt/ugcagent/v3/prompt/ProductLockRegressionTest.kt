@@ -71,6 +71,7 @@ class ProductLockRegressionTest {
         assertTrue(prompt.contains("attachment", ignoreCase = true))
         assertTrue(prompt.contains("cylindrical reservoir", ignoreCase = true))
         assertTrue(prompt.contains("Never replace the two rectangular", ignoreCase = true))
+        assertTrue(prompt.contains("keep it completely static", ignoreCase = true))
         org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint))
     }
 
@@ -120,6 +121,76 @@ class ProductLockRegressionTest {
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("STRUCTURAL IDENTITY LOCK"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("exactly 8.0 seconds"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("functionally equivalent but visually different"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("MOVING COMPONENT LOCK"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("freeze-frame tail"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("finish before the 8.0-second endpoint"))
+        assertTrue(SystemPrompts.ACTION_IDENTITY_RISK_CHECK.contains("motion_geometry_risk"))
         assertTrue(ProductIdentity.READINESS_HIGH_MESSAGE_RU.contains("Недостаточно визуальной информации"))
+    }
+
+    @Test
+    fun testE_movingComponentGeometryLock() {
+        val prompt = ProductLock.applyGenerator(ProductLock.ensure("hand grips the green handle", true, fingerprint), "VEO")
+        assertTrue(ProductLock.hasMovingComponentLock(prompt))
+        assertFalse(ProductLock.allowsMovingComponentDeformation(prompt))
+        assertTrue(prompt.contains("Do not stretch", ignoreCase = true))
+        assertTrue(prompt.contains("keep them stationary", ignoreCase = true) || prompt.contains("keep the component stationary", ignoreCase = true))
+        assertTrue(prompt.contains("A static exact component is preferable", ignoreCase = true))
+        val bad = "Animate the vent even if uncertain. Stretching and resizing the handle is allowed."
+        assertTrue(ProductLock.allowsMovingComponentDeformation(bad))
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint, "VEO", "OFF"))
+    }
+
+    @Test
+    fun testE_circularUpperStaysStaticWhenMotionUncertain() {
+        val scene = JSONObject()
+            .put("main_action", "adjust and rotate the circular upper vent")
+        val local = ActionIdentity.localCheck(scene.getString("main_action"), fingerprint)
+        assertEquals("HIGH", local.getString("motion_geometry_risk"))
+        val applied = ActionIdentity.applyIfHighRisk(scene, local)
+        assertTrue(applied.getBoolean("moving_component_kept_static"))
+        assertFalse(ActionIdentity.isHighMotionAction(applied.getString("main_action")))
+        assertTrue(applied.getString("main_action").contains("static", ignoreCase = true) || applied.getString("main_action").contains("handle", ignoreCase = true) || applied.getString("main_action").contains("stationary", ignoreCase = true))
+    }
+
+    @Test
+    fun testF_veoExactDurationNotMaximum() {
+        val prompt = ProductLock.applyGenerator(ProductLock.ensure("a clip of the referenced product", true, fingerprint), "VEO")
+        assertTrue(ProductLock.veoHasExactDuration(prompt))
+        assertFalse(prompt.contains("maximum 8"))
+        assertTrue(prompt.contains("exactly 8.0 seconds"))
+        assertTrue(prompt.contains("end at exactly 8.0 seconds", ignoreCase = true))
+        assertTrue(prompt.contains("intro", ignoreCase = true) && prompt.contains("outro", ignoreCase = true))
+        val rewritten = ProductLock.applyGenerator("Target generator: Veo. Vertical 9:16, maximum 8.0 seconds, one continuous clip.\nHello", "VEO")
+        assertTrue(ProductLock.veoHasExactDuration(rewritten))
+        assertFalse(rewritten.contains("maximum 8"))
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint, "VEO", "OFF"))
+    }
+
+    @Test
+    fun testG_speechFinishesBeforeEndpoint() {
+        val prompt = ProductLock.ensureSpeechTiming(
+            ProductLock.applyGenerator(ProductLock.ensure("the person speaks while holding the product", true, fingerprint), "VEO"),
+            "DEUTSCH",
+        )
+        assertTrue(ProductLock.hasSpeechEndTiming(prompt))
+        assertTrue(prompt.contains("The spoken line must finish before the 8.0-second endpoint"))
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint, "VEO", "DEUTSCH"))
+        val ru = ProductLock.ensureSpeechTiming("FORMAT:\nclip", "РУССКИЙ")
+        assertTrue(ProductLock.hasSpeechEndTiming(ru))
+        val off = ProductLock.ensureSpeechTiming("clip", "OFF")
+        assertTrue(off.contains("No spoken dialogue"))
+        assertFalse(ProductLock.hasSpeechEndTiming(off))
+    }
+
+    @Test
+    fun testH_noExtraTail() {
+        val prompt = ProductLock.applyGenerator(ProductLock.ensure("one micro-moment", true, fingerprint), "VEO")
+        assertFalse(ProductLock.allowsExtraTail(prompt))
+        assertTrue(prompt.contains("freeze-frame tail", ignoreCase = true))
+        assertTrue(prompt.contains("additional action", ignoreCase = true))
+        val bad = "Continue with an outro and freeze-frame tail plus additional hold after the main moment."
+        assertTrue(ProductLock.allowsExtraTail(bad))
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint, "VEO", "OFF"))
     }
 }

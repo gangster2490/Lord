@@ -31,6 +31,7 @@ class JsonExtractorTest {
     fun fillsActionRiskDefaults() {
         val obj = JsonExtractor.withDefaults(JsonExtractor.extractObject("{}"), JsonExtractor.actionRiskSchemaKeys())
         assertEquals("LOW", obj.getString("risk"))
+        assertEquals("LOW", obj.getString("motion_geometry_risk"))
     }
 
     @Test(expected = IllegalArgumentException::class)

@@ -11,6 +11,8 @@ class SystemPromptsTest {
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("Do not overuse"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("STRUCTURAL IDENTITY LOCK"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("exactly 8.0 seconds"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("MOVING COMPONENT LOCK"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("freeze-frame tail"))
         assertTrue(SystemPrompts.PRODUCT_ANALYSIS.contains("text_claims"))
         assertTrue(SystemPrompts.CONSISTENCY.contains("same_product"))
         assertTrue(SystemPrompts.PRODUCT_IDENTITY_FINGERPRINT.contains("identity_critical_components"))

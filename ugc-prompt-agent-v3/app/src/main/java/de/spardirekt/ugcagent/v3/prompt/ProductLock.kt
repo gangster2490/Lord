@@ -45,12 +45,28 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
             "A functionally similar but visually different product is a failed generation."
 
     const val ANTI_MORPH =
-        "No product redesign, substitution, morphing, duplication, component merging, component deletion, invented controls, invented reservoirs, geometry drift, proportion changes, texture drift, impossible physics, malformed hands or extra fingers."
+        "No product redesign, substitution, morphing, duplication, component merging, component deletion, invented parts, invented reservoirs, geometry drift, moving-part deformation, proportion changes, texture drift, impossible physics, malformed hands or extra fingers."
 
-    const val EXACT_DURATION =
+    const val MOVING_COMPONENT_LOCK =
+        "Identity-critical moving components must preserve their exact geometry, proportions, attachment points and mechanism during motion.\n" +
+            "Do not stretch, resize, reshape, relocate or reinterpret them.\n" +
+            "If their exact movement cannot be preserved from the reference evidence, keep them stationary."
+
+    const val STATIC_WHEN_UNCERTAIN =
+        "If an identity-critical component is structurally important and its exact movement is uncertain, do not animate that component.\n" +
+            "A static exact component is preferable to an animated but geometrically incorrect component."
+
+    const val VEO_DURATION_LOCK =
         "Generate exactly 8.0 seconds total.\n" +
-            "End the clip at exactly 8.0 seconds.\n" +
-            "Do not extend beyond 8.0 seconds."
+            "The clip must end at exactly 8.0 seconds.\n" +
+            "Do not continue beyond 8.0 seconds.\n" +
+            "Do not add an intro, outro, extra hold frame, freeze-frame tail, transition tail, or additional action after the main micro-moment."
+
+    const val SPEECH_END_TIMING =
+        "The spoken line must finish before the 8.0-second endpoint."
+
+    const val SCENE_TIMING_BUDGET =
+        "Preferred timing budget for one continuous clip: 0.0–1.0 s establish the existing First Frame; 1.0–6.5 s one main action; 6.5–8.0 s natural completion / brief settle. Not three shots. No extra scenes or CTA segments."
 
     private val appearanceLeak = Regex(
         """(use a similar product|similar product is acceptable|a similar product from the same category is acceptable|functionally equivalent is (ok|fine|acceptable)|a typical product of this type|you may (merge|replace|substitute)|category-equivalent product is (ok|fine|acceptable))""",
@@ -65,9 +81,13 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         body = insertBlock(body, "STRUCTURAL IDENTITY LOCK:", ProductIdentity.structuralLockBlock(fingerprint))
         body = ensureContains(body, COMPONENT_COUNT_LOCK)
         body = ensureContains(body, GENERIC_SUBSTITUTION_BAN)
-        body = ensureContains(body, ANTI_MORPH)
+        body = insertBlock(body, "MOVING COMPONENT LOCK:", "MOVING COMPONENT LOCK:\n$MOVING_COMPONENT_LOCK")
+        body = ensureContains(body, MOVING_COMPONENT_LOCK, "Identity-critical moving components must preserve")
+        body = ensureContains(body, STATIC_WHEN_UNCERTAIN, "A static exact component is preferable")
+        body = ensureContains(body, ANTI_MORPH, "moving-part deformation")
         if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) {
             body = ensureContains(body, ProductIdentity.MICROWAVE_COVER_LOCK)
+            body = ensureContains(body, ProductIdentity.MICROWAVE_VENT_STATIC, "keep it completely static")
         }
         body = body.replace(Regex("maximum 8(\\.0)? seconds", RegexOption.IGNORE_CASE), "exactly 8.0 seconds")
         return body.trim()
@@ -81,18 +101,30 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         }
     }
 
+    fun ensureSpeechTiming(prompt: String, speechLanguage: String): String {
+        if (speechLanguage.equals("OFF", true)) return ensureNoSpeech(prompt)
+        return ensureContains(prompt, SPEECH_END_TIMING)
+    }
+
     fun applyGenerator(prompt: String, generator: String): String {
         var cleaned = prompt.replace(Regex("maximum 8(\\.0)? seconds", RegexOption.IGNORE_CASE), "exactly 8.0 seconds")
-        if (!cleaned.contains("exactly 8.0 seconds", ignoreCase = true)) {
-            cleaned = cleaned.trimEnd() + "\n\n" + EXACT_DURATION
-        }
-        if (cleaned.contains("Target generator:", ignoreCase = true)) {
+        val gen = generator.uppercase()
+        if (gen == "VEO") {
+            cleaned = ensureContains(cleaned, VEO_DURATION_LOCK, "freeze-frame tail")
+            cleaned = ensureContains(cleaned, SCENE_TIMING_BUDGET, "0.0–1.0 s")
+            if (!cleaned.contains("Target generator:", ignoreCase = true)) {
+                cleaned = "Target generator: Veo. Vertical 9:16. One continuous clip.\n\n$cleaned"
+            }
             return cleaned
         }
-        val note = when (generator.uppercase()) {
-            "VEO" -> "Target generator: Veo. Vertical 9:16. One continuous clip."
-            "KLING" -> "Target generator: Kling. Vertical 9:16. One continuous clip.\nUse the closest supported duration to 8.0 seconds without creating multiple scenes."
-            else -> "Target generator: generic short-form video model. Vertical 9:16. One continuous clip.\nUse the closest supported duration to 8.0 seconds without creating multiple scenes."
+        val closest = "Use the closest supported duration to 8.0 seconds without creating multiple scenes.\n$VEO_DURATION_LOCK"
+        cleaned = ensureContains(cleaned, closest, "closest supported duration to 8.0 seconds")
+        cleaned = ensureContains(cleaned, VEO_DURATION_LOCK, "freeze-frame tail")
+        if (cleaned.contains("Target generator:", ignoreCase = true)) return cleaned
+        val note = if (gen == "KLING") {
+            "Target generator: Kling. Vertical 9:16. One continuous clip."
+        } else {
+            "Target generator: generic short-form video model. Vertical 9:16. One continuous clip."
         }
         return "$note\n\n$cleaned"
     }
@@ -139,23 +171,63 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
             lower.contains("cylindrical reservoir")
     }
 
-    fun regressionFailures(prompt: String, fingerprint: JSONObject? = null): List<String> {
+    fun hasMovingComponentLock(prompt: String): Boolean {
+        val lower = prompt.lowercase()
+        return lower.contains("identity-critical moving components") &&
+            lower.contains("do not stretch") &&
+            (lower.contains("keep them stationary") || lower.contains("keep the component stationary"))
+    }
+
+    fun allowsMovingComponentDeformation(prompt: String): Boolean {
+        if (!hasMovingComponentLock(prompt)) return true
+        val lower = prompt.lowercase()
+        val permits = lower.contains("you may stretch") ||
+            lower.contains("resizing is allowed") ||
+            lower.contains("shape may change") ||
+            lower.contains("animate even if uncertain")
+        return permits
+    }
+
+    fun veoHasExactDuration(prompt: String): Boolean {
+        val lower = prompt.lowercase()
+        val exact = lower.contains("exactly 8.0 seconds")
+        val end = lower.contains("end at exactly 8.0 seconds") || lower.contains("must end at exactly 8.0 seconds")
+        val noTail = lower.contains("freeze-frame tail") && (lower.contains("intro") && lower.contains("outro"))
+        val onlyMaximum = lower.contains("maximum 8") && !exact
+        return exact && end && noTail && !onlyMaximum
+    }
+
+    fun hasSpeechEndTiming(prompt: String): Boolean =
+        prompt.contains("finish before the 8.0-second endpoint", ignoreCase = true)
+
+    fun allowsExtraTail(prompt: String): Boolean {
+        val lower = prompt.lowercase()
+        val forbids = lower.contains("do not add") &&
+            lower.contains("intro") &&
+            lower.contains("outro") &&
+            (lower.contains("freeze-frame") || lower.contains("hold frame")) &&
+            lower.contains("additional action")
+        return !forbids
+    }
+
+    fun regressionFailures(prompt: String, fingerprint: JSONObject? = null, generator: String = "VEO", speechLanguage: String = "OFF"): List<String> {
         val failures = mutableListOf<String>()
         if (allowsComponentMutation(prompt)) failures.add("component_count_lock")
         if (allowsGenericSubstitution(prompt)) failures.add("generic_substitution")
         if (ProductIdentity.looksLikeMicrowaveCover(fingerprint) && !preservesMicrowaveCover(prompt)) {
             failures.add("microwave_cover_identity")
         }
-        if (!prompt.contains("exactly 8.0 seconds", ignoreCase = true)) {
-            failures.add("exact_duration")
-        }
+        if (allowsMovingComponentDeformation(prompt)) failures.add("moving_component_lock")
+        if (generator.equals("VEO", true) && !veoHasExactDuration(prompt)) failures.add("veo_exact_duration")
+        if (!speechLanguage.equals("OFF", true) && !hasSpeechEndTiming(prompt)) failures.add("speech_end_timing")
+        if (allowsExtraTail(prompt)) failures.add("extra_tail")
         return failures
     }
 
     fun wordCount(prompt: String): Int = prompt.split(Regex("\\s+")).filter { it.isNotBlank() }.size
 
-    private fun ensureContains(body: String, block: String): String {
-        val needle = block.lineSequence().first { it.isNotBlank() }
+    private fun ensureContains(body: String, block: String, marker: String? = null): String {
+        val needle = marker ?: block.lineSequence().first { it.isNotBlank() }
         return if (body.contains(needle, ignoreCase = true)) body else body.trimEnd() + "\n\n" + block.trim()
     }
 

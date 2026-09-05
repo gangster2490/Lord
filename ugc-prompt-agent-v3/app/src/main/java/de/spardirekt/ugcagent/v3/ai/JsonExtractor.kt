@@ -75,7 +75,9 @@ object JsonExtractor {
         "risk",
         "risk_reasons",
         "geometry_that_must_move",
+        "identity_critical_moving_components",
         "hidden_geometry_required",
+        "motion_geometry_risk",
         "recommended_safe_action",
     )
 
@@ -135,6 +137,7 @@ object JsonExtractor {
                     "uncertain_hidden_geometry",
                     "risk_reasons",
                     "geometry_that_must_move",
+                    "identity_critical_moving_components",
                     "hidden_geometry_required",
                     "missing_views",
                     "ambiguous_components",
@@ -144,7 +147,7 @@ object JsonExtractor {
                     "marketplace_ui_over_product" -> obj.put(key, false)
                     "confidence", "score" -> obj.put(key, 0.0)
                     "recommended_image_index" -> obj.put(key, 0)
-                    "risk", "generation_risk" -> obj.put(key, "LOW")
+                    "risk", "generation_risk", "motion_geometry_risk" -> obj.put(key, "LOW")
                     "status" -> obj.put(key, "WARNING")
                     else -> obj.put(key, "")
                 }

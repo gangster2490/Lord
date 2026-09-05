@@ -163,9 +163,7 @@ class OpenAiProvider(
         val fingerprint = try { JSONObject(ctx.fingerprint) } catch (_: Exception) { null }
         prompt = ProductLock.ensure(prompt, ctx.strictProductLock, fingerprint)
         prompt = ProductLock.applyGenerator(prompt, ctx.targetGenerator)
-        if (ctx.speechLanguage.equals("OFF", true)) {
-            prompt = ProductLock.ensureNoSpeech(prompt)
-        }
+        prompt = ProductLock.ensureSpeechTiming(prompt, ctx.speechLanguage)
         return prompt
     }
 
@@ -186,6 +184,8 @@ class OpenAiProvider(
         appendLine(ctx.scene)
         appendLine("Use ALL uploaded reference images as supporting identity evidence.")
         appendLine("Use only the selected LOW-RISK action. If the action is HIGH risk, replace it with the recommended safer action.")
+        appendLine("If motion_geometry_risk is HIGH, keep identity-critical moving components static.")
+        appendLine("Generate exactly 8.0 seconds. The spoken line must finish before the 8.0-second endpoint.")
     }
 
     private fun parseJson(text: String, keys: List<String>): JSONObject {

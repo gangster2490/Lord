@@ -202,12 +202,12 @@ class GeminiProvider(
         val fingerprint = try { JSONObject(ctx.fingerprint) } catch (_: Exception) { null }
         prompt = ProductLock.ensure(prompt, ctx.strictProductLock, fingerprint)
         prompt = ProductLock.applyGenerator(prompt, ctx.targetGenerator)
-        if (ctx.speechLanguage.equals("OFF", true)) prompt = ProductLock.ensureNoSpeech(prompt)
+        prompt = ProductLock.ensureSpeechTiming(prompt, ctx.speechLanguage)
         return prompt
     }
 
     private fun userContext(ctx: PromptContext): String =
-        "${ctx.firstFrameNote}\nStrict lock=${ctx.strictProductLock}\nSpeech=${ctx.speechLanguage}\nGenerator=${ctx.targetGenerator}\nFingerprint:\n${ctx.fingerprint}\nAction risk:\n${ctx.actionRisk}\nReadiness:\n${ctx.readiness}\nEvidence:\n${ctx.analysis}\nScene:\n${ctx.scene}\nUse all uploaded reference images as supporting identity evidence. Use only the selected LOW-RISK action."
+        "${ctx.firstFrameNote}\nStrict lock=${ctx.strictProductLock}\nSpeech=${ctx.speechLanguage}\nGenerator=${ctx.targetGenerator}\nFingerprint:\n${ctx.fingerprint}\nAction risk:\n${ctx.actionRisk}\nReadiness:\n${ctx.readiness}\nEvidence:\n${ctx.analysis}\nScene:\n${ctx.scene}\nUse all uploaded reference images as supporting identity evidence. Use only the selected LOW-RISK action. If motion_geometry_risk is HIGH, keep identity-critical moving components static. Generate exactly 8.0 seconds. The spoken line must finish before the 8.0-second endpoint."
 
     private fun complete(
         apiKey: String,

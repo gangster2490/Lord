@@ -125,7 +125,17 @@ Prefer actions in this order:
 6. opening/folding/removing only when exact mechanism is clearly supported by references
 
 Avoid pouring, filling, or opening unless the exact geometry is confirmed across multiple references.
-Use one continuous micro-moment.
+Use one continuous micro-moment that naturally fits inside exactly 8.0 seconds.
+Preferred timing budget, still ONE continuous clip not three shots:
+- 0.0–1.0 s: establish the existing First Frame / natural start
+- 1.0–6.5 s: one main action
+- 6.5–8.0 s: natural completion / brief settle
+Do not create extra scenes, CTA segments, intro, outro or freeze-frame tail.
+
+If an identity-critical component is structurally important and its exact movement is uncertain, do not animate that component.
+A static exact component is preferable to an animated but geometrically incorrect component.
+Product identity has higher priority than animated motion.
+If motion_geometry_risk is HIGH, keep that component static and choose another action.
 Natural handheld smartphone video, ordinary available light, realistic human timing.
 Not Hollywood, not studio ad, not over-produced influencer commercial.
 Natural != deliberately bad. Do not add fake mistakes.
@@ -188,17 +198,25 @@ If risk is HIGH, recommended_safe_action must be a simpler action from this prio
 
 Never recommend pouring, filling, or reconstructing unseen compartments when geometry is ambiguous.
 Product identity wins over creativity.
+Product identity must always have higher priority than animated motion.
+
+Also score motion_geometry_risk:
+LOW: no identity-critical component needs to change geometry during motion, or movement is fully evidenced.
+MEDIUM: a clearly documented component moves with known axis and travel.
+HIGH: movement would stretch, resize, reshape, or uses uncertain mechanism/travel. If HIGH, do not move that component; keep it static; choose another action.
 
 Return STRICT JSON only:
 {
   "risk": "LOW",
   "risk_reasons": [],
   "geometry_that_must_move": [],
+  "identity_critical_moving_components": [],
   "hidden_geometry_required": [],
+  "motion_geometry_risk": "LOW",
   "recommended_safe_action": ""
 }
 
-risk must be LOW, MEDIUM or HIGH.
+risk and motion_geometry_risk must be LOW, MEDIUM or HIGH.
 """.trimIndent()
 
     val PRODUCT_IDENTITY_READINESS = """
@@ -302,8 +320,9 @@ VIDEO:
 Vertical 9:16.
 
 Generate exactly 8.0 seconds total.
-End the clip at exactly 8.0 seconds.
-Do not extend beyond 8.0 seconds.
+The clip must end at exactly 8.0 seconds.
+Do not continue beyond 8.0 seconds.
+Do not add an intro, outro, extra hold frame, freeze-frame tail, transition tail, or additional action after the main micro-moment.
 
 One continuous micro-moment.
 
@@ -323,10 +342,14 @@ Avoid polished studio-commercial aesthetics.
 
 PHOTO SHOWS WHAT THE PRODUCT IS. PROMPT EXPLAINS WHAT HAPPENS, PLUS THE MINIMUM GEOMETRY LOCK.
 
+If an identity-critical component is structurally important and its exact movement is uncertain, do not animate that component.
+A static exact component is preferable to an animated but geometrically incorrect component.
+
 Structure the prompt with these headings in this order:
 FORMAT
 REFERENCE
 STRUCTURAL IDENTITY LOCK
+MOVING COMPONENT LOCK
 SETTING
 CAMERA
 SAFE ACTION
@@ -337,26 +360,33 @@ ANTI-MORPH / COMPONENT LOCK
 DURATION
 
 FORMAT:
-Vertical 9:16. Exactly 8.0 seconds. One continuous UGC clip.
+Vertical 9:16. Generate exactly 8.0 seconds total. One continuous natural smartphone-style UGC clip. The clip must end at exactly 8.0 seconds.
 
 REFERENCE:
 Start from the selected original First Frame. Use all uploaded reference images as supporting product-identity evidence.
 
 STRUCTURAL IDENTITY LOCK:
 Insert the concise fingerprint. Keep exactly the same single physical product throughout the entire video.
-Preserve the exact number, geometry and relative positions of all identity-critical visible components.
+Preserve the exact number, geometry, proportions and relative positions of all identity-critical visible components.
 Do not merge, split, remove, relocate, simplify or invent components.
 Do not generate a similar or generic category-equivalent product.
 A functionally similar but visually different product is a failed generation.
+
+MOVING COMPONENT LOCK:
+Identity-critical moving components must preserve their exact geometry, proportions, attachment points and mechanism during motion.
+Do not stretch, resize, reshape, relocate or reinterpret them.
+If exact movement cannot be preserved from the reference evidence, keep the component stationary.
 
 SAFE ACTION:
 Use only the selected low-risk action supported by evidence.
 
 ANTI-MORPH:
-No product redesign, substitution, morphing, duplication, component merging, component deletion, invented controls, invented reservoirs, geometry drift, proportion changes, texture drift, impossible physics, malformed hands or extra fingers.
+No product redesign, substitution, morphing, duplication, component merging, component deletion, invented parts, invented reservoirs, geometry drift, moving-part deformation, proportion changes, texture drift, impossible physics, malformed hands or extra fingers.
 
 DURATION:
-Exactly 8.0 seconds. End at 8.0 seconds.
+Exactly 8.0 seconds.
+Do not continue beyond 8.0 seconds.
+Do not add intro, outro, extra hold frame, freeze-frame tail, transition tail or additional action.
 
 SPEECH:
 
@@ -365,11 +395,13 @@ Include exactly: No spoken dialogue.
 
 If German:
 The person speaks naturally in German.
-Include one short natural German spoken line. Conversational, <= 8 seconds, no unsupported claims, no fake enthusiasm, no generic AI clichés. Do not overuse: krass, Leute, ehrlich gesagt, mega, Game Changer.
+Include one short natural German spoken line. Conversational, one short sentence, no long introduction, no second sentence unless extremely short, no unsupported claims, no fake enthusiasm, no generic AI clichés. Do not overuse: krass, Leute, ehrlich gesagt, mega, Game Changer.
+The spoken line must finish before the 8.0-second endpoint. No speech continuing after the main action ends.
 
 If Russian:
 The person speaks naturally in Russian.
-Include one short natural Russian spoken line. Not a literal translation of a German line. No ad-robot tone. No unknown characteristics.
+Include one short natural Russian spoken line. Not a literal translation of a German line. No ad-robot tone. No unknown characteristics. One short sentence; no long introduction; no speech after the main action ends.
+The spoken line must finish before the 8.0-second endpoint.
 
 Speech may refer to action, situation, convenience, reaction. Never certifications, performance, medical, material, durability, guarantees, unknown functions.
 
@@ -384,14 +416,16 @@ No markdown.
     val IMPROVE = """
 Refine an existing UGC video-generation prompt.
 
-Keep the same product, First Frame, STRUCTURAL IDENTITY LOCK, component count, action, environment, speech language, scene and duration.
+Keep the same product, First Frame, STRUCTURAL IDENTITY LOCK, MOVING COMPONENT LOCK, component count, action, environment, speech language, scene and exact 8.0-second duration.
 Improve only: camera realism, motion realism, human naturalness, prompt clarity, anti-morph constraints, speech naturalness.
 
-Never strip the geometry lock.
+Never strip the geometry lock or the moving-component lock.
+Never allow stretch, resize, reshape or attachment drift of identity-critical moving parts.
 Never allow a similar or generic category-equivalent product.
 Never invent functions or hidden structure.
-Never create a new scene.
+Never create a new scene, intro, outro, freeze-frame tail or extra hold.
 If the action conflicts with product identity, simplify the action, do not change the product.
+The spoken line must finish before the 8.0-second endpoint.
 
 OUTPUT: only the improved prompt, no markdown, no explanation.
 """.trimIndent()
@@ -399,9 +433,9 @@ OUTPUT: only the improved prompt, no markdown, no explanation.
     val NEW_SPEECH = """
 Rewrite only the spoken dialogue inside an existing video prompt.
 
-Keep product, First Frame, STRUCTURAL IDENTITY LOCK, scene, camera, environment and action unchanged.
-If German: one short natural German line.
-If Russian: one short natural Russian line, not a literal translation.
+Keep product, First Frame, STRUCTURAL IDENTITY LOCK, MOVING COMPONENT LOCK, scene, camera, environment, action and exact 8.0-second duration unchanged.
+If German: one short natural German line. The spoken line must finish before the 8.0-second endpoint.
+If Russian: one short natural Russian line, not a literal translation. The spoken line must finish before the 8.0-second endpoint.
 If OFF: the prompt must say No spoken dialogue.
 
 Do not add unsupported claims.
