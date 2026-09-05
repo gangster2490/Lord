@@ -156,7 +156,7 @@ object JsonExtractor {
                     "confidence", "score" -> obj.put(key, 0.0)
                     "recommended_image_index" -> obj.put(key, 0)
                     "risk", "generation_risk", "motion_geometry_risk" -> obj.put(key, "LOW")
-                    "status" -> obj.put(key, "WARNING")
+                    "status" -> obj.put(key, "PASS")
                     else -> obj.put(key, "")
                 }
             }

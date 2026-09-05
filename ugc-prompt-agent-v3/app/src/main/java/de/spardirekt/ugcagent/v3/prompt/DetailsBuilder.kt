@@ -13,8 +13,8 @@ object DetailsBuilder {
         val scene = session.scene ?: JSONObject()
         val category = analysis.optString("product_category").ifBlank { "—" }
         val use = analysis.optString("observed_use_case").ifBlank { analysis.optString("inferred_use_case").ifBlank { "—" } }
-        val visual = join(JsonExtractor.stringList(analysis, "visual_features_relevant_to_use"))
-        val text = join(JsonExtractor.stringList(analysis, "text_claims"))
+        val visual = join(de.spardirekt.ugcagent.v3.prompt.EvidenceModel.visuallyConfirmed(session.evidence, analysis))
+        val text = join(de.spardirekt.ugcagent.v3.prompt.EvidenceModel.verifiedReliable(session.evidence, analysis))
         val identity = fingerprint.optString("overall_geometry").ifBlank {
             join(JsonExtractor.stringList(fingerprint, "identity_critical_components"))
         }

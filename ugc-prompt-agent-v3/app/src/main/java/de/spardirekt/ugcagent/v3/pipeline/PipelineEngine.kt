@@ -315,10 +315,7 @@ class PipelineEngine(private val ai: PipelineAi) {
         var prompt = ai.generatePrompt(ctx)
         prompt = ProductLock.ensure(prompt, session.strictProductLock, fingerprint)
         prompt = ProductLock.applyGenerator(prompt, session.targetGenerator)
-        prompt = ProductLock.ensureSpeechTiming(prompt, session.speechLanguage)
-        if (session.hook.isNotBlank() && !prompt.contains(session.hook.take(18))) {
-            prompt = prompt.trimEnd() + "\n\n" + de.spardirekt.ugcagent.v3.prompt.HookEngine.speechBlock(session.hook, session.speechLanguage)
-        }
+        prompt = ProductLock.normalizeSpeech(prompt, session.speechLanguage, session.hook)
         session.finalPrompt = prompt
     }
 
@@ -345,33 +342,38 @@ class PipelineEngine(private val ai: PipelineAi) {
             )
             session.repairApplied = true
         }
-        prompt = de.spardirekt.ugcagent.v3.prompt.EvidenceModel.omitUnverified(prompt)
+        prompt = de.spardirekt.ugcagent.v3.prompt.EvidenceModel.sanitizePromptBody(prompt)
         if (session.hook.isNotBlank() && de.spardirekt.ugcagent.v3.prompt.HookEngine.isWeak(session.hook, session.speechLanguage)) {
             session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
-            prompt = prompt.trimEnd() + "\n\n" + de.spardirekt.ugcagent.v3.prompt.HookEngine.speechBlock(session.hook, session.speechLanguage)
         }
-        session.finalPrompt = ProductLock.repairOnce(
-            prompt,
-            fingerprint,
-            session.targetGenerator,
-            session.speechLanguage,
-            session.strictProductLock,
-        )
+        session.finalPrompt = ProductLock.normalizeSpeech(prompt, session.speechLanguage, session.hook)
         ProductLock.regressionFailures(session.finalPrompt.orEmpty(), fingerprint, session.targetGenerator, session.speechLanguage).forEach {
             session.warnings.add("Prompt quality: $it")
         }
     }
 
     private fun compliance(session: PipelineSession) {
-        val prompt = session.finalPrompt.orEmpty()
-        val result = ai.checkCompliance(prompt, session.analysis, session.caption.orEmpty(), session.hashtags)
-        session.compliance = result
-        if (result.optString("status") == "BLOCK") {
+        val language = session.captionLanguage.ifBlank { session.speechLanguage }
+        val fixed = de.spardirekt.ugcagent.v3.compliance.ComplianceEngine.enforceAndFix(
+            prompt = session.finalPrompt.orEmpty(),
+            caption = session.caption.orEmpty(),
+            hashtags = session.hashtags,
+            analysis = session.analysis,
+            evidence = session.evidence,
+            fingerprint = session.identityFingerprint,
+            language = language,
+            commercialCaption = de.spardirekt.ugcagent.v3.prompt.CaptionEngine.isCommercialLanguage(language),
+        )
+        session.finalPrompt = ProductLock.normalizeSpeech(fixed.prompt, session.speechLanguage, session.hook)
+        session.caption = fixed.caption
+        session.hashtags = fixed.hashtags.toMutableList()
+        session.compliance = fixed.review
+        if (fixed.review.optString("status") == "BLOCK") {
             throw PipelinePaused(PauseReasons.COMPLIANCE_BLOCK, PipelineStage.FINAL_QUALITY_CHECK)
         }
-        val warnings = result.optJSONArray("warnings") ?: JSONArray()
-        for (i in 0 until warnings.length()) {
-            val text = warnings.optString(i)
+        val notes = fixed.review.optJSONArray("notes") ?: JSONArray()
+        for (i in 0 until notes.length()) {
+            val text = notes.optString(i)
             if (text.isNotBlank()) session.warnings.add(text)
         }
     }
@@ -390,16 +392,18 @@ class PipelineEngine(private val ai: PipelineAi) {
             finalIdentityLock = session.finalIdentityLock.orEmpty(),
         )
         val result = ai.generateCaption(ctx)
-        var caption = de.spardirekt.ugcagent.v3.prompt.EvidenceModel.omitUnverified(result.optString("caption"))
-        if (session.captionLanguage.equals("DEUTSCH", true) || session.speechLanguage.equals("DEUTSCH", true)) {
-            caption = de.spardirekt.ugcagent.v3.compliance.ComplianceEngine.addWerbung(caption)
-        }
-        session.caption = caption
+        session.caption = de.spardirekt.ugcagent.v3.prompt.CaptionEngine.finalize(
+            raw = result.optString("caption"),
+            analysis = session.analysis,
+            evidence = session.evidence,
+            fingerprint = fingerprint,
+            language = session.captionLanguage.ifBlank { session.speechLanguage },
+            appendDisclosure = true,
+        )
         val tags = result.optJSONArray("hashtags") ?: JSONArray()
-        session.hashtags = MutableList(tags.length()) { tags.optString(it) }
-            .map { it.trim() }
-            .filter { it.isNotBlank() && !de.spardirekt.ugcagent.v3.prompt.EvidenceModel.isBanned(it) }
-            .toMutableList()
+        session.hashtags = de.spardirekt.ugcagent.v3.prompt.EvidenceModel.sanitizeHashtags(
+            MutableList(tags.length()) { tags.optString(it) },
+        ).toMutableList()
     }
 
     private fun hashtags(session: PipelineSession) {
@@ -427,6 +431,8 @@ class PipelineEngine(private val ai: PipelineAi) {
             .put("caption", session.caption.orEmpty().isNotBlank())
             .put("hashtags", de.spardirekt.ugcagent.v3.prompt.EvidenceModel.hashtagCountOk(session.hashtags))
             .put("no_hard_error", session.pausedReason == null)
+            .put("speech_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.speechHeadingCount(prompt) <= 1)
+            .put("compliance_pass", session.compliance?.optString("status") != "BLOCK")
         session.selfCheck = checks
         if (!checks.optBoolean("hook")) {
             session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)

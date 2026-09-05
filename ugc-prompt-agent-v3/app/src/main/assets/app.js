@@ -420,7 +420,8 @@
       <pre>${escapeHtml(p.caption || "")}</pre>
       <h3>${t("hashtags")}</h3>
       <pre>${escapeHtml((p.hashtags || []).join(" "))}</pre>
-      <p class="${compliance.status === "PASS" ? "ok" : compliance.status === "BLOCK" ? "err" : "warn"}">${t("compliance_result")}: ${escapeHtml(compliance.status || "-")}</p>
+      ${compliance.status === "BLOCK" ? `<p class="err">${t("compliance_result")}: BLOCK</p>` : ""}
+      ${!/\b(werbung|anzeige)\b/i.test(p.caption || "") && (p.caption || "") ? `<p class="muted">${t("disclosure_hint")}</p>` : ""}
       <pre id="advBox" class="hidden">${escapeHtml(advanced)}</pre>
     </section>`;
   }

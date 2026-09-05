@@ -22,10 +22,24 @@ class ComplianceEngineTest {
     }
 
     @Test
-    fun warnsOnAbsoluteClaim() {
-        val result = ComplianceEngine.review("Das ist das beste Produkt", "", "Caption", emptyList(), null, null)
-        assertEquals("WARNING", result.getString("status"))
+    fun absoluteClaimDoesNotSurfaceWarningAfterFix() {
+        val result = ComplianceEngine.review("Das ist das beste Produkt", "", "Caption\nWerbung", emptyList(), null, null)
         assertTrue(result.getJSONArray("unsupported_claims").toString().contains("beste"))
+        assertEquals("PASS", result.getString("status"))
+        val fixed = ComplianceEngine.enforceAndFix(
+            prompt = "Das ist das beste Produkt. Keep the referenced product unchanged.",
+            caption = "Das ist das beste Produkt, bewahrt Feuchtigkeit, BPA-free.",
+            hashtags = listOf("#tiktokshop", "#küche", "#alltag", "#ugc"),
+            analysis = JSONObject().put("product_category", "kitchen").put("observed_use_case", "cover food"),
+            evidence = null,
+            fingerprint = de.spardirekt.ugcagent.v3.prompt.ProductIdentity.microwaveCoverFingerprint(),
+            language = "DEUTSCH",
+        )
+        assertEquals("PASS", fixed.review.getString("status"))
+        assertEquals(0, fixed.review.getJSONArray("blocked_reasons").length())
+        assertFalse(fixed.caption.contains("Feuchtigkeit"))
+        assertFalse(fixed.caption.contains("beste"))
+        assertTrue(fixed.caption.contains("Werbung"))
     }
 
     @Test
@@ -35,15 +49,18 @@ class ComplianceEngineTest {
     }
 
     @Test
-    fun warnsWhenWerbungMissing() {
+    fun missingDisclosureIsNoteNotWarning() {
         val result = ComplianceEngine.review("prompt", "", "Tolle Küche heute", emptyList(), null, null)
-        assertTrue(result.getJSONArray("warnings").toString().contains("Werbung"))
+        assertEquals("PASS", result.getString("status"))
+        assertTrue(result.getJSONArray("notes").toString().contains("Werbung"))
+        assertEquals(0, result.getJSONArray("warnings").length())
     }
 
     @Test
     fun addWerbungDoesNotDuplicate() {
         assertEquals("Hallo\nWerbung", ComplianceEngine.addWerbung("Hallo"))
         assertEquals("Werbung schon da", ComplianceEngine.addWerbung("Werbung schon da"))
+        assertEquals("Текст\nAnzeige", ComplianceEngine.addDisclosure("Текст", "РУССКИЙ"))
     }
 
     @Test

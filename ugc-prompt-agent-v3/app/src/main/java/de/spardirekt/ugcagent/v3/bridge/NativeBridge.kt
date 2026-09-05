@@ -360,9 +360,18 @@ class NativeBridge(
     @JavascriptInterface
     fun generateCaption() = runOp("caption") {
         val result = provider().generateCaption(apiKey(), ctx())
-        project.caption = result.optString("caption")
+        project.caption = de.spardirekt.ugcagent.v3.prompt.CaptionEngine.finalize(
+            raw = result.optString("caption"),
+            analysis = project.analysis,
+            evidence = project.evidence,
+            fingerprint = project.identityFingerprint,
+            language = project.captionLanguage.ifBlank { project.speechLanguage },
+            appendDisclosure = true,
+        )
         val tags = result.optJSONArray("hashtags") ?: JSONArray()
-        project.hashtags = MutableList(tags.length()) { tags.optString(it) }
+        project.hashtags = de.spardirekt.ugcagent.v3.prompt.EvidenceModel.sanitizeHashtags(
+            MutableList(tags.length()) { tags.optString(it) },
+        ).toMutableList()
         persist()
         snapshot()
     }
@@ -372,27 +381,35 @@ class NativeBridge(
 
     @JavascriptInterface
     fun runCompliance() = runOp("compliance") {
-        val prompt = activePrompt()
-        val semantic = try {
-            provider().checkCompliance(apiKey(), ctx().copy(currentPrompt = prompt))
-        } catch (_: Exception) {
-            null
-        }
-        project.compliance = ComplianceEngine.review(
-            prompt = prompt,
-            speech = prompt,
+        val language = project.captionLanguage.ifBlank { project.speechLanguage }
+        val fixed = ComplianceEngine.enforceAndFix(
+            prompt = activePrompt(),
             caption = project.caption.orEmpty(),
             hashtags = project.hashtags,
             analysis = project.analysis,
-            semantic = semantic,
+            evidence = project.evidence,
+            fingerprint = project.identityFingerprint,
+            language = language,
+            commercialCaption = de.spardirekt.ugcagent.v3.prompt.CaptionEngine.isCommercialLanguage(language),
         )
+        project.finalPrompt = de.spardirekt.ugcagent.v3.prompt.ProductLock.normalizeSpeech(
+            fixed.prompt,
+            project.speechLanguage,
+            project.hook,
+        )
+        project.caption = fixed.caption
+        project.hashtags = fixed.hashtags.toMutableList()
+        project.compliance = fixed.review
         persist()
         snapshot()
     }
 
     @JavascriptInterface
     fun addWerbung() {
-        project.caption = ComplianceEngine.addWerbung(project.caption.orEmpty())
+        project.caption = ComplianceEngine.addDisclosure(
+            project.caption.orEmpty(),
+            project.captionLanguage.ifBlank { project.speechLanguage },
+        )
         persist()
         runCompliance()
     }

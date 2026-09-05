@@ -32,6 +32,12 @@ class PipelineEngineTest {
         assertTrue(fake.calls.contains(PipelineStage.PRODUCT_ANALYSIS))
         assertTrue(result.details.orEmpty().contains("Produktkategorie"))
         assertTrue(result.hook.isNotBlank())
+        assertEquals("PASS", result.compliance?.optString("status"))
+        assertEquals(de.spardirekt.ugcagent.v3.prompt.CaptionEngine.DE_FALLBACK + "\nWerbung", result.caption)
+        assertFalse(result.caption.orEmpty().contains("Feuchtigkeit"))
+        assertFalse(result.caption.orEmpty().contains("BPA"))
+        assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.speechHeadingCount(result.finalPrompt.orEmpty()))
+        assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.speechEndTimingCount(result.finalPrompt.orEmpty()))
     }
 
     @Test
@@ -203,6 +209,8 @@ class PipelineEngineTest {
             result.hashtags,
         )
         assertTrue(all.startsWith(result.details.orEmpty().trim()))
+        assertEquals(de.spardirekt.ugcagent.v3.prompt.CaptionEngine.RU_FALLBACK + "\nAnzeige", result.caption)
+        assertEquals("PASS", result.compliance?.optString("status"))
     }
 
     private fun sampleSession(): PipelineSession {
@@ -310,7 +318,7 @@ class FakePipelineAi(
     override fun generatePrompt(ctx: PromptContext): String {
         calls.add(PipelineStage.PROMPT_GENERATION)
         failIf(PipelineStage.PROMPT_GENERATION)
-        return "FORMAT:\nVertical 9:16.\nACTION:\none hand grips the handle.\nSPEECH:\nKurz den Deckel auf den Teller."
+        return "FORMAT:\nVertical 9:16.\nACTION:\none hand grips the handle.\nSPEECH:\nKurz den Deckel auf den Teller.\nSPEECH:\nThe spoken line must finish before the 8.0-second endpoint.\nThe spoken line must finish before the 8.0-second endpoint."
     }
 
     override fun checkCompliance(prompt: String, analysis: JSONObject?, caption: String, hashtags: List<String>): JSONObject {
@@ -323,8 +331,8 @@ class FakePipelineAi(
         calls.add(PipelineStage.CAPTION)
         failIf(PipelineStage.CAPTION)
         return JSONObject()
-            .put("caption", "Werbung\nDeckel einfach auf den Teller.")
-            .put("hashtags", JSONArray().put("#tiktokshop").put("#küche"))
+            .put("caption", "Deckel bewahrt Feuchtigkeit, macht das Essen weicher, BPA-free und anti-scratch.")
+            .put("hashtags", JSONArray().put("#tiktokshop").put("#küche").put("#bpafree"))
     }
 
     private fun failIf(stage: PipelineStage) {

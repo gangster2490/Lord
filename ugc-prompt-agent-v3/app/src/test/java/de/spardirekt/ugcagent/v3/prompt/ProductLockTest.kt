@@ -1,5 +1,6 @@
 package de.spardirekt.ugcagent.v3.prompt
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -41,7 +42,22 @@ class ProductLockTest {
         assertFalse(ProductLock.looksLikeProductRebuild("the referenced product sits on the table"))
     }
 
-    private fun assertEquals(expected: Int, actual: Int) {
-        org.junit.Assert.assertEquals(expected, actual)
+    @Test
+    fun collapseDuplicateSpeechHeadingAndTiming() {
+        val raw = """
+FORMAT:
+Vertical 9:16.
+SPEECH:
+Old line.
+The spoken line must finish before the 8.0-second endpoint.
+SPEECH:
+Another line.
+The spoken line must finish before the 8.0-second endpoint.
+""".trimIndent()
+        val out = ProductLock.normalizeSpeech(raw, "DEUTSCH", "Keine Lust, die Mikrowelle nach jedem Aufwärmen zu putzen?")
+        assertEquals(1, ProductLock.speechHeadingCount(out))
+        assertEquals(1, ProductLock.speechEndTimingCount(out))
+        assertTrue(out.contains("Keine Lust"))
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(out, null, "VEO", "DEUTSCH").filter { it.startsWith("duplicate_speech") })
     }
 }

@@ -100,6 +100,7 @@ window.I18N = {
     details: "DETAILS",
     video_prompt: "VIDEO PROMPT",
     advanced_details: "ADVANCED DETAILS",
+    disclosure_hint: "Hinweis: Werbung/Anzeige kann ergänzt werden, blockiert die Ausgabe aber nicht.",
     language: "Sprache",
     start: "START"
   },
@@ -204,6 +205,7 @@ window.I18N = {
     details: "DETAILS",
     video_prompt: "VIDEO PROMPT",
     advanced_details: "ADVANCED DETAILS",
+    disclosure_hint: "Пометка: Anzeige/Werbung можно добавить, генерацию это не блокирует.",
     language: "Язык",
     start: "START"
   }

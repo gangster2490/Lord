@@ -467,7 +467,15 @@ Generate a TikTok Shop caption and 4-6 relevant hashtags.
 
 Languages as requested. Default Deutsch.
 
-Must match product evidence and compliance.
+Caption may use ONLY:
+- visually confirmed product category
+- visually confirmed product features
+- safe obvious use context
+- claims explicitly marked verified/reliable
+
+Do NOT use seller/text claims, uncertain claims, conflicting claims, or anything not visually demonstrated.
+Do NOT claim: preserves moisture, makes food softer, improves taste, creates steam, easier to use, anti-scratch, BPA-free, heating performance, splash reduction unless visually confirmed.
+Omit instead of guessing.
 Do not insert marketplace price, commission, seller rank, fake discount, fake urgency, shipping guarantee, unsupported superlative, unknown feature.
 Do not invent claims. Do not auto-insert Werbung/Anzeige.
 

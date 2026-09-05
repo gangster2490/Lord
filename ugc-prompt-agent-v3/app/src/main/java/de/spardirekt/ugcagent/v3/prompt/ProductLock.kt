@@ -122,7 +122,7 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         var body = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(prompt)
         body = stripInternalLeaks(body)
         body = stripJsonDumps(body)
-        body = stripUnsupportedClaims(body)
+        body = EvidenceModel.sanitizePromptBody(body)
         body = de.spardirekt.ugcagent.v3.compliance.MarketplaceFilter.stripFromText(body)
         body = collapseDuplicateLockBlocks(body)
         body = ensure(body, lockOn, fingerprint)
@@ -144,8 +144,33 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
 
     fun ensureSpeechTiming(prompt: String, speechLanguage: String): String {
         if (speechLanguage.equals("OFF", true)) return ensureNoSpeech(prompt)
-        return ensureContains(prompt, SPEECH_END_TIMING)
+        return normalizeSpeech(prompt, speechLanguage, hook = null)
     }
+
+    fun normalizeSpeech(prompt: String, speechLanguage: String, hook: String?): String {
+        if (speechLanguage.equals("OFF", true)) {
+            var next = stripSpeechSections(prompt)
+            return ensureNoSpeech(next)
+        }
+        val block = if (!hook.isNullOrBlank()) {
+            HookEngine.speechBlock(hook, speechLanguage)
+        } else {
+            existingSpokenLine(prompt)?.let { HookEngine.speechBlock(it, speechLanguage) }
+                ?: """
+SPEECH:
+${if (speechLanguage.equals("РУССКИЙ", true)) "The person speaks naturally in Russian." else "The person speaks naturally in German."}
+Spoken hook begins around 0.3–0.8 seconds.
+$SPEECH_END_TIMING
+""".trimIndent()
+        }
+        return (stripSpeechSections(prompt).trimEnd() + "\n\n" + block).replace(Regex("\n{3,}"), "\n\n").trim()
+    }
+
+    fun speechHeadingCount(prompt: String): Int =
+        Regex("(?im)^SPEECH:").findAll(prompt).count()
+
+    fun speechEndTimingCount(prompt: String): Int =
+        Regex("spoken line must finish before the 8\\.0-second endpoint", RegexOption.IGNORE_CASE).findAll(prompt).count()
 
     fun applyGenerator(prompt: String, generator: String): String {
         var cleaned = prompt.replace(Regex("maximum 8(\\.0)? seconds", RegexOption.IGNORE_CASE), "exactly 8.0 seconds")
@@ -264,6 +289,8 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         if (allowsExtraTail(prompt)) failures.add("extra_tail")
         if (leaksInternalAnalysis(prompt)) failures.add("internal_analysis_leak")
         if (hasDuplicateProductLock(prompt)) failures.add("duplicate_product_lock")
+        if (!speechLanguage.equals("OFF", true) && speechHeadingCount(prompt) > 1) failures.add("duplicate_speech_heading")
+        if (!speechLanguage.equals("OFF", true) && speechEndTimingCount(prompt) > 1) failures.add("duplicate_speech_timing")
         return failures
     }
 
@@ -335,35 +362,36 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
             .replace(Regex("\n{3,}"), "\n\n")
     }
 
-    private fun stripUnsupportedClaims(body: String): String {
-        val banned = listOf(
-            Regex("(?im)^.*\\b100%\\b.*$"),
-            Regex("(?im)^.*\\bguaranteed\\b.*$"),
-            Regex("(?im)^.*\\bgarantiert\\b.*$"),
-            Regex("(?im)^.*\\bheilt\\b.*$"),
-            Regex("(?im)^.*medically proven.*$"),
-            Regex("(?im)^.*\\bbest\\b.*$"),
-            Regex("(?im)^.*\\bperfect\\b.*$"),
-            Regex("(?im)^.*\\balways\\b.*$"),
-            Regex("(?im)^.*\\bnever\\b.*$"),
-            Regex("(?im)^.*bpa[- ]?free.*$"),
-            Regex("(?im)^.*anti[- ]?scratch.*$"),
-            Regex("(?im)^.*revolutionary.*$"),
-            Regex("(?im)^.*game[- ]changing.*$"),
-        )
-        var next = body
-        banned.forEach { next = it.replace(next, "") }
-        return next.replace(Regex("\n{3,}"), "\n\n")
-    }
-
     private fun collapseDuplicateLockBlocks(body: String): String {
         var next = keepFirstBlock(body, Regex("(?is)The reference images define one exact physical product\\.[\\s\\S]*?REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION\\."))
         next = keepFirstHeaderSection(next, "FINAL IDENTITY LOCK:")
         next = keepFirstHeaderSection(next, "MOVING COMPONENT LOCK:")
         next = keepFirstHeaderSection(next, "ANTI-MORPH")
+        next = keepFirstHeaderSection(next, "SPEECH:")
         next = keepFirstOccurrence(next, GENERIC_SUBSTITUTION_BAN)
         next = keepFirstOccurrence(next, COMPONENT_COUNT_LOCK)
+        next = keepFirstOccurrence(next, SPEECH_END_TIMING)
+        next = keepFirstOccurrence(next, "Spoken hook begins around 0.3–0.8 seconds")
         return next.replace(Regex("\n{3,}"), "\n\n").trim()
+    }
+
+    private fun stripSpeechSections(body: String): String {
+        var next = Regex(
+            "(?is)(?:^|\\n)SPEECH:\\s*.*?(?=\\n(?:FORMAT|REFERENCE|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|ANTI-MORPH|DURATION|Target generator)\\b|$)",
+        ).replace(body, "\n")
+        next = Regex("(?im)^The spoken line must finish before the 8\\.0-second endpoint\\.?\\s*$").replace(next, "")
+        next = Regex("(?im)^Spoken hook begins around 0\\.3–0\\.8 seconds:?\\s*$").replace(next, "")
+        return next.replace(Regex("\n{3,}"), "\n\n").trim()
+    }
+
+    private fun existingSpokenLine(prompt: String): String? {
+        val quoted = Regex("Spoken hook begins around 0\\.3–0\\.8 seconds:\\s*\\n\"([^\"]+)\"").find(prompt)?.groupValues?.getOrNull(1)
+        if (!quoted.isNullOrBlank()) return quoted.trim()
+        val speech = Regex("(?is)SPEECH:\\s*(.*)").find(prompt)?.groupValues?.getOrNull(1).orEmpty()
+        val line = speech.lineSequence()
+            .map { it.trim().trim('"') }
+            .firstOrNull { it.isNotBlank() && !it.startsWith("The person speaks") && !it.startsWith("Spoken hook") && !it.startsWith("The spoken line") && !it.equals("SPEECH:", true) }
+        return line?.takeIf { it.length in 8..110 }
     }
 
     private fun keepFirstBlock(body: String, block: Regex): String {
