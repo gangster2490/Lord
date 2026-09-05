@@ -33,21 +33,37 @@ jobs:
       - name: Source audit
         working-directory: .
         run: |
-          set -e
+          set -euo pipefail
           ROOT="ugc-prompt-agent-v3/app/src/main"
-          fail() { echo "SOURCE AUDIT FAIL: $1"; exit 1; }
-          grep -R -n --include='*.js' --include='*.html' --include='*.kt' 'openaiBrowser(' "$ROOT" && fail "openaiBrowser" || true
-          grep -R -n --include='*.js' --include='*.html' --include='*.kt' 'geminiBrowser(' "$ROOT" && fail "geminiBrowser" || true
-          grep -R -n --include='*.js' --include='*.html' 'localStorage.getItem("ugc_api_key")' "$ROOT" && fail "localStorage key" || true
-          grep -R -n --include='*.js' --include='*.html' 'getApiKey(' "$ROOT" && fail "getApiKey in frontend" || true
-          grep -R -n --include='*.js' --include='*.html' 'getOpenAiKey(' "$ROOT" && fail "getOpenAiKey" || true
-          grep -R -n --include='*.js' --include='*.html' 'getGeminiKey(' "$ROOT" && fail "getGeminiKey" || true
-          grep -R -n --include='*.js' 'Authorization' "$ROOT/assets" && fail "Authorization in JS" || true
+          absent() {
+            if grep -R -n --include='*.js' --include='*.html' --include='*.kt' "$1" "$ROOT"; then
+              echo "SOURCE AUDIT FAIL: $1"
+              exit 1
+            fi
+          }
+          absent 'openaiBrowser('
+          absent 'geminiBrowser('
+          if grep -R -n --include='*.js' --include='*.html' 'localStorage.getItem("ugc_api_key")' "$ROOT"; then
+            echo "SOURCE AUDIT FAIL: localStorage key"; exit 1
+          fi
+          if grep -R -n --include='*.js' --include='*.html' 'getApiKey(' "$ROOT"; then
+            echo "SOURCE AUDIT FAIL: getApiKey in frontend"; exit 1
+          fi
+          if grep -R -n --include='*.js' --include='*.html' 'getOpenAiKey(' "$ROOT"; then
+            echo "SOURCE AUDIT FAIL: getOpenAiKey"; exit 1
+          fi
+          if grep -R -n --include='*.js' --include='*.html' 'getGeminiKey(' "$ROOT"; then
+            echo "SOURCE AUDIT FAIL: getGeminiKey"; exit 1
+          fi
+          if grep -R -n --include='*.js' 'Authorization' "$ROOT/assets"; then
+            echo "SOURCE AUDIT FAIL: Authorization in JS"; exit 1
+          fi
           test -f "$ROOT/assets/index.html"
           test -f "$ROOT/assets/app.js"
           test -f "$ROOT/assets/styles.css"
           grep -q 'INTERNET' "$ROOT/AndroidManifest.xml"
-          grep -q 'de.spardirekt.ugcagent.v3' "$ROOT/AndroidManifest.xml"
+          grep -q "applicationId 'de.spardirekt.ugcagent.v3'" ugc-prompt-agent-v3/app/build.gradle
+          grep -q 'namespace '"'"'de.spardirekt.ugcagent.v3'"'" ugc-prompt-agent-v3/app/build.gradle
           echo "SOURCE AUDIT PASS"
 
       - name: Prepare release keystore
