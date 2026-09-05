@@ -3,6 +3,20 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore/keystore.properties')
+if (keystorePropsFile.exists()) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
+def envOrProp = { String envName, String propName, String fallback ->
+    def env = System.getenv(envName)
+    if (env != null && !env.trim().isEmpty()) return env.trim()
+    def prop = keystoreProps.getProperty(propName)
+    if (prop != null && !prop.trim().isEmpty()) return prop.trim()
+    return fallback
+}
+
 android {
     namespace 'de.spardirekt.ugcagent'
     compileSdk 34
@@ -16,15 +30,25 @@ android {
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
 
+    signingConfigs {
+        release {
+            storeFile rootProject.file(envOrProp('KEYSTORE_FILE', 'storeFile', 'keystore/release.keystore'))
+            storePassword envOrProp('KEYSTORE_PASSWORD', 'storePassword', '')
+            keyAlias envOrProp('KEY_ALIAS', 'keyAlias', 'ugcagent')
+            keyPassword envOrProp('KEY_PASSWORD', 'keyPassword', '')
+            enableV1Signing true
+            enableV2Signing true
+            enableV3Signing true
+        }
+    }
+
     buildTypes {
         debug {
             minifyEnabled false
         }
         release {
             minifyEnabled false
-            // Installable even without CI signing secrets (same pattern as SD Agents / Bild-).
-            // GitHub Actions overrides this with injected release keystore when secrets exist.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

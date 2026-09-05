@@ -33,22 +33,16 @@ cd ugc-prompt-agent
 
 ## Signing (Actions)
 
-Repo-Secrets in `gangster2490/ugc-prompt-agent` bzw. diesem Repo:
+Release-Builds sind mit einem PKCS12-Keystore signiert (`keystore/release.keystore`, Alias `ugcagent`, gültig bis 2054). Gradle liest `keystore/keystore.properties`.
+
+`assembleRelease` erzeugt damit eine installierbare, v1/v2-signierte APK — auch ohne GitHub-Secrets.
+
+Optionale Repo-Secrets überschreiben den committed Keystore, falls später rotiert werden soll:
 
 - `KEYSTORE_BASE64`
 - `KEYSTORE_PASSWORD`
 - `KEY_ALIAS`
 - `KEY_PASSWORD`
-
-Keystore einmalig:
-
-```bash
-keytool -genkey -v -keystore release.keystore -alias ugcagent \
-  -keyalg RSA -keysize 2048 -validity 10000
-base64 -w0 release.keystore
-```
-
-Ohne Secrets baut der Workflow eine debug-signierte Release-APK (installierbar, analog SD Agents). Mit Secrets wird die injizierte Release-Signatur verwendet.
 
 ## Prinzip
 
