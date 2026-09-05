@@ -11,6 +11,7 @@ import de.spardirekt.ugcagent.data.SecureStore
 import de.spardirekt.ugcagent.data.SimilarityChecker
 import de.spardirekt.ugcagent.openai.ApiException
 import de.spardirekt.ugcagent.openai.OpenAiClient
+import de.spardirekt.ugcagent.prompt.PromptSanitizer
 import de.spardirekt.ugcagent.prompt.SceneIdea
 import de.spardirekt.ugcagent.prompt.ScenePool
 import kotlinx.coroutines.CoroutineScope
@@ -77,6 +78,22 @@ class NativeBridge(
     }
 
     @JavascriptInterface
+    fun removeImage(id: String) {
+        imageStore.remove(id)
+        if (firstFrameId == id) {
+            firstFrameId = imageStore.list().firstOrNull()?.id
+        }
+        emitImages(preserveFirstFrame = true)
+    }
+
+    @JavascriptInterface
+    fun clearImages() {
+        imageStore.clear()
+        firstFrameId = null
+        emitImages(preserveFirstFrame = false)
+    }
+
+    @JavascriptInterface
     fun checkSimilarity() {
         scope.launch {
             val result = runCatching {
@@ -128,13 +145,7 @@ class NativeBridge(
                 val prompt = withContext(Dispatchers.IO) {
                     openAi.buildPrompt(key, analysis, scene, first)
                 }
-                emit(
-                    "prompt",
-                    JSONObject()
-                        .put("prompt", prompt)
-                        .put("improved", false)
-                        .put("scene", sceneToJson(scene)),
-                )
+                emit("prompt", promptPayload(prompt, improved = false, scene = scene))
             } catch (t: Throwable) {
                 emitError("prompt", t)
             }
@@ -150,13 +161,7 @@ class NativeBridge(
                 val improved = withContext(Dispatchers.IO) {
                     openAi.improvePrompt(key, currentPrompt, scene)
                 }
-                emit(
-                    "prompt",
-                    JSONObject()
-                        .put("prompt", improved)
-                        .put("improved", true)
-                        .put("scene", sceneToJson(scene)),
-                )
+                emit("prompt", promptPayload(improved, improved = true, scene = scene))
             } catch (t: Throwable) {
                 emitError("prompt", t)
             }
@@ -187,6 +192,7 @@ class NativeBridge(
             id = obj.optString("id").ifBlank { UUID.randomUUID().toString() },
             createdAt = System.currentTimeMillis(),
             label = obj.optString("label"),
+            productKey = obj.optString("productKey"),
             analysisJson = obj.optString("analysisJson"),
             sceneJson = obj.optString("sceneJson"),
             prompt = obj.optString("prompt"),
@@ -215,6 +221,22 @@ class NativeBridge(
     }
 
     fun onImagesImported() {
+        emitImages(preserveFirstFrame = false)
+    }
+
+    private fun promptPayload(prompt: String, improved: Boolean, scene: SceneIdea): JSONObject {
+        val gate = PromptSanitizer.evaluate(prompt)
+        return JSONObject()
+            .put("prompt", gate.prompt)
+            .put("improved", improved)
+            .put("scene", sceneToJson(scene))
+            .put("wordCount", gate.wordCount)
+            .put("truncated", gate.truncated)
+            .put("visualLeak", gate.visualLeak)
+    }
+
+    private fun emitImages(preserveFirstFrame: Boolean) {
+        val previous = firstFrameId
         val array = JSONArray()
         imageStore.list().forEach { image ->
             array.put(
@@ -223,7 +245,11 @@ class NativeBridge(
                     .put("thumb", image.thumbDataUrl),
             )
         }
-        firstFrameId = imageStore.list().firstOrNull()?.id
+        firstFrameId = if (preserveFirstFrame && previous != null && imageStore.get(previous) != null) {
+            previous
+        } else {
+            imageStore.list().firstOrNull()?.id
+        }
         emit(
             "images",
             JSONObject()
@@ -247,6 +273,7 @@ class NativeBridge(
                     .put("id", entry.id)
                     .put("createdAt", entry.createdAt)
                     .put("label", entry.label)
+                    .put("productKey", entry.productKey)
                     .put("analysisJson", entry.analysisJson)
                     .put("sceneJson", entry.sceneJson)
                     .put("prompt", entry.prompt)

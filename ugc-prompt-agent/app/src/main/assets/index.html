@@ -11,7 +11,7 @@
   <div class="header">
     <span class="logo">UGC</span>
     <span class="brand" data-i18n="brand">Agent</span>
-    <span class="badge">v1.0</span>
+    <span class="badge">v2.0</span>
     <span class="header-spacer"></span>
     <button class="icon-btn" id="btn-settings" data-i18n="settings">Settings</button>
   </div>
@@ -35,6 +35,9 @@
       <input id="file-input" type="file" accept="image/*" multiple hidden/>
       <div class="thumbs" id="thumbs"></div>
       <p class="hint" id="count-hint"></p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btn-clear-photos" data-i18n="clearPhotos" disabled>Fotos leeren</button>
+      </div>
       <p class="hint" data-i18n="firstFrameHint"></p>
     </div>
     <div class="card" id="sim-card">
@@ -67,6 +70,7 @@
       <div id="prompt-error"></div>
       <div id="prompt-box" class="prompt-box hidden"></div>
       <div class="meta" id="word-count"></div>
+      <div id="prompt-gate"></div>
     </div>
   </div>
 
@@ -84,6 +88,7 @@
         <button class="btn btn-ghost" id="btn-save" data-i18n="saveHistory"></button>
       </div>
       <div id="export-msg"></div>
+      <div id="export-check"></div>
     </div>
   </div>
 

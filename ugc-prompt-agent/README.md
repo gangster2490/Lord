@@ -1,8 +1,28 @@
-# UGC Prompt Agent
+# UGC Prompt Agent v2
 
 Android-App (`de.spardirekt.ugcagent`) im WebView-Stil von LordApp / SDGEN: eine Activity, lokale HTML/JS-Oberfläche, Kotlin nur für Dateien, Kompression, OpenAI-Calls (GPT-5.6 Sol) und sichere Speicherung.
 
 Aus 15–20 Produktfotos entstehen natürlich wirkende Veo/Kling-Prompts für TikTok Shop DE — **ohne** Form, Farbe, Material oder Marke zu beschreiben. Das gewählte Originalfoto bleibt First-Frame.
+
+## v2 Final Build
+
+| Feld | Wert |
+|---|---|
+| applicationId | `de.spardirekt.ugcagent` |
+| versionName | `2.0.0` |
+| versionCode | 2 |
+| minSdk | 26 |
+| targetSdk | 34 |
+
+Neu gegenüber v1:
+
+- Prompt-Gate: max. 80 Wörter, Markdown/Anführungszeichen weg, Warnung bei Form/Farbe/Material/Marke (kein Auto-Fix)
+- Ein automatischer Retry bei Netzwerk/Timeout zusätzlich zur UI-Retry-Option
+- Fotos einzeln entfernen oder alle leeren, First-Frame bleibt erhalten
+- Verlauf gruppiert **pro Produkt** (`use_case`)
+- Live-Compliance auf dem VEO-Tab (Verbotsliste + Werbung/Anzeige, kein Auto-Insert)
+- Fullscreen-Theme entfernt, damit Notch, Statusleiste und Tastatur in Settings funktionieren
+- Similarity-Ausreißer an den Thumbnails markiert
 
 ## Flow
 
@@ -13,31 +33,23 @@ Aus 15–20 Produktfotos entstehen natürlich wirkende Veo/Kling-Prompts für Ti
 5. **Szenen** — 3–5 Ideen aus dem UGC-Pattern-Pool (nie dieselbe Kombination hintereinander)
 6. **Prompt-Builder** — 9:16, max. 8 Sekunden, ein Mikro-Moment; Button **Verbessern** (zweiter Pass)
 7. **Compliance** — TikTok-DE-Verbotsliste **und** Pflicht-Check auf „Werbung“/„Anzeige“ (kein Auto-Insert)
-8. **Export** — Prompt + First-Frame-Hinweis, Copy, lokaler Verlauf
+8. **Export** — Prompt + First-Frame-Hinweis, Copy, lokaler Verlauf pro Produkt
 
 ## Build
 
-Kein lokaler SDK-Build nötig. GitHub Actions (`.github/workflows/build.yml`) erzeugt die APK.
-
-```bash
-cd ugc-prompt-agent
-./gradlew assembleRelease
-```
-
-Unit-Tests (Compliance, Szenen-Pool, Similarity):
+Kein lokaler SDK-Build nötig. GitHub Actions (`.github/workflows/build.yml`) erzeugt die signierte APK.
 
 ```bash
 cd ugc-prompt-agent
 ./gradlew testDebugUnitTest
+./gradlew assembleRelease
 ```
 
 ## Signing (Actions)
 
-Release-Builds sind mit einem PKCS12-Keystore signiert (`keystore/release.keystore`, Alias `ugcagent`, gültig bis 2054). Gradle liest `keystore/keystore.properties`.
+Release-Builds sind mit einem PKCS12-Keystore signiert (`keystore/release.keystore`, Alias `ugcagent`). Gradle liest `keystore/keystore.properties`.
 
-`assembleRelease` erzeugt damit eine installierbare, v1/v2-signierte APK — auch ohne GitHub-Secrets.
-
-Optionale Repo-Secrets überschreiben den committed Keystore, falls später rotiert werden soll:
+Optionale Repo-Secrets überschreiben den committed Keystore:
 
 - `KEYSTORE_BASE64`
 - `KEYSTORE_PASSWORD`

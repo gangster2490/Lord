@@ -26,6 +26,10 @@ class ImageStore(private val context: Context) {
 
     fun get(id: String): StoredImage? = images[id]
 
+    fun remove(id: String) {
+        images.remove(id)?.file?.delete()
+    }
+
     fun clear() {
         images.values.forEach { it.file.delete() }
         images.clear()

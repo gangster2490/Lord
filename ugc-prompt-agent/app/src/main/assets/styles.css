@@ -26,7 +26,9 @@ body{padding-bottom:env(safe-area-inset-bottom)}
 .thumb{position:relative;width:72px;height:72px}
 .thumb img{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid #1e1e1e;display:block}
 .thumb.selected img{border-color:#36ff5c;box-shadow:0 0 0 1px #36ff5c}
-.thumb-mark{position:absolute;left:4px;bottom:4px;background:#36ff5c;color:#000;font-size:8px;font-weight:900;padding:1px 4px;border-radius:3px;letter-spacing:.5px}
+.thumb-x{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#ff4444;color:#fff;font-size:12px;line-height:20px;cursor:pointer}
+.group-title{font-size:11px;color:#36ff5c;letter-spacing:1px;text-transform:uppercase;margin:16px 0 8px;font-weight:700}
+.thumb.outlier img{border-color:#c9a227}
 .btn{padding:11px 18px;border-radius:6px;font-weight:700;font-size:12px;letter-spacing:1px;cursor:pointer;font-family:inherit;border:none}
 .btn-primary{background:#36ff5c;color:#000}
 .btn-outline{background:transparent;border:1px solid #36ff5c;color:#36ff5c}

@@ -8,6 +8,7 @@ data class HistoryEntry(
     val id: String,
     val createdAt: Long,
     val label: String,
+    val productKey: String,
     val analysisJson: String,
     val sceneJson: String,
     val prompt: String,
@@ -30,6 +31,7 @@ class HistoryStore(context: Context) {
                         id = obj.optString("id"),
                         createdAt = obj.optLong("createdAt"),
                         label = obj.optString("label"),
+                        productKey = obj.optString("productKey"),
                         analysisJson = obj.optString("analysisJson"),
                         sceneJson = obj.optString("sceneJson"),
                         prompt = obj.optString("prompt"),
@@ -59,6 +61,7 @@ class HistoryStore(context: Context) {
                     .put("id", entry.id)
                     .put("createdAt", entry.createdAt)
                     .put("label", entry.label)
+                    .put("productKey", entry.productKey)
                     .put("analysisJson", entry.analysisJson)
                     .put("sceneJson", entry.sceneJson)
                     .put("prompt", entry.prompt)

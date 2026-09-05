@@ -2,6 +2,7 @@ package de.spardirekt.ugcagent.openai
 
 import de.spardirekt.ugcagent.data.ImageCompressor
 import de.spardirekt.ugcagent.data.StoredImage
+import de.spardirekt.ugcagent.prompt.PromptSanitizer
 import de.spardirekt.ugcagent.prompt.SceneIdea
 import de.spardirekt.ugcagent.prompt.SystemPrompts
 import okhttp3.MediaType.Companion.toMediaType
@@ -56,15 +57,17 @@ Gewählte Szene — GENAU DIESE Kombination verwenden, keine andere:
 First-Frame: das hochgeladene Originalfoto ist die visuelle Quelle. Nicht beschreiben.
 Schreibe NUR den Veo-Prompt (max. 80 Wörter, Deutsch, 9:16, max. 8 Sekunden, ein Mikro-Moment).
 """.trimIndent()
-        return generate(
-            apiKey = apiKey,
-            system = SystemPrompts.VIDEO_PROMPT,
-            userText = user,
-            images = listOf(firstFrame),
-            temperature = 0.85,
-            maxTokens = 512,
-            jsonMode = false,
-        ).trim().removeSurrounding("\"").trim()
+        return PromptSanitizer.clean(
+            generate(
+                apiKey = apiKey,
+                system = SystemPrompts.VIDEO_PROMPT,
+                userText = user,
+                images = listOf(firstFrame),
+                temperature = 0.85,
+                maxTokens = 512,
+                jsonMode = false,
+            ),
+        )
     }
 
     fun improvePrompt(apiKey: String, current: String, scene: SceneIdea): String {
@@ -74,15 +77,17 @@ $current
 
 Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
 """.trimIndent()
-        return generate(
-            apiKey = apiKey,
-            system = SystemPrompts.IMPROVE_PASS,
-            userText = user,
-            images = emptyList(),
-            temperature = 0.5,
-            maxTokens = 512,
-            jsonMode = false,
-        ).trim().removeSurrounding("\"").trim()
+        return PromptSanitizer.clean(
+            generate(
+                apiKey = apiKey,
+                system = SystemPrompts.IMPROVE_PASS,
+                userText = user,
+                images = emptyList(),
+                temperature = 0.5,
+                maxTokens = 512,
+                jsonMode = false,
+            ),
+        )
     }
 
     private fun generate(
@@ -130,6 +135,7 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
         var jsonModeNow = jsonMode
         var useReasoningEffort = true
         var rateLimitRetried = false
+        var networkRetried = false
 
         while (true) {
             try {
@@ -149,6 +155,10 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
                     OpenAiErrorRules.isRateLimited(e.code, e.message.orEmpty()) && !rateLimitRetried -> {
                         rateLimitRetried = true
                         Thread.sleep(RATE_LIMIT_BACKOFF_MS)
+                    }
+                    (e.code == "NETWORK" || e.code == "TIMEOUT") && !networkRetried -> {
+                        networkRetried = true
+                        Thread.sleep(NETWORK_RETRY_BACKOFF_MS)
                     }
                     OpenAiErrorRules.isUnsupported("${e.code} ${e.message}") &&
                         (jsonModeNow || useReasoningEffort) -> {
@@ -267,6 +277,7 @@ Szene bleibt: ${scene.opener} / ${scene.environment} / ${scene.action}
         val MODELS = listOf("gpt-5.6-sol", "gpt-5.6-terra", "gpt-4o")
         const val IMAGE_DETAIL = "high"
         private const val RATE_LIMIT_BACKOFF_MS = 900L
+        private const val NETWORK_RETRY_BACKOFF_MS = 700L
         private val JSON = "application/json; charset=utf-8".toMediaType()
         private const val CHAT_URL = "https://api.openai.com/v1/chat/completions"
 

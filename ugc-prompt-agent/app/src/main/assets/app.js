@@ -44,6 +44,8 @@
     lastSceneKey: localStorage.getItem("ugc_last_scene") || null,
     prompt: "",
     improved: false,
+    visualLeak: false,
+    truncated: false,
     similarity: null,
     pending: null,
     browserImages: [],
@@ -73,7 +75,9 @@
     renderPrompt();
     renderExport();
     renderHistory(state.historyCache || []);
+    renderSimilarity();
     updateCount();
+    refreshLiveCheck();
     $("masked-key").textContent = state.maskedKey || "";
   }
 
@@ -152,8 +156,11 @@
 
   function updateCount() {
     const n = state.images.length;
-    $("count-hint").textContent = n ? `${n} / 20` : "";
+    $("count-hint").textContent = n
+      ? `${n} / 20 · ${t("countNeed")}`
+      : t("countNeed");
     $("btn-analyze").disabled = n < 15 || n > 20;
+    $("btn-clear-photos").disabled = n === 0;
     $("dropzone").classList.toggle("has-files", n > 0);
   }
 
@@ -162,16 +169,21 @@
     root.innerHTML = "";
     state.images.forEach((img) => {
       const wrap = document.createElement("div");
-      wrap.className = "thumb" + (img.id === state.firstFrameId ? " selected" : "");
+      const outlier = state.similarity && (state.similarity.outlierIds || []).includes(img.id);
+      wrap.className = "thumb" + (img.id === state.firstFrameId ? " selected" : "") + (outlier ? " outlier" : "");
       wrap.innerHTML = `<img alt="" src="${img.thumb}"/><span class="thumb-mark">${
         img.id === state.firstFrameId ? t("firstFrame") : ""
-      }</span>`;
+      }</span><button type="button" class="thumb-x" aria-label="remove">×</button>`;
       wrap.onclick = () => {
         state.firstFrameId = img.id;
         if (native) AndroidBridge.setFirstFrame(img.id);
         renderThumbs();
         renderExport();
         runSimilarity();
+      };
+      wrap.querySelector(".thumb-x").onclick = (e) => {
+        e.stopPropagation();
+        removePhoto(img.id);
       };
       root.appendChild(wrap);
     });
@@ -209,6 +221,7 @@
       card.classList.remove("warn");
       box.innerHTML = `<div class="ok-box">${t("similarityOk")}</div>`;
     }
+    renderThumbs();
   }
 
   function renderScenes() {
@@ -240,11 +253,18 @@
     if (!state.prompt) {
       box.classList.add("hidden");
       $("word-count").textContent = "";
+      $("prompt-gate").innerHTML = "";
       return;
     }
     box.classList.remove("hidden");
     box.textContent = state.prompt;
     $("word-count").textContent = `${wordCount(state.prompt)} ${t("words")} · 9:16 · ≤8s`;
+    const gate = $("prompt-gate");
+    const notes = [];
+    if (state.truncated) notes.push(`<div class="warn-box">${t("wordsOver")}</div>`);
+    if (state.visualLeak) notes.push(`<div class="warn-box">${t("visualLeak")}</div>`);
+    gate.innerHTML = notes.join("");
+    refreshLiveCheck();
   }
 
   function renderExport() {
@@ -252,6 +272,16 @@
     const card = $("ref-card");
     if (first) card.innerHTML = `<img alt="first-frame" src="${first.thumb}"/>`;
     $("export-prompt").textContent = state.prompt || "—";
+  }
+
+  function productKeyOf(item) {
+    if (item.productKey) return item.productKey;
+    try {
+      const analysis = JSON.parse(item.analysisJson || "{}");
+      return analysis.use_case || "";
+    } catch (_) {
+      return "";
+    }
   }
 
   function renderHistory(entries) {
@@ -262,10 +292,25 @@
       return;
     }
     root.innerHTML = "";
+    const groups = [];
+    const index = new Map();
     entries.forEach((item) => {
-      const el = document.createElement("div");
-      el.className = "history-item";
-      el.innerHTML = `
+      const key = productKeyOf(item) || t("productGroup");
+      if (!index.has(key)) {
+        index.set(key, []);
+        groups.push(key);
+      }
+      index.get(key).push(item);
+    });
+    groups.forEach((key) => {
+      const title = document.createElement("div");
+      title.className = "group-title";
+      title.textContent = `${t("productGroup")}: ${key}`;
+      root.appendChild(title);
+      index.get(key).forEach((item) => {
+        const el = document.createElement("div");
+        el.className = "history-item";
+        el.innerHTML = `
         ${item.firstFrameThumb ? `<img src="${item.firstFrameThumb}" alt=""/>` : ""}
         <div style="flex:1">
           <h4>${esc(item.label || "UGC")}</h4>
@@ -275,16 +320,17 @@
             <button class="btn btn-danger del">${t("remove")}</button>
           </div>
         </div>`;
-      el.querySelector(".reuse").onclick = () => reuseHistory(item);
-      el.querySelector(".del").onclick = () => {
-        if (native) AndroidBridge.deleteHistory(item.id);
-        else {
-          const next = (JSON.parse(localStorage.getItem("ugc_history") || "[]")).filter((x) => x.id !== item.id);
-          localStorage.setItem("ugc_history", JSON.stringify(next));
-          renderHistory(next);
-        }
-      };
-      root.appendChild(el);
+        el.querySelector(".reuse").onclick = () => reuseHistory(item);
+        el.querySelector(".del").onclick = () => {
+          if (native) AndroidBridge.deleteHistory(item.id);
+          else {
+            const next = (JSON.parse(localStorage.getItem("ugc_history") || "[]")).filter((x) => x.id !== item.id);
+            localStorage.setItem("ugc_history", JSON.stringify(next));
+            renderHistory(next);
+          }
+        };
+        root.appendChild(el);
+      });
     });
   }
 
@@ -340,6 +386,76 @@
       hasForbiddenLanguage: forbiddenHits.length > 0,
       missingAdDisclosure: !hasAdDisclosure,
     };
+  }
+
+  function sanitizePrompt(raw) {
+    let text = String(raw || "").trim();
+    text = text.replace(/^```(?:[a-zA-Z0-9_-]+)?\s*/, "").replace(/\s*```$/, "").trim();
+    text = text.replace(/^["']|["']$/g, "").trim();
+    text = text.replace(/\s+/g, " ").trim();
+    const words = text ? text.split(/\s+/) : [];
+    const truncated = words.length > 80;
+    const prompt = words.slice(0, 80).join(" ");
+    const visualLeak = /\b(form|farbe|material|größe|grosse|marke|brand|silhouette|verpackungsdesign|produktfarbe|produktform)\b/i.test(prompt);
+    return { prompt, truncated, visualLeak };
+  }
+
+  function applyPrompt(text, extra) {
+    const gate = sanitizePrompt(text);
+    state.prompt = gate.prompt;
+    state.truncated = !!(extra && extra.truncated) || gate.truncated;
+    state.visualLeak = !!(extra && extra.visualLeak) || gate.visualLeak;
+    renderPrompt();
+    renderExport();
+  }
+
+  function refreshLiveCheck() {
+    const box = $("export-check");
+    if (!box) return;
+    if (!state.prompt && !$("caption").value.trim()) {
+      box.innerHTML = "";
+      return;
+    }
+    const result = localCompliance(state.prompt || "", $("caption").value || "");
+    const hits = result.forbiddenHits || [];
+    const hitHtml = hits.length
+      ? hits.map((h) => `<span class="hit">${esc(h.label || h)}</span>`).join("")
+      : `<div class="ok-box">${t("noForbidden")}</div>`;
+    const disc = result.hasAdDisclosure
+      ? `<div class="ok-box">${t("disclosureOk")}</div>`
+      : `<div class="warn-box">${t("disclosureMissing")}</div>`;
+    box.innerHTML = `<p class="hint" style="margin-top:12px">${t("liveCheck")}</p>${hitHtml}${disc}`;
+  }
+
+  function removePhoto(id) {
+    if (native) {
+      AndroidBridge.removeImage(id);
+      return;
+    }
+    state.browserImages = state.browserImages.filter((i) => i.id !== id);
+    state.images = state.images.filter((i) => i.id !== id);
+    if (state.firstFrameId === id) {
+      state.firstFrameId = state.images[0] && state.images[0].id;
+    }
+    renderThumbs();
+    updateCount();
+    renderExport();
+    runSimilarity();
+  }
+
+  function clearPhotos() {
+    if (native) {
+      AndroidBridge.clearImages();
+      return;
+    }
+    state.browserImages = [];
+    state.images = [];
+    state.firstFrameId = null;
+    state.similarity = null;
+    renderThumbs();
+    renderSimilarity();
+    updateCount();
+    renderExport();
   }
 
   function showCompliance(result) {
@@ -592,11 +708,9 @@ OUTPUT: nur der Prompt, max. 80 Wörter, Deutsch.`;
     }
     if (event === "prompt") {
       $("prompt-load").classList.add("hidden");
-      state.prompt = payload.prompt || "";
       state.improved = !!payload.improved;
       if (payload.scene) state.selectedScene = payload.scene;
-      renderPrompt();
-      renderExport();
+      applyPrompt(payload.prompt || "", payload);
     }
     if (event === "compliance") showCompliance(payload);
     if (event === "history") renderHistory(payload.entries || []);
@@ -619,6 +733,7 @@ OUTPUT: nur der Prompt, max. 80 Wörter, Deutsch.`;
         if (native) AndroidBridge.loadHistory();
         else renderHistory(JSON.parse(localStorage.getItem("ugc_history") || "[]"));
       }
+      if (tab.dataset.tab === "veo") refreshLiveCheck();
     };
   });
 
@@ -671,6 +786,8 @@ OUTPUT: nur der Prompt, max. 80 Wörter, Deutsch.`;
     if (native) AndroidBridge.pickImages();
     else $("file-input").click();
   };
+  $("btn-clear-photos").onclick = () => clearPhotos();
+  $("caption").addEventListener("input", refreshLiveCheck);
   $("file-input").onchange = async (e) => {
     const files = Array.from(e.target.files || []).slice(0, 20);
     const imported = [];
@@ -739,8 +856,7 @@ First-Frame ist das Foto. Produkt nicht beschreiben.`;
       state.prompt = await openaiBrowser(VIDEO_PROMPT, user, first ? [first.dataUrl] : [], 0.85, false);
       state.lastSceneKey = state.selectedScene.key;
       localStorage.setItem("ugc_last_scene", state.lastSceneKey);
-      renderPrompt();
-      renderExport();
+      applyPrompt(state.prompt);
     } catch (err) {
       $("prompt-error").innerHTML = errorHtml(err.code || "GENERIC");
       bindErrorActions($("prompt-error"));
@@ -759,15 +875,14 @@ First-Frame ist das Foto. Produkt nicht beschreiben.`;
       return;
     }
     try {
-      state.prompt = await openaiBrowser(
+      const improved = await openaiBrowser(
         IMPROVE_PROMPT,
         `Aktueller Prompt:\n${state.prompt}\nSzene bleibt: ${state.selectedScene.opener}`,
         [],
         0.5,
         false,
       );
-      renderPrompt();
-      renderExport();
+      applyPrompt(improved);
     } catch (err) {
       $("prompt-error").innerHTML = errorHtml(err.code || "GENERIC");
       bindErrorActions($("prompt-error"));
@@ -799,6 +914,7 @@ First-Frame ist das Foto. Produkt nicht beschreiben.`;
     const payload = {
       id: uuid(),
       label: scene.environment || "UGC",
+      productKey: (state.analysis && state.analysis.use_case) || "",
       analysisJson: JSON.stringify(state.analysis || {}),
       sceneJson: JSON.stringify(scene),
       prompt: state.prompt,
@@ -810,6 +926,7 @@ First-Frame ist das Foto. Produkt nicht beschreiben.`;
       const items = JSON.parse(localStorage.getItem("ugc_history") || "[]");
       items.unshift(payload);
       localStorage.setItem("ugc_history", JSON.stringify(items.slice(0, 50)));
+      renderHistory(items.slice(0, 50));
     }
     $("export-msg").innerHTML = `<div class="ok-box">${t("saved")}</div>`;
   };
