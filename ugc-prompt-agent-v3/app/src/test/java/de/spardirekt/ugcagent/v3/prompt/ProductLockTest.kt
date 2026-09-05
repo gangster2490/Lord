@@ -10,6 +10,7 @@ class ProductLockTest {
         val out = ProductLock.ensure("A person picks up the referenced product.", true)
         assertTrue(out.contains("REFERENCE IMAGE OVERRIDES"))
         assertTrue(out.contains("Do not redesign"))
+        assertTrue(out.contains("Do not generate a similar product"))
     }
 
     @Test
@@ -29,11 +30,12 @@ class ProductLockTest {
         assertTrue(ProductLock.applyGenerator("x", "VEO").contains("Veo"))
         assertTrue(ProductLock.applyGenerator("x", "KLING").contains("Kling"))
         assertTrue(ProductLock.applyGenerator("x", "GENERIC").contains("generic"))
+        assertTrue(ProductLock.applyGenerator("x", "VEO").contains("exactly 8.0 seconds"))
     }
 
     @Test
-    fun flagsProductRebuildLanguage() {
-        assertTrue(ProductLock.looksLikeProductRebuild("black metal round pan with wooden handle"))
+    fun flagsGenericSubstitutionLanguage() {
+        assertTrue(ProductLock.looksLikeProductRebuild("use a similar product from the same category"))
         assertFalse(ProductLock.looksLikeProductRebuild("the referenced product sits on the table"))
     }
 

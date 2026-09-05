@@ -19,6 +19,8 @@ import de.spardirekt.ugcagent.v3.data.SettingsStore
 import de.spardirekt.ugcagent.v3.data.StoredImage
 import de.spardirekt.ugcagent.v3.image.FirstFrameHeuristics
 import de.spardirekt.ugcagent.v3.image.ImageProcessor
+import de.spardirekt.ugcagent.v3.prompt.ActionIdentity
+import de.spardirekt.ugcagent.v3.prompt.ProductIdentity
 import de.spardirekt.ugcagent.v3.security.SecureApiKeyStore
 import org.json.JSONArray
 import org.json.JSONObject
@@ -75,6 +77,19 @@ class NativeBridge(
                 }
                 if (project.firstFrameId == null) {
                     project.firstFrameId = project.images.firstOrNull()?.id
+                }
+                if (project.images.isNotEmpty() && project.firstFrameRecommendation?.optString("source") != "local+ai") {
+                    val ranked = project.images.mapIndexed { index, image ->
+                        FirstFrameHeuristics.RankedImage(
+                            id = image.id,
+                            index = index,
+                            width = image.width,
+                            height = image.height,
+                            compressedBytes = image.compressedBytes,
+                            score = FirstFrameHeuristics.score(image.width, image.height, image.compressedBytes),
+                        )
+                    }
+                    project.recommendedFirstFrameId = FirstFrameHeuristics.recommendLocal(ranked)?.id
                 }
                 persist()
                 emit("images", snapshot())
@@ -222,6 +237,9 @@ class NativeBridge(
         val result = provider().analyseProduct(apiKey(), apiImages())
         project.analysis = result
         persist()
+        project.identityFingerprint = provider().productIdentityFingerprint(apiKey(), apiImages())
+        refreshFirstFrameRecommendation()
+        persist()
         snapshot()
     }
 
@@ -239,7 +257,9 @@ class NativeBridge(
     @JavascriptInterface
     fun generateScene() = runOp("scene") {
         val analysis = project.analysis ?: throw ProviderException.generic("analysis_missing")
-        project.scene = provider().generateScene(apiKey(), analysis, apiImages(), null)
+        ensureFingerprint()
+        val scene = provider().generateScene(apiKey(), analysis, apiImages(), null, project.identityFingerprint)
+        project.scene = applyActionRisk(scene)
         persist()
         snapshot()
     }
@@ -247,14 +267,26 @@ class NativeBridge(
     @JavascriptInterface
     fun newScene() = runOp("scene") {
         val analysis = project.analysis ?: throw ProviderException.generic("analysis_missing")
-        project.scene = provider().generateScene(apiKey(), analysis, apiImages(), project.scene)
+        ensureFingerprint()
+        val scene = provider().generateScene(apiKey(), analysis, apiImages(), project.scene, project.identityFingerprint)
+        project.scene = applyActionRisk(scene)
         persist()
         snapshot()
     }
 
     @JavascriptInterface
     fun generatePrompt() = runOp("prompt") {
-        val prompt = provider().generateVideoPrompt(apiKey(), listOfNotNull(firstApiImage()), ctx())
+        ensureFingerprint()
+        val fingerprint = project.identityFingerprint ?: JSONObject()
+        val localReady = ProductIdentity.localReadiness(fingerprint)
+        val aiReady = try {
+            provider().productIdentityReadiness(apiKey(), fingerprint, apiImages())
+        } catch (_: Exception) {
+            localReady
+        }
+        project.identityReadiness = ProductIdentity.mergeReadiness(localReady, aiReady)
+        persist()
+        val prompt = provider().generateVideoPrompt(apiKey(), imagesForPrompt(), ctx())
         project.finalPrompt = prompt
         persist()
         snapshot()
@@ -430,11 +462,6 @@ class NativeBridge(
     private fun firstFrameImage(): StoredImage? =
         project.images.firstOrNull { it.id == project.firstFrameId } ?: project.images.firstOrNull()
 
-    private fun firstApiImage(): ApiImage? {
-        val image = firstFrameImage() ?: return null
-        return apiImages().firstOrNull { it.id == image.id }
-    }
-
     private fun activePrompt(): String = project.improvedPrompt ?: project.finalPrompt.orEmpty()
 
     private fun ctx(): PromptContext = PromptContext(
@@ -445,7 +472,69 @@ class NativeBridge(
         targetGenerator = project.targetGenerator,
         strictProductLock = project.strictProductLock,
         currentPrompt = activePrompt(),
+        fingerprint = project.identityFingerprint?.toString() ?: "{}",
+        actionRisk = project.actionRisk?.toString() ?: "{}",
+        readiness = project.identityReadiness?.toString() ?: "{}",
     )
+
+    private fun ensureFingerprint() {
+        if (project.identityFingerprint != null) return
+        requireImages()
+        project.identityFingerprint = provider().productIdentityFingerprint(apiKey(), apiImages())
+        persist()
+    }
+
+    private fun applyActionRisk(scene: JSONObject): JSONObject {
+        val fingerprint = project.identityFingerprint ?: JSONObject()
+        val local = ActionIdentity.localCheck(scene.optString("main_action"), fingerprint)
+        val ai = try {
+            provider().actionIdentityRiskCheck(apiKey(), fingerprint, scene, apiImages())
+        } catch (_: Exception) {
+            local
+        }
+        val merged = ActionIdentity.merge(local, ai)
+        project.actionRisk = merged
+        return ActionIdentity.applyIfHighRisk(scene, merged)
+    }
+
+    private fun refreshFirstFrameRecommendation() {
+        val ranked = project.images.mapIndexed { index, image ->
+            FirstFrameHeuristics.RankedImage(
+                id = image.id,
+                index = index,
+                width = image.width,
+                height = image.height,
+                compressedBytes = image.compressedBytes,
+                score = FirstFrameHeuristics.score(image.width, image.height, image.compressedBytes),
+            )
+        }
+        val local = FirstFrameHeuristics.recommendLocal(ranked)
+        val ai = try {
+            provider().recommendFirstFrame(apiKey(), apiImages())
+        } catch (_: Exception) {
+            null
+        }
+        val chosen = FirstFrameHeuristics.mergeRecommendation(
+            local?.id,
+            ai?.optInt("recommended_image_index", -1) ?: -1,
+            ranked,
+        )
+        project.recommendedFirstFrameId = chosen?.id
+        val rec = JSONObject()
+            .put("recommended_image_index", chosen?.index ?: 0)
+            .put("recommended_image_id", chosen?.id ?: "")
+            .put("source", if (ai != null) "local+ai" else "local")
+            .put("reasons", ai?.optJSONArray("reasons") ?: JSONArray().put("Largest clean visible product area among uploaded originals."))
+        project.firstFrameRecommendation = rec
+    }
+
+    private fun imagesForPrompt(): List<ApiImage> {
+        val all = apiImages()
+        val firstId = firstFrameImage()?.id
+        val first = all.firstOrNull { it.id == firstId }
+        val rest = all.filter { it.id != firstId }
+        return listOfNotNull(first) + rest
+    }
 
     private fun snapshot(): JSONObject {
         val images = JSONArray()
@@ -477,6 +566,9 @@ class NativeBridge(
             .put("payload", payloadInfo())
             .put("activePrompt", activePrompt())
             .put("minImagesMessage", de.spardirekt.ugcagent.v3.data.ImageRules.needMoreMessage())
+            .put("recommendedFirstFrameId", project.recommendedFirstFrameId ?: "")
+            .put("readinessWarningRu", ProductIdentity.warningFor(project.identityReadiness, "ru"))
+            .put("readinessWarningDe", ProductIdentity.warningFor(project.identityReadiness, "de"))
     }
 
     private fun payloadInfo(): JSONObject {

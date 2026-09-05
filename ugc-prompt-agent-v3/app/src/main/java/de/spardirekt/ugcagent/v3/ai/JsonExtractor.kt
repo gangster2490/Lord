@@ -59,6 +59,40 @@ object JsonExtractor {
         "warnings",
     )
 
+    fun fingerprintSchemaKeys(): List<String> = listOf(
+        "overall_geometry",
+        "identity_critical_components",
+        "component_count_constraints",
+        "component_layout",
+        "attachment_points",
+        "moving_or_removable_parts",
+        "must_not_change",
+        "uncertain_hidden_geometry",
+        "confidence",
+    )
+
+    fun actionRiskSchemaKeys(): List<String> = listOf(
+        "risk",
+        "risk_reasons",
+        "geometry_that_must_move",
+        "hidden_geometry_required",
+        "recommended_safe_action",
+    )
+
+    fun readinessSchemaKeys(): List<String> = listOf(
+        "score",
+        "missing_views",
+        "ambiguous_components",
+        "generation_risk",
+    )
+
+    fun firstFrameRecommendSchemaKeys(): List<String> = listOf(
+        "recommended_image_index",
+        "reasons",
+        "identity_components_visible",
+        "marketplace_ui_over_product",
+    )
+
     fun complianceSchemaKeys(): List<String> = listOf(
         "status",
         "warnings",
@@ -92,9 +126,25 @@ object JsonExtractor {
                     "claims_detected",
                     "evidence_supported_claims",
                     "unsupported_claims",
+                    "identity_critical_components",
+                    "component_count_constraints",
+                    "component_layout",
+                    "attachment_points",
+                    "moving_or_removable_parts",
+                    "must_not_change",
+                    "uncertain_hidden_geometry",
+                    "risk_reasons",
+                    "geometry_that_must_move",
+                    "hidden_geometry_required",
+                    "missing_views",
+                    "ambiguous_components",
+                    "reasons",
                     -> obj.put(key, JSONArray())
-                    "same_product", "usable" -> obj.put(key, true)
-                    "confidence" -> obj.put(key, 0.0)
+                    "same_product", "usable", "identity_components_visible" -> obj.put(key, true)
+                    "marketplace_ui_over_product" -> obj.put(key, false)
+                    "confidence", "score" -> obj.put(key, 0.0)
+                    "recommended_image_index" -> obj.put(key, 0)
+                    "risk", "generation_risk" -> obj.put(key, "LOW")
                     "status" -> obj.put(key, "WARNING")
                     else -> obj.put(key, "")
                 }

@@ -60,6 +60,11 @@ class ProjectRecord(
     var provider: String = "OPENAI",
     var model: String? = null,
     var consistencyOverride: Boolean = false,
+    var identityFingerprint: JSONObject? = null,
+    var actionRisk: JSONObject? = null,
+    var identityReadiness: JSONObject? = null,
+    var firstFrameRecommendation: JSONObject? = null,
+    var recommendedFirstFrameId: String? = null,
 ) {
     fun touch() {
         updatedAt = System.currentTimeMillis()
@@ -87,6 +92,11 @@ class ProjectRecord(
         .put("provider", provider)
         .put("model", model)
         .put("consistencyOverride", consistencyOverride)
+        .put("identityFingerprint", identityFingerprint)
+        .put("actionRisk", actionRisk)
+        .put("identityReadiness", identityReadiness)
+        .put("firstFrameRecommendation", firstFrameRecommendation)
+        .put("recommendedFirstFrameId", recommendedFirstFrameId)
 
     companion object {
         fun fromJson(obj: JSONObject): ProjectRecord {
@@ -114,6 +124,11 @@ class ProjectRecord(
                 provider = obj.optString("provider", "OPENAI"),
                 model = obj.optString("model").ifBlank { null },
                 consistencyOverride = obj.optBoolean("consistencyOverride", false),
+                identityFingerprint = obj.optJSONObject("identityFingerprint"),
+                actionRisk = obj.optJSONObject("actionRisk"),
+                identityReadiness = obj.optJSONObject("identityReadiness"),
+                firstFrameRecommendation = obj.optJSONObject("firstFrameRecommendation"),
+                recommendedFirstFrameId = obj.optString("recommendedFirstFrameId").ifBlank { null },
             )
         }
     }

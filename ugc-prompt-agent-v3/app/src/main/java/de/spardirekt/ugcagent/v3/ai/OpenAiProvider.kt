@@ -45,6 +45,56 @@ class OpenAiProvider(
         return parseJson(text, JsonExtractor.analysisSchemaKeys())
     }
 
+    override fun productIdentityFingerprint(apiKey: String, images: List<ApiImage>): JSONObject {
+        val text = complete(
+            apiKey, SystemPrompts.PRODUCT_IDENTITY_FINGERPRINT,
+            "Extract the product identity fingerprint from all ${images.size} reference images. Return the required JSON only.",
+            images, json = true, maxTokens = 1200, temperature = 0.1,
+        )
+        return parseJson(text, JsonExtractor.fingerprintSchemaKeys())
+    }
+
+    override fun actionIdentityRiskCheck(
+        apiKey: String,
+        fingerprint: JSONObject,
+        scene: JSONObject,
+        images: List<ApiImage>,
+    ): JSONObject {
+        val user = buildString {
+            appendLine("Proposed action / scene JSON:")
+            appendLine(scene.toString())
+            appendLine("Product identity fingerprint JSON:")
+            appendLine(fingerprint.toString())
+        }
+        val text = complete(
+            apiKey, SystemPrompts.ACTION_IDENTITY_RISK_CHECK, user,
+            images, json = true, maxTokens = 700, temperature = 0.1,
+        )
+        return parseJson(text, JsonExtractor.actionRiskSchemaKeys())
+    }
+
+    override fun productIdentityReadiness(apiKey: String, fingerprint: JSONObject, images: List<ApiImage>): JSONObject {
+        val user = buildString {
+            appendLine("Fingerprint JSON:")
+            appendLine(fingerprint.toString())
+            appendLine("Judge readiness using all ${images.size} reference images.")
+        }
+        val text = complete(
+            apiKey, SystemPrompts.PRODUCT_IDENTITY_READINESS, user,
+            images, json = true, maxTokens = 700, temperature = 0.1,
+        )
+        return parseJson(text, JsonExtractor.readinessSchemaKeys())
+    }
+
+    override fun recommendFirstFrame(apiKey: String, images: List<ApiImage>): JSONObject {
+        val text = complete(
+            apiKey, SystemPrompts.FIRST_FRAME_RECOMMENDATION,
+            "Recommend the best First Frame. Images are in 0-based order, count=${images.size}.",
+            images, json = true, maxTokens = 600, temperature = 0.1,
+        )
+        return parseJson(text, JsonExtractor.firstFrameRecommendSchemaKeys())
+    }
+
     override fun firstFrameQuality(apiKey: String, image: ApiImage): JSONObject {
         val text = complete(
             apiKey, SystemPrompts.FIRST_FRAME_QUALITY,
@@ -59,28 +109,34 @@ class OpenAiProvider(
         analysis: JSONObject,
         images: List<ApiImage>,
         previous: JSONObject?,
+        fingerprint: JSONObject?,
     ): JSONObject {
         val user = buildString {
             appendLine("Evidence JSON:")
             appendLine(analysis.toString())
+            if (fingerprint != null) {
+                appendLine("Product identity fingerprint JSON:")
+                appendLine(fingerprint.toString())
+            }
+            appendLine("Use only a LOW-RISK action. Product identity wins over creativity.")
             if (previous != null) {
-                appendLine("Previous scene (create a different action/context, same product):")
+                appendLine("Previous scene (create a different LOW-RISK action/context, same product):")
                 appendLine(previous.toString())
             }
         }
-        val text = complete(apiKey, SystemPrompts.SCENE, user, images.take(4), json = true, maxTokens = 700, temperature = 0.8)
+        val text = complete(apiKey, SystemPrompts.SCENE, user, images, json = true, maxTokens = 700, temperature = 0.8)
         return JsonExtractor.extractObject(text)
     }
 
     override fun generateVideoPrompt(apiKey: String, images: List<ApiImage>, ctx: PromptContext): String {
         val user = userContext(ctx)
-        val raw = complete(apiKey, SystemPrompts.VIDEO_PROMPT, user, images.take(1), json = false, maxTokens = 900, temperature = 0.8)
+        val raw = complete(apiKey, SystemPrompts.VIDEO_PROMPT, user, images, json = false, maxTokens = 1400, temperature = 0.8)
         return finalizePrompt(raw, ctx)
     }
 
     override fun improvePrompt(apiKey: String, ctx: PromptContext): String {
         val user = "Current prompt:\n${ctx.currentPrompt}\n\n${userContext(ctx)}"
-        val raw = complete(apiKey, SystemPrompts.IMPROVE, user, emptyList(), json = false, maxTokens = 900, temperature = 0.5)
+        val raw = complete(apiKey, SystemPrompts.IMPROVE, user, emptyList(), json = false, maxTokens = 1400, temperature = 0.5)
         return finalizePrompt(raw, ctx)
     }
 
@@ -104,7 +160,8 @@ class OpenAiProvider(
 
     private fun finalizePrompt(raw: String, ctx: PromptContext): String {
         var prompt = raw.trim().removePrefix("```").removeSuffix("```").trim()
-        prompt = ProductLock.ensure(prompt, ctx.strictProductLock)
+        val fingerprint = try { JSONObject(ctx.fingerprint) } catch (_: Exception) { null }
+        prompt = ProductLock.ensure(prompt, ctx.strictProductLock, fingerprint)
         prompt = ProductLock.applyGenerator(prompt, ctx.targetGenerator)
         if (ctx.speechLanguage.equals("OFF", true)) {
             prompt = ProductLock.ensureNoSpeech(prompt)
@@ -117,10 +174,18 @@ class OpenAiProvider(
         appendLine("Strict product lock: ${ctx.strictProductLock}")
         appendLine("Speech: ${ctx.speechLanguage}")
         appendLine("Target generator: ${ctx.targetGenerator}")
+        appendLine("Product identity fingerprint JSON:")
+        appendLine(ctx.fingerprint)
+        appendLine("Action identity risk JSON:")
+        appendLine(ctx.actionRisk)
+        appendLine("Identity readiness JSON:")
+        appendLine(ctx.readiness)
         appendLine("Evidence JSON:")
         appendLine(ctx.analysis)
         appendLine("Selected scene JSON:")
         appendLine(ctx.scene)
+        appendLine("Use ALL uploaded reference images as supporting identity evidence.")
+        appendLine("Use only the selected LOW-RISK action. If the action is HIGH risk, replace it with the recommended safer action.")
     }
 
     private fun parseJson(text: String, keys: List<String>): JSONObject {

@@ -31,4 +31,12 @@ class FirstFrameHeuristicsTest {
         assertFalse(merged.getBoolean("usable"))
         assertEquals(0.4, merged.getDouble("confidence"), 0.001)
     }
+
+    @Test
+    fun ranksLargerCleanPhotoAboveTinyFrame() {
+        val tiny = FirstFrameHeuristics.RankedImage("tiny", 0, 200, 200, 4_000, FirstFrameHeuristics.score(200, 200, 4_000))
+        val photo = FirstFrameHeuristics.RankedImage("photo", 1, 1080, 1920, 220_000, FirstFrameHeuristics.score(1080, 1920, 220_000))
+        val rec = FirstFrameHeuristics.recommendLocal(listOf(tiny, photo))
+        assertEquals("photo", rec?.id)
+    }
 }

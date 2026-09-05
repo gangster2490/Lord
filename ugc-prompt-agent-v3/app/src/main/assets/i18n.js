@@ -67,7 +67,12 @@ window.I18N = {
     busy: "Bitte warten…",
     copied: "Kopiert",
     not_configured: "Nicht konfiguriert",
-    retry: "Erneut versuchen"
+    retry: "Erneut versuchen",
+    recommended_ff: "RECOMMENDED FIRST FRAME",
+    identity_lock: "Structural Identity Lock",
+    action_risk: "Action Identity Risk",
+    action_simplified: "Aktion vereinfacht — Produktidentität hat Vorrang.",
+    fingerprint: "Product Identity Fingerprint"
   },
   ru: {
     app_eyebrow: "UGC Prompt Agent V3",
@@ -137,6 +142,11 @@ window.I18N = {
     busy: "Подождите…",
     copied: "Скопировано",
     not_configured: "Не настроено",
-    retry: "Повторить"
+    retry: "Повторить",
+    recommended_ff: "RECOMMENDED FIRST FRAME",
+    identity_lock: "Structural Identity Lock",
+    action_risk: "Action Identity Risk",
+    action_simplified: "Действие упрощено — идентичность товара важнее креатива.",
+    fingerprint: "Product Identity Fingerprint"
   }
 };

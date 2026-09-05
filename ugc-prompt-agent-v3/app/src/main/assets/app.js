@@ -144,6 +144,17 @@
     </section>`;
   }
 
+  function recId() {
+    return state.data.recommendedFirstFrameId ||
+      (state.data.project && state.data.project.recommendedFirstFrameId) || "";
+  }
+
+  function readinessWarning() {
+    return state.lang === "ru"
+      ? (state.data.readinessWarningRu || "")
+      : (state.data.readinessWarningDe || "");
+  }
+
   function photosHtml() {
     const images = (state.data.images || []);
     const payload = state.data.payload || {};
@@ -151,9 +162,9 @@
     return `<section class="card">
       <p>${enabled ? "" : t("analyse_need")}</p>
       <div class="thumbs">${images.map((img) => `
-        <div class="thumb ${img.isFirstFrame ? "ff" : ""}" data-id="${img.id}">
+        <div class="thumb ${img.isFirstFrame ? "ff" : ""} ${img.id === recId() ? "rec" : ""}" data-id="${img.id}">
           <img src="${img.thumb}" alt="" />
-          <span class="badge">${img.isFirstFrame ? "FF" : ""} ${img.width}×${img.height}</span>
+          <span class="badge ${img.id === recId() ? "rec" : ""}">${img.id === recId() ? t("recommended_ff") : ""} ${img.isFirstFrame ? "FF" : ""} ${img.width}×${img.height}</span>
         </div>`).join("")}</div>
       <div class="kv"><span>${t("payload")}</span><span>${payload.imageCount || 0} · ${fmtBytes(payload.originalBytes)} → ${fmtBytes(payload.compressedBytes)}</span></div>
       ${payload.warning ? `<p class="warn">Payload groß — extra Kompression möglich.</p>` : ""}
@@ -187,8 +198,11 @@
 
   function analyseHtml() {
     const a = (state.data.project && state.data.project.analysis) || {};
+    const fp = (state.data.project && state.data.project.identityFingerprint) || {};
     return `<section class="card">
       <pre>${JSON.stringify(a, null, 2)}</pre>
+      <h3>${t("fingerprint")}</h3>
+      <pre>${JSON.stringify(fp, null, 2)}</pre>
       <div class="row">
         <button id="runAnalyse">${t("analyse")}</button>
         <button id="toFf" class="secondary" ${a.observed_use_case ? "" : "disabled"}>${t("first_frame")}</button>
@@ -199,12 +213,15 @@
   function firstFrameHtml() {
     const images = state.data.images || [];
     const q = (state.data.project && state.data.project.firstFrameQuality) || {};
+    const rec = (state.data.project && state.data.project.firstFrameRecommendation) || {};
     return `<section class="card">
       <div class="thumbs">${images.map((img) => `
-        <div class="thumb ${img.isFirstFrame ? "ff" : ""}" data-pick="${img.id}">
+        <div class="thumb ${img.isFirstFrame ? "ff" : ""} ${img.id === recId() ? "rec" : ""}" data-pick="${img.id}">
           <img src="${img.thumb}" alt="" />
+          <span class="badge ${img.id === recId() ? "rec" : ""}">${img.id === recId() ? t("recommended_ff") : ""} ${img.isFirstFrame ? "FF" : ""}</span>
         </div>`).join("")}</div>
       <pre>${JSON.stringify(q, null, 2)}</pre>
+      <pre>${JSON.stringify(rec, null, 2)}</pre>
       <div class="row">
         <button id="quality">${t("check")}</button>
         <button id="confirmFf">${t("confirm_ff")}</button>
@@ -215,6 +232,7 @@
   function sceneHtml() {
     const scene = (state.data.project && state.data.project.scene) || {};
     const speech = (state.data.project && state.data.project.speechLanguage) || "DEUTSCH";
+    const risk = (state.data.project && state.data.project.actionRisk) || {};
     return `<section class="card">
       <label>${t("speech")}</label>
       <select id="speech">
@@ -222,7 +240,10 @@
         <option value="DEUTSCH" ${speech === "DEUTSCH" ? "selected" : ""}>${t("speech_de")}</option>
         <option value="РУССКИЙ" ${speech === "РУССКИЙ" ? "selected" : ""}>${t("speech_ru")}</option>
       </select>
+      ${scene.action_identity_override ? `<p class="warn">${t("action_simplified")}</p>` : ""}
+      <p>${t("action_risk")}: ${risk.risk || "-"}</p>
       <pre>${JSON.stringify(scene, null, 2)}</pre>
+      <pre>${JSON.stringify(risk, null, 2)}</pre>
       <div class="row">
         <button id="genScene">${t("generate_scene")}</button>
         <button id="newScene" class="secondary">${t("new_scene")}</button>
@@ -233,7 +254,9 @@
 
   function promptHtml() {
     const p = state.data.activePrompt || "";
+    const warn = readinessWarning();
     return `<section class="card">
+      ${warn ? `<p class="warn">${escapeHtml(warn)}</p>` : ""}
       <textarea id="promptBox" readonly>${escapeHtml(p)}</textarea>
       <div class="row">
         <button id="genPrompt">${t("generate_prompt")}</button>

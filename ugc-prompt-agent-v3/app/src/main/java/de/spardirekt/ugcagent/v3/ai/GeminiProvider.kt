@@ -33,24 +33,73 @@ class GeminiProvider(
     override fun analyseProduct(apiKey: String, images: List<ApiImage>): JSONObject =
         jsonCall(apiKey, SystemPrompts.PRODUCT_ANALYSIS, "Analyse these ${images.size} source images.", images, JsonExtractor.analysisSchemaKeys(), 0.2)
 
+    override fun productIdentityFingerprint(apiKey: String, images: List<ApiImage>): JSONObject =
+        jsonCall(
+            apiKey,
+            SystemPrompts.PRODUCT_IDENTITY_FINGERPRINT,
+            "Extract the product identity fingerprint from all ${images.size} reference images.",
+            images,
+            JsonExtractor.fingerprintSchemaKeys(),
+            0.1,
+        )
+
+    override fun actionIdentityRiskCheck(
+        apiKey: String,
+        fingerprint: JSONObject,
+        scene: JSONObject,
+        images: List<ApiImage>,
+    ): JSONObject = jsonCall(
+        apiKey,
+        SystemPrompts.ACTION_IDENTITY_RISK_CHECK,
+        "Proposed scene:\n$scene\nFingerprint:\n$fingerprint",
+        images,
+        JsonExtractor.actionRiskSchemaKeys(),
+        0.1,
+    )
+
+    override fun productIdentityReadiness(apiKey: String, fingerprint: JSONObject, images: List<ApiImage>): JSONObject =
+        jsonCall(
+            apiKey,
+            SystemPrompts.PRODUCT_IDENTITY_READINESS,
+            "Fingerprint:\n$fingerprint\nJudge readiness from all ${images.size} images.",
+            images,
+            JsonExtractor.readinessSchemaKeys(),
+            0.1,
+        )
+
+    override fun recommendFirstFrame(apiKey: String, images: List<ApiImage>): JSONObject =
+        jsonCall(
+            apiKey,
+            SystemPrompts.FIRST_FRAME_RECOMMENDATION,
+            "Recommend the best First Frame. 0-based order, count=${images.size}.",
+            images,
+            JsonExtractor.firstFrameRecommendSchemaKeys(),
+            0.1,
+        )
+
     override fun firstFrameQuality(apiKey: String, image: ApiImage): JSONObject =
         jsonCall(apiKey, SystemPrompts.FIRST_FRAME_QUALITY, "Check this original uploaded image as First Frame.", listOf(image), JsonExtractor.firstFrameSchemaKeys(), 0.1)
 
-    override fun generateScene(apiKey: String, analysis: JSONObject, images: List<ApiImage>, previous: JSONObject?): JSONObject {
+    override fun generateScene(apiKey: String, analysis: JSONObject, images: List<ApiImage>, previous: JSONObject?, fingerprint: JSONObject?): JSONObject {
         val user = buildString {
             appendLine("Evidence JSON:")
             appendLine(analysis.toString())
+            if (fingerprint != null) {
+                appendLine("Product identity fingerprint JSON:")
+                appendLine(fingerprint.toString())
+            }
+            appendLine("Use only a LOW-RISK action. Product identity wins over creativity.")
             if (previous != null) {
-                appendLine("Previous scene (different action/context, same product):")
+                appendLine("Previous scene (different LOW-RISK action/context, same product):")
                 appendLine(previous.toString())
             }
         }
-        val text = complete(apiKey, SystemPrompts.SCENE, user, images.take(4), json = true, temperature = 0.8)
+        val text = complete(apiKey, SystemPrompts.SCENE, user, images, json = true, temperature = 0.8)
         return JsonExtractor.extractObject(text)
     }
 
     override fun generateVideoPrompt(apiKey: String, images: List<ApiImage>, ctx: PromptContext): String {
-        val raw = complete(apiKey, SystemPrompts.VIDEO_PROMPT, userContext(ctx), images.take(1), json = false, temperature = 0.8)
+        val raw = complete(apiKey, SystemPrompts.VIDEO_PROMPT, userContext(ctx), images, json = false, temperature = 0.8)
         return finalizePrompt(raw, ctx)
     }
 
@@ -150,14 +199,15 @@ class GeminiProvider(
 
     private fun finalizePrompt(raw: String, ctx: PromptContext): String {
         var prompt = raw.trim().removePrefix("```").removeSuffix("```").trim()
-        prompt = ProductLock.ensure(prompt, ctx.strictProductLock)
+        val fingerprint = try { JSONObject(ctx.fingerprint) } catch (_: Exception) { null }
+        prompt = ProductLock.ensure(prompt, ctx.strictProductLock, fingerprint)
         prompt = ProductLock.applyGenerator(prompt, ctx.targetGenerator)
         if (ctx.speechLanguage.equals("OFF", true)) prompt = ProductLock.ensureNoSpeech(prompt)
         return prompt
     }
 
     private fun userContext(ctx: PromptContext): String =
-        "${ctx.firstFrameNote}\nStrict lock=${ctx.strictProductLock}\nSpeech=${ctx.speechLanguage}\nGenerator=${ctx.targetGenerator}\nEvidence:\n${ctx.analysis}\nScene:\n${ctx.scene}"
+        "${ctx.firstFrameNote}\nStrict lock=${ctx.strictProductLock}\nSpeech=${ctx.speechLanguage}\nGenerator=${ctx.targetGenerator}\nFingerprint:\n${ctx.fingerprint}\nAction risk:\n${ctx.actionRisk}\nReadiness:\n${ctx.readiness}\nEvidence:\n${ctx.analysis}\nScene:\n${ctx.scene}\nUse all uploaded reference images as supporting identity evidence. Use only the selected LOW-RISK action."
 
     private fun complete(
         apiKey: String,

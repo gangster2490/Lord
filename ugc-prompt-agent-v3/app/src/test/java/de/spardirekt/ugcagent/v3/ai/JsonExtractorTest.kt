@@ -20,6 +20,19 @@ class JsonExtractorTest {
         }
     }
 
+    @Test
+    fun fillsFingerprintDefaults() {
+        val obj = JsonExtractor.withDefaults(JsonExtractor.extractObject("{}"), JsonExtractor.fingerprintSchemaKeys())
+        assertTrue(obj.getJSONArray("identity_critical_components").length() == 0)
+        assertEquals(0.0, obj.getDouble("confidence"), 0.0)
+    }
+
+    @Test
+    fun fillsActionRiskDefaults() {
+        val obj = JsonExtractor.withDefaults(JsonExtractor.extractObject("{}"), JsonExtractor.actionRiskSchemaKeys())
+        assertEquals("LOW", obj.getString("risk"))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsEmpty() {
         JsonExtractor.extractObject("no json here")

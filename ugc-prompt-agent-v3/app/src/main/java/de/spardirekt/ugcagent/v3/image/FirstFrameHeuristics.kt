@@ -47,4 +47,29 @@ object FirstFrameHeuristics {
             .put("warnings", warnings)
             .put("source", "local+ai")
     }
+
+    data class RankedImage(
+        val id: String,
+        val index: Int,
+        val width: Int,
+        val height: Int,
+        val compressedBytes: Long,
+        val score: Double,
+    )
+
+    fun score(width: Int, height: Int, compressedBytes: Long): Double {
+        val area = width.toDouble() * height
+        val minSide = min(width, height).toDouble()
+        val bytesScore = (compressedBytes / 50_000.0).coerceAtMost(8.0)
+        return area / 1_000_000.0 + minSide / 100.0 + bytesScore
+    }
+
+    fun rank(images: List<RankedImage>): List<RankedImage> = images.sortedByDescending { it.score }
+
+    fun recommendLocal(images: List<RankedImage>): RankedImage? = rank(images).firstOrNull()
+
+    fun mergeRecommendation(localId: String?, aiIndex: Int, images: List<RankedImage>): RankedImage? {
+        val fromAi = images.firstOrNull { it.index == aiIndex }
+        return fromAi ?: images.firstOrNull { it.id == localId } ?: recommendLocal(images)
+    }
 }

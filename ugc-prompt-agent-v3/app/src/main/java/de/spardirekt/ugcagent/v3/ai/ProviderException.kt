@@ -45,5 +45,8 @@ data class PromptContext(
     val targetGenerator: String,
     val strictProductLock: Boolean,
     val currentPrompt: String = "",
-    val firstFrameNote: String = "Use the original uploaded First Frame. Do not generate a new first frame.",
+    val firstFrameNote: String = "Start from the selected original First Frame. Use all uploaded reference images as supporting product-identity evidence.",
+    val fingerprint: String = "{}",
+    val actionRisk: String = "{}",
+    val readiness: String = "{}",
 )
