@@ -82,8 +82,45 @@
       tab.classList.toggle("active", tab.dataset.tab === name);
     });
     document.querySelectorAll(".page").forEach((page) => {
-      page.classList.toggle("active", page.id === "page-" + name);
+      const on = page.id === "page-" + name;
+      page.classList.toggle("active", on);
+      if (on) page.scrollTop = 0;
     });
+  }
+
+  function fitOverlayToKeyboard() {
+    const overlay = $("settings");
+    const vv = window.visualViewport;
+    if (!overlay) return;
+    if (!overlay.classList.contains("open") || !vv) {
+      overlay.style.top = "";
+      overlay.style.right = "";
+      overlay.style.bottom = "";
+      overlay.style.left = "";
+      overlay.style.height = "";
+      overlay.style.paddingBottom = "";
+      return;
+    }
+    overlay.style.top = vv.offsetTop + "px";
+    overlay.style.left = "0";
+    overlay.style.right = "0";
+    overlay.style.bottom = "auto";
+    overlay.style.height = vv.height + "px";
+    overlay.style.paddingBottom = "16px";
+    const field = $("api-key");
+    if (document.activeElement === field) {
+      field.scrollIntoView({ block: "center", inline: "nearest" });
+    }
+  }
+
+  function openSettings() {
+    $("settings").classList.add("open");
+    fitOverlayToKeyboard();
+  }
+
+  function closeSettings() {
+    $("settings").classList.remove("open");
+    fitOverlayToKeyboard();
   }
 
   function errorHtml(code) {
@@ -108,7 +145,7 @@
 
   function bindErrorActions(container) {
     const go = container.querySelector("#goto-settings");
-    if (go) go.onclick = () => $("settings").classList.add("open");
+    if (go) go.onclick = () => openSettings();
     const retry = container.querySelector("#retry-last");
     if (retry) retry.onclick = () => state.pending && state.pending();
   }
@@ -585,11 +622,16 @@ OUTPUT: nur der Prompt, max. 80 Wörter, Deutsch.`;
     };
   });
 
-  $("btn-settings").onclick = () => $("settings").classList.add("open");
-  $("btn-close-settings").onclick = () => $("settings").classList.remove("open");
+  $("btn-settings").onclick = () => openSettings();
+  $("btn-close-settings").onclick = () => closeSettings();
   $("settings").addEventListener("click", (e) => {
-    if (e.target.id === "settings") $("settings").classList.remove("open");
+    if (e.target.id === "settings") closeSettings();
   });
+  $("api-key").addEventListener("focus", () => setTimeout(fitOverlayToKeyboard, 50));
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", fitOverlayToKeyboard);
+    window.visualViewport.addEventListener("scroll", fitOverlayToKeyboard);
+  }
 
   $("lang-de").onclick = () => {
     state.lang = "de";
