@@ -31,8 +31,8 @@ class CopyOutputsTest {
         assertThat(pack).contains("Alltag am Schreibtisch. Werbung")
         assertThat(pack).contains("#Büro")
         assertThat(pack).doesNotContain("Produkt:")
-        assertThat(pack).doesNotContain("First Frame:")
-        assertThat(pack).doesNotContain(record.copyPack!!.details)
+        assertThat(pack).doesNotContain("Nutzen:")
+        assertThat(pack).doesNotContain("First Frame: erstes hochgeladenes Foto")
     }
 
     @Test
