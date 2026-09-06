@@ -10,7 +10,7 @@ import de.spardirekt.ugcclean.model.PipelineStage
 import de.spardirekt.ugcclean.model.ProjectRecord
 import de.spardirekt.ugcclean.model.ProjectStatus
 import de.spardirekt.ugcclean.model.SpeechLanguage
-import de.spardirekt.ugcclean.net.OpenAiClient
+import de.spardirekt.ugcclean.net.ProviderClients
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,7 +24,7 @@ class GenerationSession(
     private val app: Application,
     private val projects: ProjectStore,
     private val settings: SettingsStore,
-    private val pipeline: Pipeline = Pipeline(OpenAiClient()),
+    private val clients: ProviderClients = ProviderClients(),
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _active = MutableStateFlow<ProjectRecord?>(null)
@@ -58,7 +58,8 @@ class GenerationSession(
                 if (images.size < StartGate.MIN_PHOTOS) {
                     throw PipelineException("Fotos konnten nicht gelesen werden.")
                 }
-                pipeline.run(key, images, language) { stage, percent ->
+                val live = clients.forKey(settings.provider(), key)
+                Pipeline(liveClient = live, demoClient = clients.demo).run(key, images, language) { stage, percent ->
                     update { it.copy(stage = stage, progressPercent = percent, updatedAt = System.currentTimeMillis()) }
                 }
             }.onSuccess { result ->

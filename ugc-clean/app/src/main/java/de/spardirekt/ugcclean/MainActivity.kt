@@ -103,8 +103,10 @@ class MainActivity : ComponentActivity() {
                                 onDelete = vm::deleteProject,
                             )
                             state.tab == Tab.SETTINGS -> SettingsScreen(
+                                provider = state.provider,
                                 keyDraft = state.keyDraft,
                                 masked = state.keyMasked,
+                                onProvider = vm::setProvider,
                                 onKeyChange = vm::setKeyDraft,
                                 onToggleMask = vm::toggleKeyMask,
                                 onSave = vm::saveKey,

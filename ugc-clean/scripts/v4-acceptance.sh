@@ -6,6 +6,7 @@ cd "$ROOT"
 
 echo "== V4 source audit =="
 test -f app/src/main/java/de/spardirekt/ugcclean/gen/PromptComposer.kt
+test -f app/src/main/java/de/spardirekt/ugcclean/net/GeminiClient.kt
 test -f app/src/test/java/de/spardirekt/ugcclean/gen/V4AcceptanceTest.kt
 grep -q 'applicationId = "de.spardirekt.ugcclean"' app/build.gradle.kts
 grep -q 'INTERNET' app/src/main/AndroidManifest.xml

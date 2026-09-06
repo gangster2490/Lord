@@ -16,8 +16,16 @@
     <string name="remove">Убрать</string>
     <string name="clear_all">Убрать все</string>
     <string name="settings_title">Настройки</string>
-    <string name="api_key">OpenAI API-ключ</string>
+    <string name="api_key">API-ключ</string>
+    <string name="api_key_openai">OpenAI API-ключ</string>
+    <string name="api_key_gemini">Gemini API-ключ</string>
     <string name="api_key_hint">sk-… или sk-demo</string>
+    <string name="api_key_hint_openai">sk-… или sk-demo</string>
+    <string name="api_key_hint_gemini">AIza… или sk-demo</string>
+    <string name="provider">Провайдер ИИ</string>
+    <string name="provider_openai">OpenAI</string>
+    <string name="provider_gemini">Gemini</string>
+    <string name="provider_hint">START использует сохранённого провайдера. На экране создания его выбирать не нужно.</string>
     <string name="save_key">Сохранить ключ</string>
     <string name="test_key">Проверить связь</string>
     <string name="remove_key">Удалить ключ</string>

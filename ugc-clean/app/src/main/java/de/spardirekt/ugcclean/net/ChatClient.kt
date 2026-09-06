@@ -10,6 +10,8 @@ interface ChatClient {
     ): String
 }
 
+class AiException(message: String, val retryable: Boolean = false) : Exception(message)
+
 object Keys {
     fun isDemo(apiKey: String): Boolean = apiKey.trim().equals("sk-demo", ignoreCase = true)
 }

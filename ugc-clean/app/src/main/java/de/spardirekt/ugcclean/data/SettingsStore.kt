@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import de.spardirekt.ugcclean.net.AiProviderId
 
 class SettingsStore(context: Context) {
     private val prefs: SharedPreferences = runCatching {
@@ -21,19 +22,32 @@ class SettingsStore(context: Context) {
         context.getSharedPreferences("ugc_clean_settings", Context.MODE_PRIVATE)
     }
 
-    fun apiKey(): String = prefs.getString(KEY, "").orEmpty()
+    fun provider(): AiProviderId = AiProviderId.fromStored(prefs.getString(PROVIDER, null))
 
-    fun hasKey(): Boolean = apiKey().isNotBlank()
-
-    fun saveKey(value: String) {
-        prefs.edit().putString(KEY, value.trim()).apply()
+    fun setProvider(id: AiProviderId) {
+        prefs.edit().putString(PROVIDER, id.name).apply()
     }
 
-    fun clearKey() {
-        prefs.edit().remove(KEY).apply()
+    fun apiKey(id: AiProviderId = provider()): String = prefs.getString(keyName(id), "").orEmpty()
+
+    fun hasKey(id: AiProviderId = provider()): Boolean = apiKey(id).isNotBlank()
+
+    fun saveKey(value: String, id: AiProviderId = provider()) {
+        prefs.edit().putString(keyName(id), value.trim()).apply()
+    }
+
+    fun clearKey(id: AiProviderId = provider()) {
+        prefs.edit().remove(keyName(id)).apply()
+    }
+
+    private fun keyName(id: AiProviderId): String = when (id) {
+        AiProviderId.OPENAI -> KEY_OPENAI
+        AiProviderId.GEMINI -> KEY_GEMINI
     }
 
     companion object {
-        private const val KEY = "openai_api_key"
+        private const val PROVIDER = "ai_provider"
+        private const val KEY_OPENAI = "openai_api_key"
+        private const val KEY_GEMINI = "gemini_api_key"
     }
 }

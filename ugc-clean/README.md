@@ -4,7 +4,7 @@ New Android app (`de.spardirekt.ugcclean`) built from scratch. It does not reuse
 
 Native Kotlin + Jetpack Compose. One flow:
 
-1. Settings → paste OpenAI key (or `sk-demo`)
+1. Settings → pick OpenAI or Gemini, paste that key (or `sk-demo`)
 2. Create → 3–15 product photos
 3. Deutsch or Русский
 4. **START** once
@@ -19,6 +19,13 @@ Previous apps stacked extra engines until prompts leaked kitchen/microwave/fishi
 - One vision call → a `ProductPlan` JSON for **this** product
 - A local `PromptComposer` that always emits the same 12 headings, once each
 - One caption/hashtag call, then TikTok Shop disclosure (`Werbung` / `Реклама`)
+
+Providers (Settings only, not on START):
+
+- OpenAI: `gpt-5.6-sol` → `gpt-5.6-terra` → `gpt-4o`
+- Gemini: `gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash`
+
+Keys stay in EncryptedSharedPreferences. `sk-demo` still runs locally with no network.
 
 No leftover templates. Demo mode (`sk-demo`) is first-frame locked and category-unknown, so it cannot leak another product family.
 

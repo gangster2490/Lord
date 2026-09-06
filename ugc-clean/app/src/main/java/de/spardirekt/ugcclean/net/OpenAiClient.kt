@@ -17,8 +17,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-class OpenAiException(message: String, val retryable: Boolean = false) : Exception(message)
-
 class OpenAiClient(
     private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
     private val http: OkHttpClient = OkHttpClient.Builder()
@@ -28,8 +26,6 @@ class OpenAiClient(
         .callTimeout(150, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build(),
-    private val primaryModel: String = "gpt-5.6-sol",
-    private val fallbackModel: String = "gpt-4o",
 ) : ChatClient {
 
     override suspend fun chat(
@@ -40,29 +36,33 @@ class OpenAiClient(
         jsonMode: Boolean,
     ): String {
         val attempts = listOf(
-            RequestShape(primaryModel, jsonMode, includeReasoning = true),
-            RequestShape(primaryModel, jsonMode = false, includeReasoning = false),
-            RequestShape(fallbackModel, jsonMode, includeReasoning = false),
-            RequestShape(fallbackModel, jsonMode = false, includeReasoning = false),
+            RequestShape(AiModelConfig.OPENAI_PRIMARY, jsonMode, includeReasoning = true),
+            RequestShape(AiModelConfig.OPENAI_PRIMARY, jsonMode = false, includeReasoning = false),
+            RequestShape(AiModelConfig.OPENAI_FALLBACK, jsonMode, includeReasoning = true),
+            RequestShape(AiModelConfig.OPENAI_FALLBACK, jsonMode = false, includeReasoning = false),
+            RequestShape(AiModelConfig.OPENAI_FALLBACK_2, jsonMode, includeReasoning = false),
+            RequestShape(AiModelConfig.OPENAI_FALLBACK_2, jsonMode = false, includeReasoning = false),
         )
         var last: Exception? = null
         for ((index, shape) in attempts.withIndex()) {
             try {
                 return execute(apiKey, systemPrompt, userText, imageDataUrls, shape)
-            } catch (e: OpenAiException) {
+            } catch (e: AiException) {
                 last = e
-                val unsupported = e.message?.contains("unsupported_parameter", true) == true
+                val unsupported = e.message?.contains("unsupported_parameter", true) == true ||
+                    e.message?.contains("not found", true) == true ||
+                    e.message?.contains("404") == true
                 val rate = e.message?.contains("429") == true || e.retryable
                 if (!unsupported && !rate) throw e
                 if (index == attempts.lastIndex) throw e
             } catch (e: IOException) {
                 last = e
                 if (index == attempts.lastIndex) {
-                    throw OpenAiException("Netzwerkfehler: ${e.message}", retryable = true)
+                    throw AiException("Netzwerkfehler: ${e.message}", retryable = true)
                 }
             }
         }
-        throw last ?: OpenAiException("OpenAI-Anfrage fehlgeschlagen")
+        throw last ?: AiException("OpenAI-Anfrage fehlgeschlagen")
     }
 
     fun testConnection(apiKey: String): String {
@@ -75,7 +75,7 @@ class OpenAiClient(
         http.newCall(request).execute().use { response ->
             val raw = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                throw OpenAiException(httpError(response.code, raw))
+                throw AiException(httpError(response.code, raw))
             }
             return "Verbindung OK"
         }
@@ -142,12 +142,12 @@ class OpenAiClient(
         http.newCall(request).execute().use { response ->
             val raw = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                throw OpenAiException(httpError(response.code, raw), retryable = response.code == 429)
+                throw AiException(httpError(response.code, raw), retryable = response.code == 429)
             }
             val root = json.parseToJsonElement(raw) as? JsonObject
-                ?: throw OpenAiException("Ungültige OpenAI-Antwort")
+                ?: throw AiException("Ungültige OpenAI-Antwort")
             val content = flattenContent(root)
-            if (content.isBlank()) throw OpenAiException("Leere Modellantwort")
+            if (content.isBlank()) throw AiException("Leere Modellantwort")
             return content
         }
     }

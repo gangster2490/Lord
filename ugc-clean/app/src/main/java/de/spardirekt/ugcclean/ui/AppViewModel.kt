@@ -9,8 +9,9 @@ import de.spardirekt.ugcclean.gen.StartGate
 import de.spardirekt.ugcclean.model.ProjectRecord
 import de.spardirekt.ugcclean.model.ProjectStatus
 import de.spardirekt.ugcclean.model.SpeechLanguage
+import de.spardirekt.ugcclean.net.AiProviderId
 import de.spardirekt.ugcclean.net.Keys
-import de.spardirekt.ugcclean.net.OpenAiClient
+import de.spardirekt.ugcclean.net.ProviderClients
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,15 +33,20 @@ data class UiState(
     val active: ProjectRecord? = null,
     val opened: ProjectRecord? = null,
     val showResult: Boolean = false,
+    val provider: AiProviderId = AiProviderId.OPENAI,
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as UgcCleanApp
     private val _state = MutableStateFlow(
-        UiState(hasKey = app.settings.hasKey(), keyDraft = if (app.settings.hasKey()) "••••••••" else ""),
+        UiState(
+            hasKey = app.settings.hasKey(),
+            keyDraft = if (app.settings.hasKey()) "••••••••" else "",
+            provider = app.settings.provider(),
+        ),
     )
     val state: StateFlow<UiState> = _state
-    private val openAi = OpenAiClient()
+    private val clients = ProviderClients()
 
     init {
         refreshHistory()
@@ -132,6 +138,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setProvider(id: AiProviderId) {
+        app.settings.setProvider(id)
+        val has = app.settings.hasKey(id)
+        _state.update {
+            it.copy(
+                provider = id,
+                hasKey = has,
+                keyDraft = if (has) "••••••••" else "",
+                keyMasked = true,
+            )
+        }
+    }
+
     fun setKeyDraft(value: String) = _state.update { it.copy(keyDraft = value, keyMasked = false) }
 
     fun toggleKeyMask() = _state.update { it.copy(keyMasked = !it.keyMasked) }
@@ -142,18 +161,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             _state.update { it.copy(toast = "Bitte einen Key einfügen.") }
             return
         }
-        app.settings.saveKey(value)
+        app.settings.saveKey(value, _state.value.provider)
         _state.update { it.copy(hasKey = true, keyDraft = "••••••••", keyMasked = true, toast = "Key gespeichert") }
     }
 
     fun removeKey() {
-        app.settings.clearKey()
+        app.settings.clearKey(_state.value.provider)
         _state.update { it.copy(hasKey = false, keyDraft = "", toast = "Key gelöscht") }
     }
 
     fun testKey() {
         viewModelScope.launch {
-            val stored = app.settings.apiKey()
+            val provider = _state.value.provider
+            val stored = app.settings.apiKey(provider)
             val draft = _state.value.keyDraft.trim()
             val key = when {
                 stored.isNotBlank() -> stored
@@ -165,9 +185,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             val msg = withContext(Dispatchers.IO) {
-                runCatching { openAi.testConnection(key) }.getOrElse { it.message ?: "Test fehlgeschlagen" }
+                runCatching { clients.test(provider, key) }.getOrElse { it.message ?: "Test fehlgeschlagen" }
             }
-            _state.update { it.copy(toast = msg, hasKey = app.settings.hasKey() || Keys.isDemo(key)) }
+            _state.update { it.copy(toast = msg, hasKey = app.settings.hasKey(provider) || Keys.isDemo(key)) }
         }
     }
 
@@ -179,6 +199,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun refreshHistory() {
-        _state.update { it.copy(history = app.projects.list(), hasKey = app.settings.hasKey()) }
+        _state.update { it.copy(history = app.projects.list(), hasKey = app.settings.hasKey(), provider = app.settings.provider()) }
     }
 }
