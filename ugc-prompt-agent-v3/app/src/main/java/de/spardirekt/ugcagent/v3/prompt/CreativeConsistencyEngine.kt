@@ -22,10 +22,11 @@ object CreativeConsistencyEngine {
     ): CreativeStrategyEngine.Plan {
         val blob = blob(analysis, fingerprint, firstFrameContext)
         val setting = resolveSetting(analysis, fingerprint, firstFrameContext, blob)
-        val primary = classifyMotivation(blob, setting, fingerprint, analysis)
-        val secondary = secondaryMotivation(primary, blob, setting)
-        val idea = sellingIdea(primary, blob)
-        val hookType = hookTypeFor(primary, idea, setting)
+        val angle = SellingAngleSelector.winner(analysis, fingerprint, setting, blob)
+        val primary = angle.motivation
+        val secondary = SellingAngleSelector.secondary(angle, analysis, fingerprint, setting, blob)
+        val idea = angle.idea
+        val hookType = angle.hookType
         val action = CreativeStrategyEngine.safeAction(fingerprint, analysis, idea, setting.type)
         val human = humanFor(setting.type, fingerprint, analysis)
         val lighting = lightingFor(setting.type, blob)
@@ -146,124 +147,6 @@ object CreativeConsistencyEngine {
             failures.add("format_mismatch")
         }
         return failures.distinct()
-    }
-
-    private fun classifyMotivation(
-        blob: String,
-        setting: SettingEvidence,
-        fingerprint: JSONObject?,
-        analysis: JSONObject?,
-    ): CreativeStrategyEngine.Motivation {
-        val pain = listOf("mess", "splash", "брызг", "clean", "убор", "cover food", "leak", "clutter", "возн", "putzen")
-        val comfort = listOf("cushion", "подуш", "comfort", "комфорт", "chair", "кресл", "seat", "stuhl")
-        val organize = listOf("organizer", "storage", "хранен", "drawer", "shelf")
-        val portable = listOf("folding", "portable", "travel", "компакт", "складн", "походн")
-        val visual = listOf("lamp", "ламп", "decor", "декор", "glassware", "бокал", "fashion", "светильн", "aesthetic")
-        val function = listOf("waffle", "grill", "processor", "pump", "blender", "вафельн", "гриль")
-        val outdoor = listOf("fish", "рыбал", "angel", "camp", "кемпинг", "hiking", "bait")
-        val home = listOf("cookware", "pan", "сковород", "кастрюл", "serving", "посуд")
-        val safety = listOf("guard", "cover", "крыш", "child lock", "safety")
-        val time = listOf("faster", "quick", "time-sav", "экономит время")
-        val space = listOf("space-sav", "compact storage", "flat pack")
-        val gift = listOf("gift", "подарок")
-        val premium = listOf("premium", "elegant", "luxury")
-        return when {
-            outdoor.any { blob.contains(it) } && setting.type.isOutdoor() -> CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY
-            pain.any { blob.contains(it) } || ProductIdentity.looksLikeMicrowaveCover(fingerprint) ->
-                CreativeStrategyEngine.Motivation.PROBLEM_SOLVER
-            organize.any { blob.contains(it) } -> CreativeStrategyEngine.Motivation.ORGANIZATION
-            portable.any { blob.contains(it) } && !ProductIdentity.looksLikeMicrowaveCover(fingerprint) ->
-                CreativeStrategyEngine.Motivation.PORTABLE
-            function.any { blob.contains(it) } -> CreativeStrategyEngine.Motivation.DEMONSTRABLE_FUNCTION
-            visual.any { blob.contains(it) } -> CreativeStrategyEngine.Motivation.VISUAL
-            safety.any { blob.contains(it) } && setting.type == CreativeStrategyEngine.SettingType.HOME_KITCHEN ->
-                CreativeStrategyEngine.Motivation.PROBLEM_SOLVER
-            home.any { blob.contains(it) } && setting.type == CreativeStrategyEngine.SettingType.HOME_KITCHEN ->
-                CreativeStrategyEngine.Motivation.HOME_COZY
-            ProductIdentity.looksLikeCookwarePan(fingerprint, analysis) &&
-                setting.type == CreativeStrategyEngine.SettingType.HOME_KITCHEN ->
-                CreativeStrategyEngine.Motivation.HOME_COZY
-            comfort.any { blob.contains(it) } -> CreativeStrategyEngine.Motivation.COMFORT
-            time.any { blob.contains(it) } -> CreativeStrategyEngine.Motivation.TIME_SAVING
-            space.any { blob.contains(it) } -> CreativeStrategyEngine.Motivation.SPACE_SAVING
-            gift.any { blob.contains(it) } -> CreativeStrategyEngine.Motivation.GIFT_APPEAL
-            premium.any { blob.contains(it) } -> CreativeStrategyEngine.Motivation.PREMIUM_FEEL
-            setting.type == CreativeStrategyEngine.SettingType.HOME_KITCHEN -> CreativeStrategyEngine.Motivation.HOME_COZY
-            setting.type == CreativeStrategyEngine.SettingType.WORKSHOP ||
-                setting.type == CreativeStrategyEngine.SettingType.GARAGE -> CreativeStrategyEngine.Motivation.DEMONSTRABLE_FUNCTION
-            setting.type == CreativeStrategyEngine.SettingType.OFFICE -> CreativeStrategyEngine.Motivation.CONVENIENCE
-            setting.confidence < 0.5 -> CreativeStrategyEngine.Motivation.OTHER
-            else -> CreativeStrategyEngine.Motivation.SIMPLICITY
-        }
-    }
-
-    private fun secondaryMotivation(
-        primary: CreativeStrategyEngine.Motivation,
-        blob: String,
-        setting: SettingEvidence,
-    ): CreativeStrategyEngine.Motivation? {
-        val candidate = when (primary) {
-            CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY ->
-                if (listOf("fold", "portable", "travel").any { blob.contains(it) }) CreativeStrategyEngine.Motivation.PORTABLE
-                else CreativeStrategyEngine.Motivation.COMFORT
-            CreativeStrategyEngine.Motivation.PROBLEM_SOLVER ->
-                if (setting.type == CreativeStrategyEngine.SettingType.HOME_KITCHEN) CreativeStrategyEngine.Motivation.HOME_COZY else null
-            CreativeStrategyEngine.Motivation.HOME_COZY -> null
-            CreativeStrategyEngine.Motivation.PORTABLE -> CreativeStrategyEngine.Motivation.CONVENIENCE
-            CreativeStrategyEngine.Motivation.ORGANIZATION -> CreativeStrategyEngine.Motivation.CONVENIENCE
-            CreativeStrategyEngine.Motivation.COMFORT ->
-                if (setting.type.isOutdoor()) CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY else CreativeStrategyEngine.Motivation.CONVENIENCE
-            else -> null
-        }
-        return candidate.takeIf { it != primary }
-    }
-
-    private fun sellingIdea(
-        primary: CreativeStrategyEngine.Motivation,
-        blob: String,
-    ): CreativeStrategyEngine.SellingIdea = when (primary) {
-        CreativeStrategyEngine.Motivation.PROBLEM_SOLVER ->
-            if (listOf("clean", "убор", "mess", "splash", "cover").any { blob.contains(it) }) {
-                CreativeStrategyEngine.SellingIdea.CLEANLINESS
-            } else CreativeStrategyEngine.SellingIdea.SIMPLE_USE
-        CreativeStrategyEngine.Motivation.COMFORT -> CreativeStrategyEngine.SellingIdea.COMFORT
-        CreativeStrategyEngine.Motivation.CONVENIENCE, CreativeStrategyEngine.Motivation.TIME_SAVING ->
-            CreativeStrategyEngine.SellingIdea.CONVENIENCE
-        CreativeStrategyEngine.Motivation.HOME_COZY -> CreativeStrategyEngine.SellingIdea.HOME_FEELING
-        CreativeStrategyEngine.Motivation.VISUAL, CreativeStrategyEngine.Motivation.PREMIUM_FEEL ->
-            CreativeStrategyEngine.SellingIdea.VISUAL_APPEAL
-        CreativeStrategyEngine.Motivation.DEMONSTRABLE_FUNCTION -> CreativeStrategyEngine.SellingIdea.SIMPLE_USE
-        CreativeStrategyEngine.Motivation.PORTABLE, CreativeStrategyEngine.Motivation.SPACE_SAVING ->
-            CreativeStrategyEngine.SellingIdea.PORTABILITY
-        CreativeStrategyEngine.Motivation.ORGANIZATION -> CreativeStrategyEngine.SellingIdea.ORGANIZATION
-        CreativeStrategyEngine.Motivation.CLEANLINESS -> CreativeStrategyEngine.SellingIdea.CLEANLINESS
-        CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY -> CreativeStrategyEngine.SellingIdea.COMFORT
-        CreativeStrategyEngine.Motivation.SIMPLICITY, CreativeStrategyEngine.Motivation.OTHER ->
-            CreativeStrategyEngine.SellingIdea.SIMPLE_USE
-        CreativeStrategyEngine.Motivation.DURABILITY_APPEAL -> CreativeStrategyEngine.SellingIdea.SIMPLE_USE
-        CreativeStrategyEngine.Motivation.GIFT_APPEAL -> CreativeStrategyEngine.SellingIdea.VISUAL_APPEAL
-        CreativeStrategyEngine.Motivation.SAFETY_CONVENIENCE -> CreativeStrategyEngine.SellingIdea.SIMPLE_USE
-    }
-
-    private fun hookTypeFor(
-        primary: CreativeStrategyEngine.Motivation,
-        idea: CreativeStrategyEngine.SellingIdea,
-        setting: SettingEvidence,
-    ): CreativeStrategyEngine.HookType = when {
-        primary == CreativeStrategyEngine.Motivation.PROBLEM_SOLVER || idea == CreativeStrategyEngine.SellingIdea.CLEANLINESS ->
-            CreativeStrategyEngine.HookType.PROBLEM
-        setting.type.isOutdoor() && (primary == CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY || primary == CreativeStrategyEngine.Motivation.COMFORT) ->
-            CreativeStrategyEngine.HookType.OUTDOOR
-        idea == CreativeStrategyEngine.SellingIdea.HOME_FEELING || primary == CreativeStrategyEngine.Motivation.HOME_COZY ->
-            CreativeStrategyEngine.HookType.HOME
-        idea == CreativeStrategyEngine.SellingIdea.VISUAL_APPEAL -> CreativeStrategyEngine.HookType.VISUAL
-        idea == CreativeStrategyEngine.SellingIdea.ORGANIZATION -> CreativeStrategyEngine.HookType.ORGANIZATION
-        idea == CreativeStrategyEngine.SellingIdea.PORTABILITY || primary == CreativeStrategyEngine.Motivation.CONVENIENCE ->
-            CreativeStrategyEngine.HookType.CONVENIENCE
-        primary == CreativeStrategyEngine.Motivation.COMFORT -> CreativeStrategyEngine.HookType.COMFORT
-        primary == CreativeStrategyEngine.Motivation.SIMPLICITY -> CreativeStrategyEngine.HookType.SIMPLICITY
-        primary == CreativeStrategyEngine.Motivation.GIFT_APPEAL -> CreativeStrategyEngine.HookType.OWNERSHIP
-        else -> CreativeStrategyEngine.HookType.CURIOSITY
     }
 
     fun settingText(type: CreativeStrategyEngine.SettingType, lowConfidence: Boolean): String {
@@ -474,7 +357,7 @@ object CreativeConsistencyEngine {
     private val outdoorTokens = listOf("outdoor", "outside", "draußen", "улиц", "lake", "camp", "fish", "garden", "beach")
 }
 
-private fun CreativeStrategyEngine.SettingType.isOutdoor(): Boolean = this in setOf(
+internal fun CreativeStrategyEngine.SettingType.isOutdoor(): Boolean = this in setOf(
     CreativeStrategyEngine.SettingType.CAMPSITE,
     CreativeStrategyEngine.SettingType.FISHING_SPOT,
     CreativeStrategyEngine.SettingType.BEACH,

@@ -47,6 +47,7 @@ object PurchaseAppealEngine {
         val human: String,
         val pitch: String,
         val scores: ConceptScore,
+        val motivation: CreativeStrategyEngine.Motivation,
     ) {
         val score: Double get() = scores.total
     }
@@ -81,20 +82,7 @@ object PurchaseAppealEngine {
         val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
         val concepts = conceptsFor(plan, analysis, fingerprint)
         val winner = select(concepts)
-        val refined = plan.copy(
-            idea = winner.idea,
-            hookType = winner.hookType,
-            setting = winner.setting,
-            human = winner.human,
-            action = winner.action,
-            opening = openingFor(winner),
-            pitch = winner.pitch,
-            conceptKind = winner.kind,
-            boughtFor = plan.boughtFor,
-            viewerFeel = plan.viewerFeel,
-            desire = desireFor(winner.idea),
-            formatTone = formatTone(plan, winner),
-        )
+        val refined = lock(plan, winner)
         return Brief(
             boughtFor = refined.boughtFor,
             desireKind = desireFor(winner.idea),
@@ -111,7 +99,12 @@ object PurchaseAppealEngine {
 
     fun apply(plan: CreativeStrategyEngine.Plan, analysis: JSONObject?, fingerprint: JSONObject?): CreativeStrategyEngine.Plan {
         val winner = select(conceptsFor(plan, analysis, fingerprint))
+        return lock(plan, winner)
+    }
+
+    private fun lock(plan: CreativeStrategyEngine.Plan, winner: Concept): CreativeStrategyEngine.Plan {
         return plan.copy(
+            primary = winner.motivation,
             idea = winner.idea,
             hookType = winner.hookType,
             setting = winner.setting,
@@ -120,8 +113,11 @@ object PurchaseAppealEngine {
             opening = openingFor(winner),
             pitch = winner.pitch,
             conceptKind = winner.kind,
+            boughtFor = boughtFor(winner.motivation),
+            viewerFeel = viewerFeel(winner.motivation),
             desire = desireFor(winner.idea),
-            formatTone = formatTone(plan, winner),
+            formatTone = formatTone(plan.copy(primary = winner.motivation, idea = winner.idea), winner),
+            secondary = plan.secondary.takeIf { it != winner.motivation },
         )
     }
 
@@ -196,21 +192,29 @@ object PurchaseAppealEngine {
         val action = plan.action
         val glance = "The referenced product stays in place while the person shares one quiet natural glance. Do not fold, open, rotate, pull, detach or reconstruct hidden geometry."
         val safestAction = if (action.contains("already seated") || ProductIdentity.looksLikeMicrowaveCover(fingerprint)) action else glance
-        val purchaseIdea = when (plan.primary) {
-            CreativeStrategyEngine.Motivation.PROBLEM_SOLVER -> CreativeStrategyEngine.SellingIdea.CLEANLINESS
-            CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY -> CreativeStrategyEngine.SellingIdea.CONVENIENCE
-            else -> plan.idea
-        }
-        val purchaseHook = when (plan.primary) {
-            CreativeStrategyEngine.Motivation.PROBLEM_SOLVER -> CreativeStrategyEngine.HookType.PROBLEM
-            CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY -> CreativeStrategyEngine.HookType.CONVENIENCE
-            else -> plan.hookType
-        }
-        val scores = scoresFor(plan.primary)
+        val settingEvidence = CreativeConsistencyEngine.resolveSetting(analysis, fingerprint, null)
+        val angle = SellingAngleSelector.winner(analysis, fingerprint, settingEvidence)
+        val scores = scoresFor(angle.motivation)
+        fun asConcept(kind: String, chosenAction: String, score: ConceptScore): Concept = Concept(
+            kind = kind,
+            motivation = angle.motivation,
+            idea = angle.idea,
+            hookType = angle.hookType,
+            setting = setting,
+            action = chosenAction,
+            human = human,
+            pitch = CreativeConsistencyEngine.pitchFor(angle.motivation, angle.idea),
+            scores = score.copy(
+                purchaseAppeal = minOf(score.purchaseAppeal, angle.purchase),
+                relevance = minOf(score.relevance, angle.relevance),
+                settingCoherence = angle.settingCoherence,
+                speechNaturalness = angle.naturalness,
+            ),
+        )
         return listOf(
-            Concept("safest", plan.idea, plan.hookType, setting, safestAction, human, plan.pitch, scores.safest),
-            Concept("purchase", purchaseIdea, purchaseHook, setting, action, human, plan.pitch, scores.purchase),
-            Concept("natural", plan.idea, plan.hookType, setting, action, human, plan.pitch, scores.natural),
+            asConcept("safest", safestAction, scores.safest),
+            asConcept("purchase", action, scores.purchase),
+            asConcept("natural", action, scores.natural),
         ).map { concept ->
             val actionRisk = scoreAction(concept.action)
             val motion = minOf(concept.scores.motionSafety, actionRisk.motionSafety)
@@ -252,8 +256,9 @@ object PurchaseAppealEngine {
     }
 
     private fun select(concepts: List<Concept>): Concept {
-        val safe = concepts.filter { it.scores.safe }
-        val pool = if (safe.isNotEmpty()) safe else concepts.sortedByDescending { it.scores.motionSafety * it.scores.identity }
+        val aligned = concepts.filter { it.idea == concepts.first().idea && it.hookType == concepts.first().hookType }
+        val safe = aligned.filter { it.scores.safe }.ifEmpty { concepts.filter { it.scores.safe } }
+        val pool = if (safe.isNotEmpty()) safe else aligned.ifEmpty { concepts }
         return pool.maxByOrNull { it.score } ?: concepts.first()
     }
 

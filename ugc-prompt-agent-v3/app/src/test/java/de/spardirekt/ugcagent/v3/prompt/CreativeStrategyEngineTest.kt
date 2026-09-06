@@ -15,7 +15,14 @@ class CreativeStrategyEngineTest {
             .put("observed_context", "lakeside")
         val plan = CreativeStrategyEngine.plan(analysis, CreativeStrategyEngine.fishingChairFingerprint())
         assertEquals(CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY, plan.primary)
-        assertTrue(plan.hookType == CreativeStrategyEngine.HookType.OUTDOOR || plan.hookType == CreativeStrategyEngine.HookType.CONVENIENCE)
+        assertEquals(CreativeStrategyEngine.HookType.OUTDOOR, plan.hookType)
+        assertTrue(
+            plan.idea == CreativeStrategyEngine.SellingIdea.COMFORT ||
+                plan.idea == CreativeStrategyEngine.SellingIdea.OUTDOOR_PRACTICALITY,
+        )
+        assertFalse(plan.idea == CreativeStrategyEngine.SellingIdea.CONVENIENCE)
+        assertFalse(plan.idea == CreativeStrategyEngine.SellingIdea.HOME_FEELING)
+        assertFalse(plan.desire.contains("convenience"))
         assertTrue(plan.desire.isNotBlank())
         assertTrue(plan.setting.contains("lakeside") || plan.setting.contains("riverside"))
         assertFalse(plan.setting.contains("kitchen", ignoreCase = true))
@@ -74,6 +81,8 @@ class CreativeStrategyEngineTest {
         val analysis = JSONObject().put("product_category", "kitchen").put("observed_use_case", "frying pan")
         val plan = CreativeStrategyEngine.plan(analysis, ProductIdentity.cookwarePanFingerprint())
         assertEquals(CreativeStrategyEngine.Motivation.HOME_COZY, plan.primary)
+        assertEquals(CreativeStrategyEngine.SellingIdea.HOME_FEELING, plan.idea)
+        assertEquals(CreativeStrategyEngine.HookType.HOME, plan.hookType)
         val hook = HookEngine.generate(analysis, "DEUTSCH", ProductIdentity.cookwarePanFingerprint(), plan)
         assertTrue(hook.contains("Küche") || hook.contains("Hause") || hook.contains("Pfanne") || hook.contains("mag"))
         assertTrue(plan.action.contains("wooden handle") || plan.action.contains("lid"))
@@ -87,10 +96,8 @@ class CreativeStrategyEngineTest {
             .put("observed_context", "desk")
         val plan = CreativeStrategyEngine.plan(analysis)
         assertEquals(CreativeStrategyEngine.SettingType.OFFICE, plan.settingType)
-        assertTrue(
-            plan.primary == CreativeStrategyEngine.Motivation.ORGANIZATION ||
-                plan.primary == CreativeStrategyEngine.Motivation.CONVENIENCE,
-        )
+        assertEquals(CreativeStrategyEngine.Motivation.ORGANIZATION, plan.primary)
+        assertEquals(CreativeStrategyEngine.SellingIdea.ORGANIZATION, plan.idea)
         assertFalse(plan.setting.contains("kitchen", ignoreCase = true))
         assertFalse(plan.setting.contains("lakeside", ignoreCase = true))
         assertFalse(plan.formatTone.contains("lived-in kitchen feeling"))
@@ -162,6 +169,9 @@ class CreativeStrategyEngineTest {
         val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
         assertEquals(CreativeStrategyEngine.SettingType.LIVING_ROOM, plan.settingType)
         assertEquals(CreativeStrategyEngine.Motivation.COMFORT, plan.primary)
+        assertEquals(CreativeStrategyEngine.SellingIdea.COMFORT, plan.idea)
+        assertEquals(CreativeStrategyEngine.HookType.COMFORT, plan.hookType)
+        assertFalse(plan.primary == CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY)
         assertTrue(plan.action.contains("already seated"))
         assertFalse(plan.setting.contains("lakeside", ignoreCase = true))
         assertFalse(plan.setting.contains("kitchen", ignoreCase = true))

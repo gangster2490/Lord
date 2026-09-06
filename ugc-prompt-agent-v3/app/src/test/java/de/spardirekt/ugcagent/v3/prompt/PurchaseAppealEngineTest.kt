@@ -17,10 +17,15 @@ class PurchaseAppealEngineTest {
         val brief = PurchaseAppealEngine.evaluate(analysis, fingerprint)
         assertEquals(CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY, brief.plan.primary)
         assertEquals(CreativeStrategyEngine.Motivation.COMFORT, brief.plan.secondary)
+        assertEquals(CreativeStrategyEngine.HookType.OUTDOOR, brief.plan.hookType)
+        assertTrue(
+            brief.plan.idea == CreativeStrategyEngine.SellingIdea.COMFORT ||
+                brief.plan.idea == CreativeStrategyEngine.SellingIdea.OUTDOOR_PRACTICALITY,
+        )
+        assertEquals(1, brief.concepts.map { it.idea }.distinct().size)
         assertEquals(3, brief.concepts.size)
         assertTrue(brief.concepts.map { it.kind }.containsAll(listOf("safest", "purchase", "natural")))
         assertFalse(brief.toPublicJson().toString().contains("safest concept"))
-        assertTrue(brief.plan.hookType == CreativeStrategyEngine.HookType.OUTDOOR || brief.plan.hookType == CreativeStrategyEngine.HookType.CONVENIENCE)
         assertTrue(brief.setting.contains("lakeside") || brief.setting.contains("riverside"))
         assertTrue(brief.action.contains("already seated"))
         assertTrue(PurchaseAppealEngine.scoreAction("fold the chair and rotate the backrest 180 degrees").highRisk)
@@ -78,5 +83,19 @@ class PurchaseAppealEngineTest {
         assertFalse(json.contains("safest concept"))
         assertTrue(json.contains("setting_type"))
         assertEquals(CreativeStrategyEngine.SettingType.INDOOR_NEUTRAL, brief.plan.settingType)
+    }
+
+    @Test
+    fun travelBagPicksPortabilityNotHomeCozy() {
+        val analysis = JSONObject()
+            .put("product_category", "travel")
+            .put("observed_use_case", "portable folding suitcase")
+            .put("observed_context", "airport")
+        val brief = PurchaseAppealEngine.evaluate(analysis)
+        assertEquals(CreativeStrategyEngine.Motivation.PORTABLE, brief.plan.primary)
+        assertEquals(CreativeStrategyEngine.SellingIdea.PORTABILITY, brief.plan.idea)
+        assertEquals(1, brief.concepts.map { it.idea }.distinct().size)
+        assertFalse(brief.plan.idea == CreativeStrategyEngine.SellingIdea.HOME_FEELING)
+        assertFalse(brief.plan.idea == CreativeStrategyEngine.SellingIdea.CLEANLINESS)
     }
 }
