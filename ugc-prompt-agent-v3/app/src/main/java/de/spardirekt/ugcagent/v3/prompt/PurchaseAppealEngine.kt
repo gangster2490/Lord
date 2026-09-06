@@ -28,10 +28,13 @@ object PurchaseAppealEngine {
         val motionSafety: Double,
         val identity: Double,
         val relevance: Double,
+        val settingCoherence: Double = 0.95,
+        val speechNaturalness: Double = 0.92,
     ) {
         val total: Double
-            get() = 0.22 * purchaseAppeal + 0.18 * naturalness + 0.14 * claimSafety +
-                0.14 * visualClarity + 0.12 * motionSafety + 0.12 * identity + 0.08 * relevance
+            get() = 0.20 * purchaseAppeal + 0.16 * naturalness + 0.12 * claimSafety +
+                0.12 * visualClarity + 0.11 * motionSafety + 0.11 * identity + 0.08 * relevance +
+                0.06 * settingCoherence + 0.04 * speechNaturalness
         val safe: Boolean get() = motionSafety >= 0.75 && identity >= 0.85 && claimSafety >= 0.85
     }
 
@@ -69,6 +72,9 @@ object PurchaseAppealEngine {
             .put("concept_kind", winnerKind)
             .put("primary_motivation", plan.primary.name)
             .put("secondary_motivation", plan.secondary?.name ?: "")
+            .put("setting_type", plan.settingType.name)
+            .put("setting_confidence", plan.settingConfidence)
+            .put("emotional_tone", plan.emotionalTone)
     }
 
     fun evaluate(analysis: JSONObject?, fingerprint: JSONObject? = null): Brief {
@@ -145,23 +151,39 @@ object PurchaseAppealEngine {
     }
 
     fun viewerFeel(primary: CreativeStrategyEngine.Motivation): String = when (primary) {
-        CreativeStrategyEngine.Motivation.PROBLEM_SOLVER -> "This solves an annoying problem."
+        CreativeStrategyEngine.Motivation.PROBLEM_SOLVER, CreativeStrategyEngine.Motivation.CLEANLINESS,
+        CreativeStrategyEngine.Motivation.SAFETY_CONVENIENCE -> "This solves an annoying problem."
         CreativeStrategyEngine.Motivation.COMFORT -> "This makes the experience easier / more comfortable."
         CreativeStrategyEngine.Motivation.HOME_COZY -> "This feels pleasant, useful and nice to have at home."
         CreativeStrategyEngine.Motivation.DEMONSTRABLE_FUNCTION -> "I immediately understand what it does."
-        CreativeStrategyEngine.Motivation.PORTABLE -> "This is easy to carry / store / keep around."
-        CreativeStrategyEngine.Motivation.VISUAL -> "This looks really good."
+        CreativeStrategyEngine.Motivation.PORTABLE, CreativeStrategyEngine.Motivation.SPACE_SAVING ->
+            "This is easy to carry / store / keep around."
+        CreativeStrategyEngine.Motivation.VISUAL, CreativeStrategyEngine.Motivation.PREMIUM_FEEL,
+        CreativeStrategyEngine.Motivation.GIFT_APPEAL -> "This looks really good."
         CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY -> "This improves the experience outdoors."
+        CreativeStrategyEngine.Motivation.ORGANIZATION -> "This makes everyday things easier to keep in order."
+        CreativeStrategyEngine.Motivation.CONVENIENCE, CreativeStrategyEngine.Motivation.TIME_SAVING ->
+            "This makes the moment easier."
+        CreativeStrategyEngine.Motivation.SIMPLICITY, CreativeStrategyEngine.Motivation.OTHER,
+        CreativeStrategyEngine.Motivation.DURABILITY_APPEAL -> "This is simple and useful in real life."
     }
 
     fun boughtFor(primary: CreativeStrategyEngine.Motivation): String = when (primary) {
-        CreativeStrategyEngine.Motivation.PROBLEM_SOLVER -> "relief from an everyday mess or hassle"
+        CreativeStrategyEngine.Motivation.PROBLEM_SOLVER, CreativeStrategyEngine.Motivation.CLEANLINESS,
+        CreativeStrategyEngine.Motivation.SAFETY_CONVENIENCE -> "relief from an everyday mess or hassle"
         CreativeStrategyEngine.Motivation.COMFORT -> "more comfortable everyday use"
         CreativeStrategyEngine.Motivation.HOME_COZY -> "a pleasant useful home object"
         CreativeStrategyEngine.Motivation.DEMONSTRABLE_FUNCTION -> "one clear useful function"
-        CreativeStrategyEngine.Motivation.PORTABLE -> "easy carrying or compact keeping"
-        CreativeStrategyEngine.Motivation.VISUAL -> "how it looks in real life"
+        CreativeStrategyEngine.Motivation.PORTABLE, CreativeStrategyEngine.Motivation.SPACE_SAVING ->
+            "easy carrying or compact keeping"
+        CreativeStrategyEngine.Motivation.VISUAL, CreativeStrategyEngine.Motivation.PREMIUM_FEEL,
+        CreativeStrategyEngine.Motivation.GIFT_APPEAL -> "how it looks in real life"
         CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY -> "more comfortable, practical outdoor use"
+        CreativeStrategyEngine.Motivation.ORGANIZATION -> "keeping things in easy reach"
+        CreativeStrategyEngine.Motivation.CONVENIENCE, CreativeStrategyEngine.Motivation.TIME_SAVING ->
+            "less fuss in a real moment"
+        CreativeStrategyEngine.Motivation.SIMPLICITY, CreativeStrategyEngine.Motivation.OTHER,
+        CreativeStrategyEngine.Motivation.DURABILITY_APPEAL -> "simple everyday usefulness"
     }
 
     private fun conceptsFor(
@@ -169,23 +191,33 @@ object PurchaseAppealEngine {
         analysis: JSONObject?,
         fingerprint: JSONObject?,
     ): List<Concept> {
-        val fishing = CreativeStrategyEngine.looksLikeFishingChair(fingerprint, analysis)
-        val microwave = ProductIdentity.looksLikeMicrowaveCover(fingerprint)
-        val pan = ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)
         val setting = plan.setting
         val human = plan.human
-        return when {
-            fishing -> fishingConcepts(setting, human)
-            microwave -> microwaveConcepts(setting, human)
-            pan -> panConcepts(setting, human)
-            else -> genericConcepts(plan, setting, human)
-        }.map { concept ->
+        val action = plan.action
+        val glance = "The referenced product stays in place while the person shares one quiet natural glance. Do not fold, open, rotate, pull, detach or reconstruct hidden geometry."
+        val safestAction = if (action.contains("already seated") || ProductIdentity.looksLikeMicrowaveCover(fingerprint)) action else glance
+        val purchaseIdea = when (plan.primary) {
+            CreativeStrategyEngine.Motivation.PROBLEM_SOLVER -> CreativeStrategyEngine.SellingIdea.CLEANLINESS
+            CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY -> CreativeStrategyEngine.SellingIdea.CONVENIENCE
+            else -> plan.idea
+        }
+        val purchaseHook = when (plan.primary) {
+            CreativeStrategyEngine.Motivation.PROBLEM_SOLVER -> CreativeStrategyEngine.HookType.PROBLEM
+            CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY -> CreativeStrategyEngine.HookType.CONVENIENCE
+            else -> plan.hookType
+        }
+        val scores = scoresFor(plan.primary)
+        return listOf(
+            Concept("safest", plan.idea, plan.hookType, setting, safestAction, human, plan.pitch, scores.safest),
+            Concept("purchase", purchaseIdea, purchaseHook, setting, action, human, plan.pitch, scores.purchase),
+            Concept("natural", plan.idea, plan.hookType, setting, action, human, plan.pitch, scores.natural),
+        ).map { concept ->
             val actionRisk = scoreAction(concept.action)
             val motion = minOf(concept.scores.motionSafety, actionRisk.motionSafety)
             val identity = minOf(concept.scores.identity, actionRisk.identity)
             if (actionRisk.highRisk) {
                 concept.copy(
-                    action = CreativeStrategyEngine.safeAction(fingerprint, analysis),
+                    action = CreativeStrategyEngine.safeAction(fingerprint, analysis, plan.idea, plan.settingType),
                     scores = concept.scores.copy(motionSafety = motion * 0.4, identity = identity * 0.5, purchaseAppeal = concept.scores.purchaseAppeal * 0.7),
                 )
             } else {
@@ -194,73 +226,28 @@ object PurchaseAppealEngine {
         }
     }
 
-    private fun fishingConcepts(setting: String, human: String): List<Concept> {
-        val seated = "The person is already seated in the referenced fishing chair. Relaxed posture. One LOW-RISK moment: a hand rests on the arm. Do not fold, unfold, rotate a backrest, change leg height or reconstruct hidden geometry. The chair stays exact and stable."
-        val tray = "The person is already seated in the referenced fishing chair. Relaxed posture. One LOW-RISK moment: a hand uses a clearly visible bait tray or rests on the arm. Do not fold, unfold, rotate a backrest, change leg height or reconstruct hidden geometry. The chair stays exact and stable."
-        val natural = "The person is already seated in the referenced fishing chair at a real fishing spot. Relaxed posture. A brief natural hand rest on the arm or tray. Do not fold, unfold, rotate a backrest, change leg height or reconstruct hidden geometry. The chair stays exact and stable."
-        return listOf(
-            Concept(
-                "safest",
-                CreativeStrategyEngine.SellingIdea.COMFORT,
-                CreativeStrategyEngine.HookType.OUTDOOR,
-                setting,
-                seated,
-                human,
-                "comfortable real fishing sit, simplest motion",
-                ConceptScore(0.78, 0.84, 0.96, 0.86, 0.98, 0.98, 0.94),
-            ),
-            Concept(
-                "purchase",
-                CreativeStrategyEngine.SellingIdea.CONVENIENCE,
-                CreativeStrategyEngine.HookType.CONVENIENCE,
-                setting,
-                tray,
-                human,
-                "needed bits stay in reach while fishing",
-                ConceptScore(0.95, 0.86, 0.94, 0.9, 0.9, 0.94, 0.92),
-            ),
-            Concept(
-                "natural",
-                CreativeStrategyEngine.SellingIdea.COMFORT,
-                CreativeStrategyEngine.HookType.OUTDOOR,
-                setting,
-                natural,
-                human,
-                "comfortable real fishing use, not a technical demo",
-                ConceptScore(0.91, 0.97, 0.96, 0.92, 0.94, 0.96, 0.96),
-            ),
-        )
-    }
+    private data class Trio(val safest: ConceptScore, val purchase: ConceptScore, val natural: ConceptScore)
 
-    private fun microwaveConcepts(setting: String, human: String): List<Concept> {
-        val action = ActionIdentity.MICROWAVE_SAFE_ACTION
-        return listOf(
-            Concept("safest", CreativeStrategyEngine.SellingIdea.SIMPLE_USE, CreativeStrategyEngine.HookType.CONVENIENCE, setting, action, human, "cover already in place, light handle touch", ConceptScore(0.8, 0.86, 0.95, 0.88, 0.96, 0.98, 0.9)),
-            Concept("purchase", CreativeStrategyEngine.SellingIdea.CLEANLINESS, CreativeStrategyEngine.HookType.PROBLEM, setting, action, human, "pain of a messy microwave, simple relief", ConceptScore(0.96, 0.9, 0.93, 0.9, 0.92, 0.96, 0.96)),
-            Concept("natural", CreativeStrategyEngine.SellingIdea.CLEANLINESS, CreativeStrategyEngine.HookType.PROBLEM, setting, action, human, "everyday kitchen cover moment", ConceptScore(0.9, 0.95, 0.94, 0.88, 0.94, 0.96, 0.93)),
+    private fun scoresFor(primary: CreativeStrategyEngine.Motivation): Trio = when (primary) {
+        CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY -> Trio(
+            ConceptScore(0.78, 0.84, 0.96, 0.86, 0.98, 0.98, 0.94),
+            ConceptScore(0.95, 0.86, 0.94, 0.9, 0.9, 0.94, 0.92),
+            ConceptScore(0.91, 0.97, 0.96, 0.92, 0.94, 0.96, 0.96),
         )
-    }
-
-    private fun panConcepts(setting: String, human: String): List<Concept> {
-        val touch = "One hand casually touches the wooden handle of the referenced pan. The lid stays static. Do not fold, open, rotate, pull, detach or reconstruct hidden geometry."
-        val glance = "The referenced pan stays in place. One quiet natural glance. The lid stays static. Do not fold, open, rotate, pull, detach or reconstruct hidden geometry."
-        return listOf(
-            Concept("safest", CreativeStrategyEngine.SellingIdea.HOME_FEELING, CreativeStrategyEngine.HookType.HOME, setting, glance, human, "quiet home presence, lid static", ConceptScore(0.8, 0.88, 0.97, 0.86, 0.98, 0.98, 0.9)),
-            Concept("purchase", CreativeStrategyEngine.SellingIdea.HOME_FEELING, CreativeStrategyEngine.HookType.HOME, setting, touch, human, "pleasant useful home cookware", ConceptScore(0.92, 0.9, 0.96, 0.9, 0.94, 0.96, 0.94)),
-            Concept("natural", CreativeStrategyEngine.SellingIdea.HOME_FEELING, CreativeStrategyEngine.HookType.HOME, setting, touch, human, "a calm real kitchen moment", ConceptScore(0.88, 0.97, 0.96, 0.88, 0.95, 0.96, 0.93)),
+        CreativeStrategyEngine.Motivation.PROBLEM_SOLVER, CreativeStrategyEngine.Motivation.CLEANLINESS -> Trio(
+            ConceptScore(0.8, 0.86, 0.95, 0.88, 0.96, 0.98, 0.9),
+            ConceptScore(0.96, 0.9, 0.93, 0.9, 0.92, 0.96, 0.96),
+            ConceptScore(0.9, 0.95, 0.94, 0.88, 0.94, 0.96, 0.93),
         )
-    }
-
-    private fun genericConcepts(plan: CreativeStrategyEngine.Plan, setting: String, human: String): List<Concept> {
-        val simple = ActionIdentity.DEFAULT_SAFE_ACTION
-        val glance = "The referenced product stays in place while the person shares one quiet natural glance. Do not fold, open, rotate, pull, detach or reconstruct hidden geometry."
-        val rest = "One hand rests on the referenced product as it already stands ready. Do not fold, unfold or reconstruct hidden geometry."
-        val salesIdea = plan.idea
-        val salesHook = plan.hookType
-        return listOf(
-            Concept("safest", salesIdea, salesHook, setting, glance, human, plan.pitch, ConceptScore(0.76, 0.84, 0.96, 0.84, 0.98, 0.98, 0.88)),
-            Concept("purchase", salesIdea, salesHook, setting, rest, human, plan.pitch, ConceptScore(0.93, 0.86, 0.94, 0.9, 0.9, 0.94, 0.92)),
-            Concept("natural", salesIdea, salesHook, setting, simple, human, plan.pitch, ConceptScore(0.88, 0.96, 0.95, 0.88, 0.93, 0.95, 0.9)),
+        CreativeStrategyEngine.Motivation.HOME_COZY -> Trio(
+            ConceptScore(0.8, 0.88, 0.97, 0.86, 0.98, 0.98, 0.9),
+            ConceptScore(0.92, 0.9, 0.96, 0.9, 0.94, 0.96, 0.94),
+            ConceptScore(0.88, 0.97, 0.96, 0.88, 0.95, 0.96, 0.93),
+        )
+        else -> Trio(
+            ConceptScore(0.76, 0.84, 0.96, 0.84, 0.98, 0.98, 0.88),
+            ConceptScore(0.93, 0.86, 0.94, 0.9, 0.9, 0.94, 0.92),
+            ConceptScore(0.88, 0.96, 0.95, 0.88, 0.93, 0.95, 0.9),
         )
     }
 
@@ -270,15 +257,7 @@ object PurchaseAppealEngine {
         return pool.maxByOrNull { it.score } ?: concepts.first()
     }
 
-    private fun openingFor(concept: Concept): String = when (concept.hookType) {
-        CreativeStrategyEngine.HookType.PROBLEM -> "hook and immediate problem context so the relief idea is already clear"
-        CreativeStrategyEngine.HookType.COMFORT -> "hook and immediate comfort context so the viewer already feels why it helps"
-        CreativeStrategyEngine.HookType.CONVENIENCE -> "hook and immediate convenience context so usefulness is already clear"
-        CreativeStrategyEngine.HookType.VISUAL -> "hook and immediate visual presence so desirability is already clear"
-        CreativeStrategyEngine.HookType.CURIOSITY -> "hook and immediate useful detail so the idea is already clear"
-        CreativeStrategyEngine.HookType.HOME -> "hook and immediate home context so the viewer already grasps the everyday appeal"
-        CreativeStrategyEngine.HookType.OUTDOOR -> "hook and immediate outdoor context so the viewer already feels why this helps outside"
-    }
+    private fun openingFor(concept: Concept): String = CreativeConsistencyEngine.openingFor(concept.hookType)
 
     private fun formatTone(plan: CreativeStrategyEngine.Plan, winner: Concept): String {
         val desire = desireFor(winner.idea)

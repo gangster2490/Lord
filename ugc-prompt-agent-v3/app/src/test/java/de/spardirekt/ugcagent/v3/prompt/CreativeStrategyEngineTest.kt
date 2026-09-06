@@ -78,4 +78,133 @@ class CreativeStrategyEngineTest {
         assertTrue(hook.contains("Küche") || hook.contains("Hause") || hook.contains("Pfanne") || hook.contains("mag"))
         assertTrue(plan.action.contains("wooden handle") || plan.action.contains("lid"))
     }
+
+    @Test
+    fun officeOrganizerDoesNotInheritKitchenOrFishingStereotypes() {
+        val analysis = JSONObject()
+            .put("product_category", "office")
+            .put("observed_use_case", "desk organizer")
+            .put("observed_context", "desk")
+        val plan = CreativeStrategyEngine.plan(analysis)
+        assertEquals(CreativeStrategyEngine.SettingType.OFFICE, plan.settingType)
+        assertTrue(
+            plan.primary == CreativeStrategyEngine.Motivation.ORGANIZATION ||
+                plan.primary == CreativeStrategyEngine.Motivation.CONVENIENCE,
+        )
+        assertFalse(plan.setting.contains("kitchen", ignoreCase = true))
+        assertFalse(plan.setting.contains("lakeside", ignoreCase = true))
+        assertFalse(plan.formatTone.contains("lived-in kitchen feeling"))
+        val prompt = ProductLock.finalizeClean(
+            "ACTION:\none hand rests near the organizer.",
+            JSONObject().put("overall_geometry", "desktop organizer tray"),
+            "VEO",
+            "DEUTSCH",
+            null,
+            true,
+            analysis,
+        )
+        assertTrue(prompt.contains("desk", ignoreCase = true) || prompt.contains("office", ignoreCase = true))
+        assertFalse(prompt.contains("Ordinary cozy home kitchen"))
+        assertFalse(prompt.substringAfter("LIGHTING:").contains("outdoor daylight"))
+        assertTrue(prompt.contains("speaks naturally in casual German"))
+        assertTrue(
+            CreativeStrategyEngine.gateFailures(
+                prompt,
+                ProductLock.extractSpokenHooks(prompt).firstOrNull().orEmpty(),
+                plan,
+                "DEUTSCH",
+                analysis,
+            ).isEmpty(),
+        )
+    }
+
+    @Test
+    fun unknownProductKeepsNeutralFallbackNotAnInventedNiche() {
+        val analysis = JSONObject()
+            .put("product_category", "unknown gadget")
+            .put("observed_use_case", "small household widget")
+        val plan = CreativeStrategyEngine.plan(analysis)
+        assertEquals(CreativeStrategyEngine.SettingType.INDOOR_NEUTRAL, plan.settingType)
+        assertTrue(plan.settingConfidence < 0.5)
+        assertTrue(
+            plan.primary == CreativeStrategyEngine.Motivation.OTHER ||
+                plan.primary == CreativeStrategyEngine.Motivation.SIMPLICITY ||
+                plan.primary == CreativeStrategyEngine.Motivation.CONVENIENCE,
+        )
+        assertTrue(
+            plan.hookType == CreativeStrategyEngine.HookType.CURIOSITY ||
+                plan.hookType == CreativeStrategyEngine.HookType.CONVENIENCE ||
+                plan.hookType == CreativeStrategyEngine.HookType.SIMPLICITY,
+        )
+        assertFalse(plan.setting.contains("Ordinary cozy home kitchen"))
+        assertFalse(plan.formatTone.contains("Warm, homely, lived-in kitchen feeling"))
+        val prompt = ProductLock.finalizeClean(
+            "ACTION:\none hand lightly touches the referenced product.",
+            JSONObject().put("overall_geometry", "small unknown household widget"),
+            "VEO",
+            "DEUTSCH",
+            null,
+            true,
+            analysis,
+        )
+        assertFalse(prompt.contains("Ordinary cozy home kitchen"))
+        assertFalse(prompt.contains("lakeside"))
+        assertTrue(prompt.contains("Neutral realistic indoor") || prompt.contains("matching the First Frame"))
+    }
+
+    @Test
+    fun livingRoomChairDoesNotBecomeAFishingScene() {
+        val analysis = JSONObject()
+            .put("product_category", "furniture")
+            .put("observed_use_case", "armchair")
+            .put("observed_context", "living room")
+        val fingerprint = JSONObject().put("overall_geometry", "upholstered armchair with armrests and stable legs")
+        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+        assertEquals(CreativeStrategyEngine.SettingType.LIVING_ROOM, plan.settingType)
+        assertEquals(CreativeStrategyEngine.Motivation.COMFORT, plan.primary)
+        assertTrue(plan.action.contains("already seated"))
+        assertFalse(plan.setting.contains("lakeside", ignoreCase = true))
+        assertFalse(plan.setting.contains("kitchen", ignoreCase = true))
+        assertFalse(plan.human.contains("tray"))
+        val prompt = ProductLock.finalizeClean(
+            "ACTION:\nfold the chair.",
+            fingerprint,
+            "VEO",
+            "DEUTSCH",
+            null,
+            true,
+            analysis,
+        )
+        assertTrue(prompt.contains("living room", ignoreCase = true))
+        assertFalse(prompt.contains("Ordinary cozy home kitchen"))
+        assertFalse(prompt.contains("lakeside"))
+        assertTrue(prompt.substringAfter("LIGHTING:").contains("home daylight") || prompt.substringAfter("LIGHTING:").contains("indoor"))
+    }
+
+    @Test
+    fun firstFrameGardenBeatsKitchenCategoryStereotype() {
+        val analysis = JSONObject()
+            .put("product_category", "kitchen")
+            .put("observed_use_case", "frying pan")
+            .put("observed_context", "white background packshot")
+            .put("first_frame_context", "home garden table")
+        val plan = CreativeStrategyEngine.plan(analysis, ProductIdentity.cookwarePanFingerprint(), "home garden table")
+        assertEquals(CreativeStrategyEngine.SettingType.GARDEN, plan.settingType)
+        assertFalse(plan.setting.contains("Ordinary cozy home kitchen"))
+        assertTrue(plan.lighting.contains("outdoor daylight"))
+        assertFalse(plan.speechContext.contains("kitchen"))
+        val prompt = ProductLock.finalizeClean(
+            "SETTING:\nOrdinary cozy home kitchen.\nACTION:\none hand touches the handle.",
+            ProductIdentity.cookwarePanFingerprint(),
+            "VEO",
+            "DEUTSCH",
+            null,
+            true,
+            analysis,
+        )
+        assertTrue(prompt.contains("garden", ignoreCase = true) || prompt.contains("yard", ignoreCase = true) || prompt.contains("outdoor"))
+        assertFalse(prompt.contains("Ordinary cozy home kitchen"))
+        assertTrue(prompt.substringAfter("LIGHTING:").contains("outdoor daylight"))
+        assertFalse(prompt.substringAfter("SPEECH:").contains("in their own kitchen"))
+    }
 }

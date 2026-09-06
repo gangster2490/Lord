@@ -34,6 +34,8 @@ object JsonExtractor {
         "product_category",
         "observed_use_case",
         "observed_context",
+        "first_frame_context",
+        "supporting_contexts",
         "visual_features_relevant_to_use",
         "text_claims",
         "dimensions",
@@ -123,6 +125,7 @@ object JsonExtractor {
             if (!obj.has(key) || obj.isNull(key)) {
                 when (key) {
                     "visual_features_relevant_to_use",
+                    "supporting_contexts",
                     "text_claims",
                     "dimensions",
                     "usage_instructions",

@@ -97,7 +97,7 @@ object HookEngine {
     ): List<String> {
         val resolved = plan ?: CreativeStrategyEngine.plan(analysis, fingerprint)
         val russian = language.equals("РУССКИЙ", true)
-        return hooksFor(resolved.hookType, resolved.primary, russian, analysis, fingerprint)
+        return hooksFor(resolved, russian, analysis, fingerprint)
     }
 
     fun isWeak(
@@ -198,42 +198,43 @@ $SPEECH_END
     private const val SPEECH_END = "The spoken line must finish before the 8.0-second endpoint."
 
     private fun hooksFor(
-        type: CreativeStrategyEngine.HookType,
-        primary: CreativeStrategyEngine.Motivation,
+        plan: CreativeStrategyEngine.Plan,
         russian: Boolean,
         analysis: JSONObject?,
         fingerprint: JSONObject?,
     ): List<String> {
-        val fishing = CreativeStrategyEngine.looksLikeFishingChair(fingerprint, analysis)
-        val microwave = ProductIdentity.looksLikeMicrowaveCover(fingerprint) ||
+        val type = plan.hookType
+        val fishingSpot = plan.settingType == CreativeStrategyEngine.SettingType.FISHING_SPOT
+        val microwaveEvidence = ProductIdentity.looksLikeMicrowaveCover(fingerprint) ||
             listOf("microwave", "микроволн", "cover food").any {
                 analysis?.toString().orEmpty().lowercase().contains(it)
             }
-        val pan = ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)
+        val cookware = ProductIdentity.looksLikeCookwarePan(fingerprint, analysis) &&
+            plan.settingType == CreativeStrategyEngine.SettingType.HOME_KITCHEN
         if (russian) {
             return when {
-                fishing -> listOf(
+                fishingSpot -> listOf(
                     "Вот так на рыбалке сидеть уже совсем другое дело.",
                     "Когда на рыбалке всё удобно — и отдых совсем другой.",
                     "На берегу так сидеть уже намного спокойнее.",
                 )
-                type == CreativeStrategyEngine.HookType.PROBLEM && microwave -> listOf(
+                type == CreativeStrategyEngine.HookType.PROBLEM && microwaveEvidence && plan.kitchenDefault -> listOf(
                     "Надоело после разогрева отмывать микроволновку?",
                     "После разогрева столько возни с этой микроволновкой.",
                     "Вот из-за таких мелочей на кухне потом меньше уборки.",
                 )
-                type == CreativeStrategyEngine.HookType.PROBLEM -> listOf(
+                type == CreativeStrategyEngine.HookType.PROBLEM || type == CreativeStrategyEngine.HookType.DAILY_FRUSTRATION -> listOf(
                     "Надоело каждый раз возиться с этим вручную?",
                     "Вот ради такой мелочи потом меньше возни по дому.",
                     "Когда эта штука под рукой, обычный момент идёт спокойнее.",
                 )
-                pan || type == CreativeStrategyEngine.HookType.HOME -> listOf(
+                cookware || (type == CreativeStrategyEngine.HookType.HOME && plan.kitchenDefault) -> listOf(
                     "Вот за такие вещи я и люблю домашнюю кухню.",
                     "Люблю, когда на плите всё выглядит просто и по-домашнему.",
                     "С такой вещью дома сразу как-то спокойнее.",
                 )
                 type == CreativeStrategyEngine.HookType.OUTDOOR -> listOf(
-                    "Вот так на рыбалке уже совсем другой комфорт.",
+                    "Вот так на улице уже совсем другой комфорт.",
                     "На улице так сидеть уже намного спокойнее.",
                     "Когда всё удобно снаружи — отдых сразу другой.",
                 )
@@ -242,45 +243,51 @@ $SPEECH_END
                     "Так сидеть уже намного спокойнее.",
                     "Когда сидеть удобно, обычный момент сразу мягче.",
                 )
-                type == CreativeStrategyEngine.HookType.VISUAL -> listOf(
+                type == CreativeStrategyEngine.HookType.VISUAL || type == CreativeStrategyEngine.HookType.OWNERSHIP -> listOf(
                     "Смотри, как аккуратно это выглядит.",
                     "Смотри, как аккуратно это выглядит вживую.",
                     "Приятно, когда вещь вживую выглядит так спокойно.",
                 )
-                type == CreativeStrategyEngine.HookType.CONVENIENCE -> listOf(
+                type == CreativeStrategyEngine.HookType.CONVENIENCE || type == CreativeStrategyEngine.HookType.ORGANIZATION -> listOf(
                     "Когда всё нужное прямо под рукой — намного удобнее.",
                     "Когда мелочи лежат рядом, всё идёт как-то проще.",
                     "Вот эта привычка реально экономит нервы в быту.",
                 )
-                type == CreativeStrategyEngine.HookType.CURIOSITY -> listOf(
+                type == CreativeStrategyEngine.HookType.CURIOSITY || type == CreativeStrategyEngine.HookType.SATISFYING_USE ||
+                    type == CreativeStrategyEngine.HookType.SIMPLICITY -> listOf(
                     "Вот эта деталь здесь реально решает многое.",
                     "С этой мелочью обычный момент сразу понятнее.",
                     "Вот ради такой детали это и берут домой.",
                 )
-                else -> listOf(
+                plan.kitchenDefault -> listOf(
                     "Вот за такие вещи я и люблю домашнюю кухню.",
                     "Люблю, когда домашняя кухня остаётся простой и живой.",
                     "Приятно, когда обычная кухонная вещь сразу вписывается в дом.",
                 )
+                else -> listOf(
+                    "Вот эта мелочь в обычном дне реально выручает.",
+                    "Когда так под рукой — сразу спокойнее.",
+                    "Вот ради такой простоты это и оставляют рядом.",
+                )
             }
         }
         return when {
-            fishing -> listOf(
+            fishingSpot -> listOf(
                 "So sitzt sich's beim Angeln schon ganz anders.",
                 "Wenn's beim Angeln bequem liegt, fühlt sich die Pause gleich anders an.",
                 "Am Wasser so zu sitzen fühlt sich gleich ruhiger an.",
             )
-            type == CreativeStrategyEngine.HookType.PROBLEM && microwave -> listOf(
+            type == CreativeStrategyEngine.HookType.PROBLEM && microwaveEvidence && plan.kitchenDefault -> listOf(
                 "Keine Lust, die Mikrowelle nach jedem Aufwärmen zu putzen?",
                 "Nach dem Aufwärmen die Mikrowelle auszuwischen nervt ganz schön.",
                 "Genau so eine Kleinigkeit spart später in der Küche Nerven.",
             )
-            type == CreativeStrategyEngine.HookType.PROBLEM -> listOf(
+            type == CreativeStrategyEngine.HookType.PROBLEM || type == CreativeStrategyEngine.HookType.DAILY_FRUSTRATION -> listOf(
                 "Keine Lust, das jedes Mal extra nachzubereiten?",
                 "Solche Kleinigkeiten nehmen einem später Arbeit ab.",
                 "Wenn das in Reichweite ist, bleibt der Ablauf ruhiger.",
             )
-            pan || type == CreativeStrategyEngine.HookType.HOME -> listOf(
+            cookware || (type == CreativeStrategyEngine.HookType.HOME && plan.kitchenDefault) -> listOf(
                 "Ich mag's, wenn so eine Pfanne die Küche nach Zuhause anfühlen lässt.",
                 "Solche Sachen haben wir gern einfach zu Hause am Herd.",
                 "Mit so was wird's in der Küche gleich gemütlicher.",
@@ -295,25 +302,31 @@ $SPEECH_END
                 "So zu sitzen fühlt sich gleich ruhiger an.",
                 "Wenn's bequem liegt, bleibt der Moment weicher.",
             )
-            type == CreativeStrategyEngine.HookType.VISUAL -> listOf(
+            type == CreativeStrategyEngine.HookType.VISUAL || type == CreativeStrategyEngine.HookType.OWNERSHIP -> listOf(
                 "Schau, wie ruhig das in echt wirkt.",
                 "So sieht das im normalen Licht gleich lebendiger aus.",
                 "Ich mag's, wenn so was schlicht und klar dasteht.",
             )
-            type == CreativeStrategyEngine.HookType.CONVENIENCE -> listOf(
+            type == CreativeStrategyEngine.HookType.CONVENIENCE || type == CreativeStrategyEngine.HookType.ORGANIZATION -> listOf(
                 "Wenn alles Nötige in Reichweite ist, wird's gleich einfacher.",
                 "Solche Kleinigkeiten machen den Ablauf einfach ruhiger.",
                 "Ich mag's, wenn man nicht extra suchen muss.",
             )
-            type == CreativeStrategyEngine.HookType.CURIOSITY -> listOf(
+            type == CreativeStrategyEngine.HookType.CURIOSITY || type == CreativeStrategyEngine.HookType.SATISFYING_USE ||
+                type == CreativeStrategyEngine.HookType.SIMPLICITY -> listOf(
                 "Genau diese Kleinigkeit macht hier den Unterschied.",
                 "An der Stelle merkt man, warum man das dabeihält.",
                 "So eine Detailsache nimmt einem im Alltag Arbeit ab.",
             )
-            else -> listOf(
+            plan.kitchenDefault -> listOf(
                 "Ich mag's, wenn die Küche sich nach Zuhause anfühlt.",
                 "Solche Sachen haben wir gern einfach zu Hause.",
                 "Mit so was wird's in der Küche gleich gemütlicher.",
+            )
+            else -> listOf(
+                "Solche Kleinigkeiten machen den Alltag einfach ruhiger.",
+                "Ich mag's, wenn so was einfach in Reichweite bleibt.",
+                "Genau so eine Sache lässt den Moment entspannter.",
             )
         }
     }
@@ -324,33 +337,21 @@ $SPEECH_END
         plan: CreativeStrategyEngine.Plan,
     ): String {
         val russian = language.equals("РУССКИЙ", true)
-        return when {
-            plan.hookType == CreativeStrategyEngine.HookType.OUTDOOR && russian -> "Вот так на рыбалке сидеть уже совсем другое дело."
-            plan.hookType == CreativeStrategyEngine.HookType.OUTDOOR -> "So sitzt sich's beim Angeln schon ganz anders."
-            plan.primary == CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY && russian -> "Вот так на рыбалке сидеть уже совсем другое дело."
-            plan.primary == CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY -> "So sitzt sich's beim Angeln schon ganz anders."
-            plan.hookType == CreativeStrategyEngine.HookType.PROBLEM && russian -> "Надоело после разогрева отмывать микроволновку?"
-            plan.hookType == CreativeStrategyEngine.HookType.PROBLEM -> "Keine Lust, die Mikrowelle nach jedem Aufwärmen zu putzen?"
-            russian -> "Вот за такие вещи я и люблю домашнюю кухню."
-            else -> "Ich mag's, wenn die Küche sich nach Zuhause anfühlt."
-        }
+        return hooksFor(plan, russian, analysis, null).first()
     }
 
     fun isKitchen(analysis: JSONObject?): Boolean {
+        val context = analysis?.optString("observed_context").orEmpty().lowercase()
+        val first = analysis?.optString("first_frame_context").orEmpty().lowercase()
         val use = analysis?.optString("observed_use_case").orEmpty().lowercase()
         val category = analysis?.optString("product_category").orEmpty().lowercase()
-        val blob = "$use $category ${analysis?.toString().orEmpty().lowercase()}"
-        return category.contains("kitchen") ||
-            category.contains("кухн") ||
-            use.contains("kitchen") ||
-            use.contains("кухн") ||
-            use.contains("microwave") ||
-            use.contains("микроволн") ||
-            use.contains("cover") ||
-            use.contains("крыш") ||
-            blob.contains("pan") ||
-            blob.contains("сковород") ||
-            blob.contains("кастрюл")
+        val blob = "$first $context $use $category"
+        return blob.contains("kitchen") ||
+            blob.contains("küche") ||
+            blob.contains("кухн") ||
+            blob.contains("cookware") ||
+            blob.contains("microwave") ||
+            blob.contains("микроволн")
     }
 
     private fun isUnrelated(hook: String, analysis: JSONObject?, plan: CreativeStrategyEngine.Plan): Boolean {
@@ -373,12 +374,21 @@ $SPEECH_END
     private fun matchesPlan(hook: String, plan: CreativeStrategyEngine.Plan): Boolean {
         val lower = hook.lowercase()
         return when (plan.hookType) {
-            CreativeStrategyEngine.HookType.PROBLEM -> listOf("надоел", "возн", "убор", "разогрев", "микроволн", "putzen", "aufwärm", "mikrowelle", "nerven").any { lower.contains(it) }
+            CreativeStrategyEngine.HookType.PROBLEM,
+            CreativeStrategyEngine.HookType.DAILY_FRUSTRATION,
+            -> listOf("надоел", "возн", "убор", "разогрев", "микроволн", "putzen", "aufwärm", "mikrowelle", "nerven", "возиться").any { lower.contains(it) }
             CreativeStrategyEngine.HookType.COMFORT -> listOf("сидеть", "спокойн", "sitzt", "ruhiger", "anders", "bequem").any { lower.contains(it) }
-            CreativeStrategyEngine.HookType.CONVENIENCE -> listOf("под рукой", "удобн", "рядом", "reichweite", "einfacher", "nötig").any { lower.contains(it) }
-            CreativeStrategyEngine.HookType.HOME -> listOf("кух", "дом", "посуд", "küche", "hause", "pfanne", "herd", "gemütlich", "mag").any { lower.contains(it) }
-            CreativeStrategyEngine.HookType.VISUAL -> listOf("выгляд", "вживую", "смотри", "sieht", "licht", "wirkt").any { lower.contains(it) }
-            CreativeStrategyEngine.HookType.CURIOSITY -> listOf("детал", "мелоч", "kleinigkeit", "unterschied").any { lower.contains(it) }
+            CreativeStrategyEngine.HookType.CONVENIENCE,
+            CreativeStrategyEngine.HookType.ORGANIZATION,
+            -> listOf("под рукой", "удобн", "рядом", "reichweite", "einfacher", "nötig", "suchen", "лежат").any { lower.contains(it) }
+            CreativeStrategyEngine.HookType.HOME,
+            CreativeStrategyEngine.HookType.OWNERSHIP,
+            -> listOf("кух", "дом", "посуд", "küche", "hause", "pfanne", "herd", "gemütlich", "mag", "оставить", "dabeihält").any { lower.contains(it) }
+            CreativeStrategyEngine.HookType.VISUAL -> listOf("выгляд", "вживую", "смотри", "sieht", "licht", "wirkt", "schau").any { lower.contains(it) }
+            CreativeStrategyEngine.HookType.CURIOSITY,
+            CreativeStrategyEngine.HookType.SATISFYING_USE,
+            CreativeStrategyEngine.HookType.SIMPLICITY,
+            -> listOf("детал", "мелоч", "kleinigkeit", "unterschied", "простот", "detailsache").any { lower.contains(it) }
             CreativeStrategyEngine.HookType.OUTDOOR -> listOf("рыбал", "берег", "улиц", "отдых", "комфорт", "sitzt", "angeln", "wasser", "ufer", "draußen", "pause").any { lower.contains(it) }
         }
     }

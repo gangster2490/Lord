@@ -67,4 +67,16 @@ class PurchaseAppealEngineTest {
         assertTrue(prompt.contains("Warm, homely"))
         assertTrue(prompt.contains("One desire only: cleanliness") || prompt.contains("cleanliness"))
     }
+
+    @Test
+    fun unknownCategoryKeepsInternalConceptsOffThePublicBrief() {
+        val analysis = JSONObject().put("product_category", "unknown gadget")
+        val brief = PurchaseAppealEngine.evaluate(analysis)
+        assertEquals(3, brief.concepts.size)
+        assertTrue(brief.concepts.map { it.kind }.containsAll(listOf("safest", "purchase", "natural")))
+        val json = brief.toPublicJson().toString()
+        assertFalse(json.contains("safest concept"))
+        assertTrue(json.contains("setting_type"))
+        assertEquals(CreativeStrategyEngine.SettingType.INDOOR_NEUTRAL, brief.plan.settingType)
+    }
 }

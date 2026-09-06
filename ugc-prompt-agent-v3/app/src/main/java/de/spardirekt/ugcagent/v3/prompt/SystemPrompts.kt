@@ -79,6 +79,8 @@ Return STRICT JSON only:
   "product_category": "",
   "observed_use_case": "",
   "observed_context": "",
+  "first_frame_context": "",
+  "supporting_contexts": [],
   "visual_features_relevant_to_use": [],
   "text_claims": [],
   "dimensions": [],
@@ -92,6 +94,9 @@ Return STRICT JSON only:
 }
 
 observed_* fields: only what images confirm.
+first_frame_context: the real-use environment visible in the most usable product photo (hero / likely First Frame). Empty if that photo is a packshot, infographic or marketplace crop.
+supporting_contexts: other real-use environments repeated across supporting photos. Do not invent a niche setting because the product could theoretically be used there.
+If use context is unclear, leave observed_context generic (indoor/outdoor/neutral). Do not default every product to a kitchen.
 possible_* and inferred_use_case: inference, not fact.
 possible_actions: only safe actions confirmed by evidence.
 """.trimIndent()
@@ -121,11 +126,12 @@ Create one believable smartphone UGC micro-scene for the referenced product.
 
 Before choosing setting or action, decide ONE reason someone would want this product.
 The scene must make that desire feel true in 8 seconds.
-Match the real-use setting: kitchen in a kitchen, fishing lakeside, camping outdoors, cleaning in a real home, tools in a garage/workshop.
-Do not place every product in a generic kitchen.
+Derive setting from evidence, in this order: selected First Frame visible context, repeated supporting photos, verified product-use evidence, then category. If confidence is low, use a neutral realistic environment. Do not invent a niche story.
+If the First Frame already shows a realistic usable environment, keep it.
+Do not place every product in a generic kitchen. Do not swap home→camping or workshop→kitchen without evidence.
 Do not create a technical demo, feature brochure, presenter pose or montage.
 
-Environment must follow evidence, not a random setting.
+Environment must follow evidence, not a category stereotype.
 One main action only, and only if confirmed by visual or text evidence.
 If a function is not confirmed, do not use it.
 
@@ -362,9 +368,12 @@ Ordinary available light.
 Natural human movement.
 
 Avoid polished studio-commercial aesthetics.
-Match the UGC feeling to the product's real use: kitchen products feel homely; outdoor products feel like a real hobby moment; tools feel like a real home repair corner. Never default every product to a kitchen.
+Build one coherent 8-second moment from a single creative concept: same place, same emotional tone, same selling idea, one natural action, one hook, one speech line, one lighting logic.
+SETTING, FORMAT, ACTION, SPEECH, LIGHTING and HUMAN BEHAVIOUR must all describe that same moment. Lighting must match the setting (no outdoor camp + indoor window light).
+If the First Frame already shows a realistic usable environment, keep that environment unless stronger evidence requires a change.
+Never default every product to a kitchen. Do not invent a niche scene when context is uncertain — use a neutral realistic environment and a LOW-RISK hand interaction.
 
-Choose ONE selling idea before writing: problem relief, comfort, convenience, home feeling, a single useful function, portability, or visual appeal. Do not sell a feature list.
+Choose ONE selling idea before writing. Do not sell a feature list.
 
 Think like a UGC creative assistant: why would someone want this, what feeling or practical benefit should be obvious in the first 2 seconds, and what simple LOW-RISK moment makes it desirable. Not a prompt formatter and not a technical demo.
 
@@ -410,7 +419,7 @@ MOVING COMPONENT LOCK:
 Preserve exact geometry, proportions, attachment points and mechanism. If exact motion is uncertain, keep the component static.
 
 SETTING:
-Use the product's real-use context. Kitchen: real kitchen. Fishing: lake/riverside. Camping: camp. Cleaning: bathroom/kitchen. Tool: garage/workshop. Do not place every product in a generic kitchen.
+Use the evidenced real-use context, preferring the First Frame environment. Do not place every product in a generic kitchen. Do not invent camping, lakeside, workshop or studio scenes without photo/listing evidence. If unsure, keep a neutral realistic environment matching the First Frame.
 
 ACTION:
 Use only the selected LOW-RISK evidence-supported action. The selling angle must not override identity safety. If the strongest sales action is HIGH-RISK, use a simpler visual moment and let the hook carry the idea.
