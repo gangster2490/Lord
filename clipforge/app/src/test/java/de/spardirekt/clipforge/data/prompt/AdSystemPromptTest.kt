@@ -58,6 +58,7 @@ class AdSystemPromptTest {
         assertThat(text).contains("exactly 15 seconds")
         assertThat(text).contains(Platform.SHORTS.canonicalCta(AdLanguage.RU))
         assertThat(text).contains("на кухне")
+        assertThat(text).contains("every storyboard shot")
         assertThat(text).contains("Photos uploaded: 3")
     }
 }

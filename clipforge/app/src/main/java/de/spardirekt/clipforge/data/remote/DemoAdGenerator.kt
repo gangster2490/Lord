@@ -27,7 +27,7 @@ object DemoAdGenerator : AdGenerator {
     ): AdPackage {
         val copy = Copy.forLanguage(brief.language)
         val cta = brief.platform.canonicalCta(brief.language)
-        val shots = storyboard(brief.length, brief.formula, copy, cta)
+        val shots = storyboard(brief.length, brief.formula, copy, cta, brief.wish, brief.language)
         val platformTag = when (brief.platform) {
             Platform.TIKTOK_SHOP -> "#TikTokShop"
             Platform.REELS -> "#Reels"
@@ -75,6 +75,8 @@ object DemoAdGenerator : AdGenerator {
         formula: AdFormula,
         copy: Copy,
         cta: String,
+        wish: String,
+        language: AdLanguage,
     ): List<StoryboardShot> {
         val beats = when (length) {
             AdLength.EIGHT -> listOf(0.0 to 2.0, 2.0 to 5.0, 5.0 to 7.0, 7.0 to 8.0)
@@ -88,10 +90,21 @@ object DemoAdGenerator : AdGenerator {
                 startSec = start,
                 endSec = end,
                 shot = shots[i],
-                action = actions[i],
+                action = applyWish(actions[i], wish, language),
                 overlay = overlays.getOrElse(i) { cta },
             )
         }
+    }
+
+    internal fun applyWish(action: String, wish: String, language: AdLanguage): String {
+        val extra = wish.trim()
+        if (extra.isBlank()) return action
+        val scene = when (language) {
+            AdLanguage.RU -> "Место/сцена: $extra."
+            AdLanguage.DE -> "Ort/Szene: $extra."
+            AdLanguage.EN -> "Setting: $extra."
+        }
+        return "$scene $action"
     }
 
     private fun buildVeoPrompt(
@@ -107,6 +120,10 @@ object DemoAdGenerator : AdGenerator {
         appendLine("FORMAT: Photorealistic vertical 9:16 ${brief.platform.labelEn} product advertisement. Exactly ${brief.length.seconds}.0 seconds. Visual style: ${brief.style.id}.")
         appendLine("LOCKED PRODUCT: ${copy.visualLock}")
         appendLine("FORMULA: ${brief.formula.id}.")
+        val wish = brief.wish.trim()
+        if (wish.isNotBlank()) {
+            appendLine("OWNER WISH: Honor this setting in every shot. Keep the product locked. Setting: $wish")
+        }
         appendLine()
         shots.forEach { shot ->
             appendLine("${shot.startSec}–${shot.endSec}s ${shot.shot.uppercase()}: ${shot.action} On-screen text: \"${shot.overlay}\".")
@@ -217,9 +234,27 @@ object DemoAdGenerator : AdGenerator {
                             "Нанесение, блики на стекле, лицо в расфокусе.",
                             "Средний план, банка как на фото, CTA.",
                         )
-                        else -> listOf(
+                        AdFormula.UGC -> listOf(
+                            "Говорит в камеру, банка уже в руке, без постановки.",
+                            "Наносит крем как в сторис, камера чуть трясётся.",
+                            "Показывает текстуру пальцем, этикетка как на фото.",
+                            "Кивок в камеру, товар в кадре, CTA.",
+                        )
+                        AdFormula.PROBLEM_SOLUTION -> listOf(
+                            "Сухая кожа крупно, банка уже рядом в кадре.",
+                            "Одно нанесение — живые руки, товар не менять.",
+                            "Кожа после ритуала, банка как на фото.",
+                            "Спокойный взгляд, товар в руке, CTA.",
+                        )
+                        AdFormula.BEFORE_AFTER -> listOf(
+                            "Честный кадр до ритуала, банка в руке, без стыда.",
+                            "Наносит крем, камера на руках и товаре.",
+                            "Тот же свет после одного нанесения, банка не меняется.",
+                            "Средний план, товар у лица, CTA.",
+                        )
+                        AdFormula.HOOK_DEMO_CTA -> listOf(
                             "Человек уже наносит крем, банка в кадре, прямой взгляд.",
-                            "Живое использование у зеркала, камера вокруг рук и товара.",
+                            "Живое использование, камера вокруг рук и товара.",
                             "Крупный план текстуры и золотой крышки, ничего не меняя.",
                             "Средний план, товар в руке, финальный CTA.",
                         )
@@ -246,7 +281,11 @@ object DemoAdGenerator : AdGenerator {
                 angle = { formula ->
                     when (formula) {
                         AdFormula.UGC -> "Ehrliches Abendritual statt Hochglanz"
-                        else -> "Textur-Hook, echte Anwendung, native CTA"
+                        AdFormula.PROBLEM_SOLUTION -> "Trockene Haut abends → ein Ritual"
+                        AdFormula.UNBOXING -> "Unboxing der Dose, genau wie im Foto"
+                        AdFormula.BEFORE_AFTER -> "Vor dem Ritual / nach einem Auftrag — ohne Wunder"
+                        AdFormula.ASMR -> "Deckel, Textur, Finger — Sound und Close-up"
+                        AdFormula.HOOK_DEMO_CTA -> "Textur-Hook, echte Anwendung, native CTA"
                     }
                 },
                 caption = { platform, _ ->
@@ -271,13 +310,33 @@ object DemoAdGenerator : AdGenerator {
                 why = { platform, formula ->
                     "Der erste Frame zeigt schon Hände und Produkt. Formel ${formula.labelRu} beweist echte Nutzung. Der Cut endet auf ${platform.labelEn}-CTA, ohne Preis."
                 },
-                actions = { _ ->
-                    listOf(
-                        "Person trägt die Creme schon auf, Dose im Frame, Blick in die Kamera.",
-                        "Natürliche Nutzung am Spiegel, Kamera um Hände und Produkt.",
-                        "Close-up der Textur und des Golddeckels, nichts verändern.",
-                        "Medium shot, Produkt in der Hand, finaler CTA.",
-                    )
+                actions = { formula ->
+                    when (formula) {
+                        AdFormula.UNBOXING -> listOf(
+                            "Person öffnet die Box, Dose sofort im Frame wie im Foto.",
+                            "Nimmt den Golddeckel ab, zeigt die Textur mit dem Finger.",
+                            "Trägt auf, Close-up der Dose daneben.",
+                            "Blick in die Kamera, Dose in der Hand, CTA.",
+                        )
+                        AdFormula.ASMR -> listOf(
+                            "Makro: Finger am Golddeckel, Produkt füllt den Frame.",
+                            "Deckel dreht sich, Sound und cremige Textur.",
+                            "Auftrag, Glanz auf dem Glas, Gesicht unscharf.",
+                            "Medium shot, Dose wie im Foto, CTA.",
+                        )
+                        AdFormula.UGC -> listOf(
+                            "Spricht in die Kamera, Dose schon in der Hand, ohne Posing.",
+                            "Trägt auf wie in einer Story, leichte Handheld-Bewegung.",
+                            "Zeigt die Textur, Etikett wie im Foto.",
+                            "Nicken in die Kamera, Produkt im Frame, CTA.",
+                        )
+                        else -> listOf(
+                            "Person trägt die Creme schon auf, Dose im Frame, Blick in die Kamera.",
+                            "Natürliche Nutzung, Kamera um Hände und Produkt.",
+                            "Close-up der Textur und des Golddeckels, nichts verändern.",
+                            "Medium shot, Produkt in der Hand, finaler CTA.",
+                        )
+                    }
                 },
             )
 
@@ -300,7 +359,11 @@ object DemoAdGenerator : AdGenerator {
                 angle = { formula ->
                     when (formula) {
                         AdFormula.UGC -> "Honest evening ritual, not glossy ad-speak"
-                        else -> "Texture hook, live application, native CTA"
+                        AdFormula.PROBLEM_SOLUTION -> "Dry evening skin → one ritual"
+                        AdFormula.UNBOXING -> "Unboxing the jar that matches the photo"
+                        AdFormula.BEFORE_AFTER -> "Before the ritual / after one application — no miracle claims"
+                        AdFormula.ASMR -> "Lid, texture, fingers — sound and close-up"
+                        AdFormula.HOOK_DEMO_CTA -> "Texture hook, live application, native CTA"
                     }
                 },
                 caption = { platform, _ ->
@@ -325,13 +388,33 @@ object DemoAdGenerator : AdGenerator {
                 why = { platform, formula ->
                     "The first frame already has hands on the product so the thumb stops. Formula ${formula.labelRu} proves real use. The ending uses a native ${platform.labelEn} CTA with no price."
                 },
-                actions = { _ ->
-                    listOf(
-                        "Person already applying cream, jar in frame, eye contact.",
-                        "Natural use at a mirror, camera around hands and product.",
-                        "Close-up of texture and gold lid, product unchanged.",
-                        "Medium shot, product in hand, final CTA.",
-                    )
+                actions = { formula ->
+                    when (formula) {
+                        AdFormula.UNBOXING -> listOf(
+                            "Person opens the box, jar immediately in frame as photographed.",
+                            "Takes off the gold lid, shows texture with a finger.",
+                            "Applies cream, close-up of the jar beside the hands.",
+                            "Looks to camera, jar in hand, CTA.",
+                        )
+                        AdFormula.ASMR -> listOf(
+                            "Macro: fingers on the gold lid, product fills the frame.",
+                            "Lid unscrews, sound and creamy texture.",
+                            "Application, glass highlights, face soft in background.",
+                            "Medium shot, jar as photographed, CTA.",
+                        )
+                        AdFormula.UGC -> listOf(
+                            "Talks to camera, jar already in hand, no posing.",
+                            "Applies like a story, slight handheld move.",
+                            "Shows texture, label matching the photo.",
+                            "Nods to camera, product in frame, CTA.",
+                        )
+                        else -> listOf(
+                            "Person already applying cream, jar in frame, eye contact.",
+                            "Natural use, camera around hands and product.",
+                            "Close-up of texture and gold lid, product unchanged.",
+                            "Medium shot, product in hand, final CTA.",
+                        )
+                    }
                 },
             )
         }

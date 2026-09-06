@@ -212,6 +212,22 @@ class DemoAdGeneratorTest {
         assertThat(ad.product.sellingAngle).contains("на рыбалке")
         assertThat(ad.product.sellingAngle).contains("Пожелание")
         assertThat(ad.storyboard.last().overlay).isEqualTo("Сейчас в корзине")
+        assertThat(ad.veoPrompt).contains("на рыбалке")
+        assertThat(ad.storyboard[1].action).contains("на рыбалке")
+        assertThat(ad.storyboard[1].action).doesNotContain("зеркал")
+    }
+
+    @Test
+    fun unboxingFormulaChangesTheFirstShot() = runBlocking {
+        val hook = DemoAdGenerator.generate("sk-demo", emptyList(), brief(Platform.TIKTOK_SHOP))
+        val unbox = DemoAdGenerator.generate(
+            "sk-demo",
+            emptyList(),
+            brief(Platform.TIKTOK_SHOP, formula = AdFormula.UNBOXING),
+        )
+        assertThat(unbox.storyboard.first().action).contains("коробк")
+        assertThat(hook.storyboard.first().action).isNotEqualTo(unbox.storyboard.first().action)
+        assertThat(unbox.product.sellingAngle).contains("Распаковка")
     }
 }
 

@@ -171,6 +171,7 @@ Visual style: ${brief.style.id} (${brief.style.labelRu})
 Language for copy/voice/overlays: ${brief.language.id} (${brief.language.nativeName})
 Photos uploaded: ${brief.photoCount}
 Owner wish: $wish
+If a wish is set, every storyboard shot AND every veoPrompt scene must use that setting. Do not default to a studio, bathroom or mirror if the wish names another place.
 
 Required CTA (copy exactly, or a tight equivalent in ${brief.language.nativeName}): "$cta"
 $forbidden
