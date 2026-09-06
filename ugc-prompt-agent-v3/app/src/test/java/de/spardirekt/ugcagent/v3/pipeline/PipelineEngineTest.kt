@@ -54,6 +54,26 @@ class PipelineEngineTest {
     }
 
     @Test
+    fun startReportsProgressAfterEachStageAndFinishesAt100() {
+        val seen = mutableListOf<PipelineStage>()
+        val percents = mutableListOf<Int>()
+        val result = PipelineEngine(FakePipelineAi()).start(sampleSession()) { session ->
+            seen.add(session.stage)
+            percents.add(PipelineProgress.percent(session.completed, session.stage))
+        }
+        assertEquals(PipelineStage.READY, result.stage)
+        assertTrue(seen.contains(PipelineStage.PRODUCT_ANALYSIS))
+        assertTrue(seen.contains(PipelineStage.PURCHASE_APPEAL))
+        assertTrue(seen.contains(PipelineStage.VEO_PROMPT_GENERATION))
+        assertEquals(PipelineStage.READY, seen.last())
+        assertEquals(100, percents.last())
+        assertTrue(percents.first() < 100)
+        for (i in 1 until percents.size) {
+            assertTrue(percents[i] >= percents[i - 1])
+        }
+    }
+
+    @Test
     fun testM_resumeAfterFailureDoesNotRestartCompletedStages() {
         val fake = FakePipelineAi(failAt = PipelineStage.MOTION_RISK_SELECTION)
         val engine = PipelineEngine(fake)

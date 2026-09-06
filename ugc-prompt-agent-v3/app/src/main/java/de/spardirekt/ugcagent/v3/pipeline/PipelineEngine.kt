@@ -14,7 +14,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class PipelineEngine(private val ai: PipelineAi) {
-    fun start(session: PipelineSession): PipelineSession {
+    fun start(
+        session: PipelineSession,
+        onProgress: ((PipelineSession) -> Unit)? = null,
+    ): PipelineSession {
         session.pausedReason = null
         session.errorMessage = null
         session.warnings.clear()
@@ -27,10 +30,13 @@ class PipelineEngine(private val ai: PipelineAi) {
         session.dominantImageIndices = emptyList()
         session.stage = PipelineStage.IDLE
         session.resumeStage = PipelineStage.IMAGES_READY
-        return advance(session)
+        return advance(session, onProgress)
     }
 
-    fun resume(session: PipelineSession): PipelineSession {
+    fun resume(
+        session: PipelineSession,
+        onProgress: ((PipelineSession) -> Unit)? = null,
+    ): PipelineSession {
         session.pausedReason = null
         session.errorMessage = null
         if (session.stage == PipelineStage.READY || session.stage == PipelineStage.EXPORT_READY) return session
@@ -39,21 +45,29 @@ class PipelineEngine(private val ai: PipelineAi) {
             ?: PipelineStage.IMAGES_READY
         session.stage = from
         session.resumeStage = from
-        return advance(session)
+        return advance(session, onProgress)
     }
 
-    private fun advance(session: PipelineSession): PipelineSession {
+    private fun advance(
+        session: PipelineSession,
+        onProgress: ((PipelineSession) -> Unit)?,
+    ): PipelineSession {
         for (stage in PipelineStage.runnableOrder) {
             if (session.completed.contains(stage)) continue
+            session.stage = stage
+            session.resumeStage = stage
+            onProgress?.invoke(session)
             try {
                 runStage(session, stage)
                 session.completed.add(stage)
                 session.stage = stage
                 session.resumeStage = nextAfter(stage)
+                onProgress?.invoke(session)
             } catch (paused: PipelinePaused) {
                 session.stage = PipelineStage.PAUSED
                 session.resumeStage = paused.stage
                 session.pausedReason = paused.reason
+                onProgress?.invoke(session)
                 return session
             } catch (error: Exception) {
                 if (isTransient(error) && !session.autoRetried) {
@@ -64,10 +78,12 @@ class PipelineEngine(private val ai: PipelineAi) {
                         session.completed.add(stage)
                         session.stage = stage
                         session.resumeStage = nextAfter(stage)
+                        onProgress?.invoke(session)
                     } catch (paused: PipelinePaused) {
                         session.stage = PipelineStage.PAUSED
                         session.resumeStage = paused.stage
                         session.pausedReason = paused.reason
+                        onProgress?.invoke(session)
                         return session
                     } catch (retryError: Exception) {
                         session.stage = PipelineStage.ERROR
@@ -86,6 +102,8 @@ class PipelineEngine(private val ai: PipelineAi) {
         session.stage = PipelineStage.READY
         session.resumeStage = null
         session.pausedReason = null
+        session.completed.add(PipelineStage.READY)
+        onProgress?.invoke(session)
         return session
     }
 

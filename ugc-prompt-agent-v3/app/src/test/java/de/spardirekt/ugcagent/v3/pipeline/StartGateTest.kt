@@ -28,9 +28,9 @@ class StartGateTest {
     }
 
     @Test
-    fun disablesOnlyHardGeometryConflict() {
-        val debug = StartGate.evaluate(5, "DEUTSCH", "PAUSED", PauseReasons.DIFFERENT_PRODUCTS, false, 3, 15)
-        assertTrue(debug.getBoolean("hardConflict"))
+    fun disablesWhenPipelineIsBusy() {
+        val debug = StartGate.evaluate(4, "DEUTSCH", "PRODUCT_ANALYSIS", null, true, 3, 15)
+        assertTrue(debug.getBoolean("busy"))
         assertFalse(debug.getBoolean("startEnabled"))
     }
 }

@@ -85,10 +85,11 @@
     steps.hidden = true;
     homeNav.style.display = ["home", "history", "settings", "pause", "export"].includes(state.screen) ? "flex" : "none";
     title.textContent = titleFor(state.screen);
-    pages.className = state.busy ? "busy" : "";
+    pages.className = "";
     const errorHtml = state.lastError ? `<section class="card"><p class="err">${escapeHtml(state.lastError.message || state.lastError.code || "error")}</p>${state.lastError.retryable && state.lastOp ? `<button id="retryOp">${t("retry")}</button>` : ""}</section>` : "";
     pages.innerHTML = errorHtml + htmlFor(state.screen);
     bind(state.screen);
+    renderSteps();
     const retry = $("retryOp");
     if (retry) retry.onclick = () => {
       const op = state.lastOp;
@@ -136,7 +137,44 @@
     }
   }
 
-  function canStart() {
+  function isRunning() {
+    const progress = state.data.progress || {};
+    return !!(state.busy || state.data.pipelineRunning || progress.running);
+  }
+
+  function renderSteps() {
+    const el = $("steps");
+    if (!el) return;
+    const progress = state.data.progress || {};
+    const steps = progress.steps || [];
+    if (!isRunning() || !steps.length) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    el.hidden = false;
+    el.innerHTML = steps.map((step) => {
+      const cls = step.done ? "on" : (step.current ? "now" : "");
+      return `<li class="${cls}">${escapeHtml(step.label || "")}</li>`;
+    }).join("");
+  }
+
+  function progressCard() {
+    const progress = state.data.progress || {};
+    const percent = typeof progress.percent === "number" ? progress.percent : 0;
+    const steps = progress.steps || [];
+    const items = steps.map((step) => {
+      const cls = step.done ? "on" : (step.current ? "now" : "");
+      return `<li class="${cls}">${escapeHtml(step.label || "")}</li>`;
+    }).join("");
+    return `<div class="progress-card">
+      <p class="ok">${t("pipeline_background")}</p>
+      <p>${t("pipeline_progress")}: ${escapeHtml(progress.label || t("busy"))} · ${t("pipeline_step")} ${progress.index || 0}/${progress.total || 0}</p>
+      <div class="progress-bar"><span style="width:${percent}%"></span></div>
+      <p class="muted">${percent}%</p>
+      <ol class="progress-steps">${items}</ol>
+    </div>`;
+  }
     const debug = state.data.startDebug || {};
     const images = (state.data.images || []).length;
     const lang = outputLang();
@@ -148,7 +186,7 @@
     const enabled = typeof debug.startEnabled === "boolean"
       ? !!debug.startEnabled
       : (imagesOk && languageOk && !hard);
-    const result = enabled && !state.busy;
+    const result = enabled && !isRunning();
     console.log("START conditions", {
       imageCount: images,
       imagesOk: imagesOk,
@@ -169,7 +207,8 @@
     const enabled = canStart();
     const lang = outputLang();
     const stage = state.data.pipelineStage || (state.data.project && state.data.project.pipelineStage) || "";
-    const working = state.busy ? `<p class="warn">${t("busy")}${stage && stage !== "IDLE" ? " · " + escapeHtml(stage) : ""}</p>` : "";
+    const running = isRunning() && stage !== "READY" && stage !== "EXPORT_READY";
+    const working = running ? progressCard() : "";
     return `<section class="card">
       <p>${t("app_eyebrow")}</p>
       ${working}
@@ -178,10 +217,10 @@
           <img src="${img.thumb}" alt="" />
           <span class="badge">${img.width}×${img.height}</span>
         </div>`).join("")}</div>
-      <p>${enabled ? "" : t("analyse_need")}</p>
+      <p>${enabled || running ? "" : t("analyse_need")}</p>
       <div class="row">
-        <button id="pick">${t("upload")}</button>
-        <button id="clear" class="secondary">${t("clear")}</button>
+        <button id="pick" ${running ? "disabled" : ""}>${t("upload")}</button>
+        <button id="clear" class="secondary" ${running ? "disabled" : ""}>${t("clear")}</button>
       </div>
       <label>${t("language")}</label>
       <div class="row lang-toggle">
@@ -700,7 +739,7 @@
           const stage = (payload.project && payload.project.pipelineStage) || payload.pipelineStage || "";
           if (stage === "EXPORT_READY" || stage === "READY") state.screen = "export";
           else if (stage === "PAUSED" || stage === "ERROR") state.screen = "pause";
-          else state.screen = "home";
+          else if (state.screen === "home" || state.screen === "photos") state.screen = "home";
         }
         if (event === "images" && state.screen !== "export" && state.screen !== "pause") state.screen = "home";
         render();

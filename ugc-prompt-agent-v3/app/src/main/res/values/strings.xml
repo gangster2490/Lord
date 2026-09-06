@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">UGC Prompt Agent V3</string>
+    <string name="pipeline_channel">Pipeline</string>
+    <string name="pipeline_running">Pipeline läuft im Hintergrund</string>
 </resources>

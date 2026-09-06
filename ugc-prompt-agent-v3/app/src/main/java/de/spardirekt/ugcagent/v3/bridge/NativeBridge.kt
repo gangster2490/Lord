@@ -25,6 +25,7 @@ import de.spardirekt.ugcagent.v3.prompt.DetailsBuilder
 import de.spardirekt.ugcagent.v3.prompt.ProductIdentity
 import de.spardirekt.ugcagent.v3.prompt.ProductLock
 import de.spardirekt.ugcagent.v3.pipeline.PauseReasons
+import de.spardirekt.ugcagent.v3.pipeline.PipelineProgress
 import de.spardirekt.ugcagent.v3.pipeline.PipelineAi
 import de.spardirekt.ugcagent.v3.pipeline.PipelineEngine
 import de.spardirekt.ugcagent.v3.pipeline.PipelineImage
@@ -47,19 +48,34 @@ class NativeBridge(
     private val pickImages: () -> Unit,
     private val shareFile: (File, String) -> Unit,
 ) {
+    private val app = activity.application as de.spardirekt.ugcagent.v3.UgcAgentV3App
+    private val runner = app.pipelineRunner
     private val executor = Executors.newSingleThreadExecutor()
-    private val keys = SecureApiKeyStore(activity)
-    private val settings = SettingsStore(activity)
-    private val projects = ProjectStore(activity)
+    private val appContext = activity.applicationContext
+    private val keys = SecureApiKeyStore(appContext)
+    private val settings = SettingsStore(appContext)
+    private val projects = ProjectStore(appContext)
     private val openAi = OpenAiProvider()
     private val gemini = GeminiProvider()
-    private var project = ProjectRecord(
-        speechLanguage = settings.speechLanguage,
-        captionLanguage = settings.captionLanguage,
-        targetGenerator = settings.targetGenerator,
-        strictProductLock = settings.strictProductLock,
-        provider = settings.provider,
+    @Volatile private var attached = true
+    private var project = runner.adopt(
+        ProjectRecord(
+            speechLanguage = settings.speechLanguage,
+            captionLanguage = settings.captionLanguage,
+            targetGenerator = settings.targetGenerator,
+            strictProductLock = settings.strictProductLock,
+            provider = settings.provider,
+        ),
     )
+
+    init {
+        runner.attachUi(this)
+    }
+
+    fun detach() {
+        attached = false
+        runner.detachUi(this)
+    }
 
     fun persist() {
         projects.save(project)
@@ -232,12 +248,14 @@ class NativeBridge(
     @JavascriptInterface
     fun newProject() {
         persist()
-        project = ProjectRecord(
-            speechLanguage = settings.speechLanguage,
-            captionLanguage = settings.captionLanguage,
-            targetGenerator = settings.targetGenerator,
-            strictProductLock = settings.strictProductLock,
-            provider = settings.provider,
+        project = runner.replace(
+            ProjectRecord(
+                speechLanguage = settings.speechLanguage,
+                captionLanguage = settings.captionLanguage,
+                targetGenerator = settings.targetGenerator,
+                strictProductLock = settings.strictProductLock,
+                provider = settings.provider,
+            ),
         )
         persist()
         emit("project", snapshot())
@@ -462,7 +480,7 @@ class NativeBridge(
 
     @JavascriptInterface
     fun openProject(id: String) {
-        project = projects.load(id) ?: project
+        project = runner.replace(projects.load(id) ?: project)
         emit("project", snapshot())
         maybeAutoResume()
     }
@@ -483,20 +501,20 @@ class NativeBridge(
     }
 
     @JavascriptInterface
-    fun startPipeline() = runOp("pipeline") {
+    fun startPipeline() {
         applyAutoDefaults()
         val stage = PipelineStage.fromName(project.pipelineStage)
         val resume = project.completedStages.isNotEmpty() &&
             stage != PipelineStage.READY &&
             stage != PipelineStage.EXPORT_READY &&
             stage != PipelineStage.IDLE
-        runAutomaticPipeline(resume = resume)
+        startPipelineJob(resume)
     }
 
     @JavascriptInterface
-    fun resumePipeline() = runOp("pipeline") {
+    fun resumePipeline() {
         applyAutoDefaults()
-        runAutomaticPipeline(resume = true)
+        startPipelineJob(resume = true)
     }
 
     @JavascriptInterface
@@ -526,6 +544,11 @@ class NativeBridge(
     }
 
     private fun maybeAutoResume() {
+        if (runner.isRunning) {
+            emit("busy", JSONObject().put("op", "pipeline").put("busy", true))
+            emit("pipeline", snapshot())
+            return
+        }
         val stage = PipelineStage.fromName(project.pipelineStage)
         val can = project.images.size >= ImageRules.MIN && keys.has(project.provider) && project.completedStages.isNotEmpty()
         val inProgress = can &&
@@ -535,7 +558,30 @@ class NativeBridge(
             stage != PipelineStage.IDLE &&
             stage != PipelineStage.ERROR
         if (inProgress) {
-            resumePipeline()
+            startPipelineJob(resume = true)
+        }
+    }
+
+    private fun startPipelineJob(resume: Boolean) {
+        persist()
+        if (runner.isRunning) {
+            emit("busy", JSONObject().put("op", "pipeline").put("busy", true))
+            emit("pipeline", snapshot())
+            return
+        }
+        val started = runner.start(project) {
+            try {
+                emit("busy", JSONObject().put("op", "pipeline").put("busy", true))
+                val payload = runAutomaticPipeline(resume)
+                emit("pipeline", payload)
+            } catch (e: Exception) {
+                emitError(e)
+            } finally {
+                emit("busy", JSONObject().put("op", "pipeline").put("busy", false))
+            }
+        }
+        if (!started) {
+            emit("pipeline", snapshot())
         }
     }
 
@@ -543,8 +589,15 @@ class NativeBridge(
         val cachedImages = apiImages()
         val engine = PipelineEngine(LivePipelineAi(cachedImages))
         val session = sessionFromProject()
+        val russian = project.speechLanguage.equals("РУССКИЙ", true)
+        val onProgress: (PipelineSession) -> Unit = { current ->
+            applySession(current)
+            persist()
+            runner.notifyStage(current.stage, russian)
+            emit("pipeline", snapshot())
+        }
         val result = try {
-            if (resume) engine.resume(session) else engine.start(session)
+            if (resume) engine.resume(session, onProgress) else engine.start(session, onProgress)
         } catch (paused: PipelinePaused) {
             session.stage = PipelineStage.PAUSED
             session.resumeStage = paused.stage
@@ -847,6 +900,16 @@ class NativeBridge(
             .put("copyAll", DetailsBuilder.copyAll(project.details.orEmpty(), activePrompt(), project.caption.orEmpty(), project.hashtags))
             .put("hook", project.hook ?: "")
             .put("veoReferences", veoReferencesJson(thumbById))
+            .put("pipelineRunning", runner.isRunning)
+            .put(
+                "progress",
+                PipelineProgress.toJson(
+                    PipelineStage.fromName(project.pipelineStage),
+                    PipelineSession.parseCompleted(JSONArray(project.completedStages)),
+                    runner.isRunning,
+                    project.speechLanguage.equals("РУССКИЙ", true) || settings.appLanguage.equals("ru", true),
+                ),
+            )
     }
 
     private fun startDebug(): JSONObject {
@@ -855,7 +918,7 @@ class NativeBridge(
             language = if (project.speechLanguage.equals("РУССКИЙ", true)) "РУССКИЙ" else "DEUTSCH",
             stage = project.pipelineStage,
             pausedReason = project.pausedReason,
-            busy = false,
+            busy = runner.isRunning,
             minImages = ImageRules.MIN,
             maxImages = ImageRules.MAX,
         )
@@ -950,9 +1013,24 @@ class NativeBridge(
     }
 
     private fun emit(event: String, payload: JSONObject) {
+        val target = (runner.ui as? NativeBridge) ?: this
+        target.pushToWeb(event, payload)
+    }
+
+    private fun pushToWeb(event: String, payload: JSONObject) {
+        if (!attached) return
         val json = Utf8Guard.repair(Utf8Guard.repairJson(payload).toString())
         val encoded = Base64.encodeToString(json.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
         val js = "(function(){try{var b=atob('$encoded');var u=new Uint8Array(b.length);for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i)&255;var t=(typeof TextDecoder!=='undefined')?new TextDecoder('utf-8').decode(u):decodeURIComponent(escape(b));window.UgcV3App&&window.UgcV3App.onNativeEvent('$event',JSON.parse(t));}catch(e){}}())"
-        webView.post { webView.evaluateJavascript(js, null) }
+        try {
+            webView.post {
+                if (!attached) return@post
+                try {
+                    webView.evaluateJavascript(js, null)
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
     }
 }
