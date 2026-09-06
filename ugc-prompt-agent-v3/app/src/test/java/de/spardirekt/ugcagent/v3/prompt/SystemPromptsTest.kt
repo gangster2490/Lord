@@ -10,6 +10,7 @@ class SystemPromptsTest {
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("No spoken dialogue"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("Do not overuse"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("PRODUCT IDENTITY LOCK"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("5–10 unique identity-critical visible features"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("8.0 seconds"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("MOVING COMPONENT LOCK"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("freeze-frame"))

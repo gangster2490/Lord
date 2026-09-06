@@ -19,6 +19,7 @@ import de.spardirekt.ugcagent.v3.data.SettingsStore
 import de.spardirekt.ugcagent.v3.data.StoredImage
 import de.spardirekt.ugcagent.v3.image.FirstFrameHeuristics
 import de.spardirekt.ugcagent.v3.image.ImageProcessor
+import de.spardirekt.ugcagent.v3.image.VeoReferenceSelector
 import de.spardirekt.ugcagent.v3.prompt.ActionIdentity
 import de.spardirekt.ugcagent.v3.prompt.DetailsBuilder
 import de.spardirekt.ugcagent.v3.prompt.ProductIdentity
@@ -799,12 +800,14 @@ class NativeBridge(
 
     private fun snapshot(): JSONObject {
         val images = JSONArray()
+        val thumbById = mutableMapOf<String, String>()
         project.images.forEach { image ->
             val file = File(image.compressedPath)
             val thumb = if (file.exists()) {
                 val bytes = ImageProcessor.thumbnailJpeg(file)
                 if (bytes.isEmpty()) "" else "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
             } else ""
+            thumbById[image.id] = thumb
             images.put(
                 JSONObject()
                     .put("id", image.id)
@@ -842,6 +845,7 @@ class NativeBridge(
             .put("videoPackage", DetailsBuilder.videoPackage(activePrompt(), project.caption.orEmpty(), project.hashtags))
             .put("copyAll", DetailsBuilder.copyAll(project.details.orEmpty(), activePrompt(), project.caption.orEmpty(), project.hashtags))
             .put("hook", project.hook ?: "")
+            .put("veoReferences", veoReferencesJson(thumbById))
     }
 
     private fun startDebug(): JSONObject {
@@ -864,6 +868,45 @@ class NativeBridge(
             0,
         )
         return debug
+    }
+
+    private fun veoReferencesJson(thumbById: Map<String, String>): JSONArray {
+        val rec = project.firstFrameRecommendation
+        val candidates = project.images.mapIndexed { index, image ->
+            VeoReferenceSelector.Candidate(
+                id = image.id,
+                index = index,
+                width = image.width,
+                height = image.height,
+                compressedBytes = image.compressedBytes,
+                filename = File(image.originalPath).name,
+                reasons = if (image.id == project.firstFrameId) rec?.optJSONArray("reasons")?.toString().orEmpty() else "",
+                marketplaceUiOverProduct = image.id == project.firstFrameId && rec?.optBoolean("marketplace_ui_over_product", false) == true,
+                identityComponentsVisible = image.id != project.firstFrameId || rec?.optBoolean("identity_components_visible", true) != false,
+            )
+        }
+        val picks = VeoReferenceSelector.select(candidates, project.firstFrameId, project.consistency)
+        val out = JSONArray()
+        picks.forEach { pick ->
+            val image = project.images.firstOrNull { it.id == pick.id } ?: return@forEach
+            val file = File(image.compressedPath)
+            val preview = if (file.exists()) {
+                val bytes = ImageProcessor.thumbnailJpeg(file, 720)
+                if (bytes.isEmpty()) thumbById[image.id].orEmpty()
+                else "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+            } else {
+                thumbById[image.id].orEmpty()
+            }
+            out.put(
+                JSONObject()
+                    .put("id", pick.id)
+                    .put("role", pick.role)
+                    .put("label", pick.label)
+                    .put("thumb", thumbById[image.id].orEmpty())
+                    .put("preview", preview),
+            )
+        }
+        return out
     }
 
     private fun payloadInfo(): JSONObject {

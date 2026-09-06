@@ -57,6 +57,45 @@ object ProductIdentity {
         )
         .put("confidence", 0.88)
 
+    val MICROWAVE_COVER_FEATURES = listOf(
+        "Transparent dome body",
+        "Green circular base ring",
+        "Curved green handle",
+        "Circular upper vent",
+        "Two separate rectangular transparent upper modules",
+        "Green caps on the rectangular modules",
+        "Original relative positions of the vent and rectangular modules",
+        "Visible central dome seam/rib",
+        "Visible perimeter attachment layout",
+        "Never replace the two rectangular modules or the circular vent with one cylindrical reservoir",
+    )
+
+    val COOKWARE_PAN_FEATURES = listOf(
+        "pan body",
+        "rounded deep sidewall",
+        "side handle assembly",
+        "short metal tang",
+        "wooden handle grip",
+        "metallic/gold-colored collar",
+        "hanging ring",
+        "wooden lid",
+        "raised lid handle",
+        "visible fastener heads",
+    )
+
+    val IDENTITY_POLICY_LINES = listOf(
+        "Do not merge, split, omit, relocate, simplify or invent components. Do not redesign, reinterpret, replace, duplicate or morph it.",
+        "Do not generate a similar product. Do not generate a generic product from the same category. A functionally similar but visually different product is a failed generation.",
+    )
+
+    private val GENERIC_IDENTITY_PADS = listOf(
+        "Exact referenced silhouette from the photos",
+        "Visible component count from the photos",
+        "Original attachment layout",
+        "Distinctive color and finish from the First Frame",
+        "Identity-critical parts stay in their photo positions",
+    )
+
     const val MICROWAVE_VENT_STATIC =
         "If the scene does not require the circular upper component to move, keep it completely static.\n" +
             "If that circular upper component moves, its shape, diameter, thickness and attachment point must remain identical; the axis of movement must stay consistent; it must not rise, stretch, expand, collapse or turn into another mechanism."
@@ -103,52 +142,99 @@ object ProductIdentity {
         )
         .put("confidence", 0.86)
 
-    fun finalIdentityConstraints(fingerprint: JSONObject?): List<String> {
-        val out = mutableListOf<String>()
+    fun finalIdentityConstraints(fingerprint: JSONObject?): List<String> =
+        compactIdentityFeatures(fingerprint)
+
+    fun compactIdentityFeatures(fingerprint: JSONObject?, extra: List<String> = emptyList()): List<String> {
+        val features = mutableListOf<String>()
+        fun add(raw: String) {
+            if (features.size >= 10) return
+            val item = compactFeature(raw) ?: return
+            if (features.any { similarFeature(it, item) }) return
+            features += item
+        }
         if (looksLikeMicrowaveCover(fingerprint)) {
-            out.add("transparent low dome with green circular perimeter base ring and curved green handle")
-            out.add("separate circular upper vent remains present and separate")
-            out.add("exactly two separate square-capped rectangular transparent upper modules with green caps")
-            out.add("original relative positions of the circular upper vent and both rectangular modules")
-            out.add("visible ribs/seams including the central clear dome seam/rib")
-            out.add("visible perimeter attachment layout")
-            out.add("never replace the two rectangular modules or the circular vent with one cylindrical reservoir")
-            out.add("do not remove the circular vent, relocate the handle, merge modules, or change relative positions")
+            MICROWAVE_COVER_FEATURES.forEach(::add)
+            extra.forEach(::add)
+            return padIdentityFeatures(features)
         }
         if (looksLikeCookwarePan(fingerprint)) {
-            out.add("pan body with rounded deep sidewall")
-            out.add("side handle assembly with short metal tang")
-            out.add("wooden handle grip")
-            out.add("metallic/gold-colored collar")
-            out.add("hanging ring")
-            out.add("wooden lid with raised lid handle")
-            out.add("visible fastener heads")
+            COOKWARE_PAN_FEATURES.forEach(::add)
+            extra.forEach(::add)
+            return padIdentityFeatures(features)
         }
+        addVisibleItems(fingerprint, "identity_critical_components", features)
+        addVisibleItems(fingerprint, "must_not_change", features)
+        addVisibleItems(fingerprint, "attachment_points", features, skipUnconfirmed = true)
         val geometry = fingerprint?.optString("overall_geometry").orEmpty().trim()
-        if (geometry.isNotBlank()) out.add(geometry)
-        addVisibleItems(fingerprint, "component_count_constraints", out)
-        addVisibleItems(fingerprint, "identity_critical_components", out)
-        addVisibleItems(fingerprint, "component_layout", out)
-        addVisibleItems(fingerprint, "attachment_points", out, skipUnconfirmed = true)
-        addVisibleItems(fingerprint, "moving_or_removable_parts", out, skipUnconfirmed = true)
-        addVisibleItems(fingerprint, "must_not_change", out)
-        return out.map { it.trim() }.filter { it.isNotBlank() && !isInternalLeak(it) && !looksLikeDimension(it) }.distinctBy { it.lowercase() }
+        if (geometry.length in 12..140) add(geometry)
+        addVisibleItems(fingerprint, "component_layout", features)
+        extra.forEach(::add)
+        return padIdentityFeatures(features)
     }
 
+    fun identityPolicyLines(): List<String> = IDENTITY_POLICY_LINES
+
     fun finalIdentityLockBlock(fingerprint: JSONObject?): String {
-        val constraints = finalIdentityConstraints(fingerprint).let { items ->
-            if (items.size >= 5) items else (items + listOf(
-                "Keep exactly the same single physical product",
-                "Preserve exact component count, geometry and relative positions",
-                "Do not merge, split, remove, relocate, simplify or invent components",
-                "Do not generate a similar or generic category-equivalent product",
-                "Do not invent hidden structure",
-            )).distinctBy { it.lowercase() }
-        }
+        val features = compactIdentityFeatures(fingerprint)
         return buildString {
             appendLine("PRODUCT IDENTITY LOCK:")
-            constraints.forEachIndexed { index, line -> appendLine("${index + 1}. $line") }
+            features.forEachIndexed { index, line -> appendLine("${index + 1}. $line") }
+            IDENTITY_POLICY_LINES.forEach { appendLine(it) }
         }.trim()
+    }
+
+    fun compactFeature(raw: String): String? {
+        var text = raw.trim().replace(Regex("^\\d+\\.\\s*"), "").trim()
+        if (text.isBlank()) return null
+        if (isPolicyLine(text) || isInternalLeak(text) || looksLikeDimension(text) || looksLikeSellerClaim(text)) return null
+        if (text.length < 8 || text.length > 140) return null
+        return text.trimEnd('.', ';')
+    }
+
+    fun isPolicyLine(text: String): Boolean {
+        val lower = text.lowercase().replace(Regex("^\\d+\\.\\s*"), "")
+        return lower.startsWith("do not ") ||
+            lower.startsWith("keep exactly the same") ||
+            lower.startsWith("preserve the exact number") ||
+            lower.startsWith("preserve exact component count") ||
+            lower.contains("functionally similar but visually different") ||
+            lower.contains("functionally equivalent but visually different") ||
+            lower.contains("generic product from the same category")
+    }
+
+    private fun padIdentityFeatures(features: List<String>): List<String> {
+        val out = features.take(10).toMutableList()
+        GENERIC_IDENTITY_PADS.forEach { pad ->
+            if (out.size >= 5) return@forEach
+            if (out.none { similarFeature(it, pad) }) out += pad
+        }
+        return out.take(10)
+    }
+
+    private fun similarFeature(a: String, b: String): Boolean {
+        val left = featureKey(a)
+        val right = featureKey(b)
+        if (left.isBlank() || right.isBlank()) return false
+        if (left == right) return true
+        val seed = minOf(18, minOf(left.length, right.length))
+        if (seed < 10) return false
+        return left.contains(right) || right.contains(left)
+    }
+
+    private fun featureKey(text: String): String =
+        text.lowercase().replace(Regex("^\\d+\\.\\s*"), "").replace(Regex("[^a-z0-9а-яё]+"), " ").trim()
+
+    private fun looksLikeSellerClaim(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("listing") ||
+            lower.contains("seller") ||
+            lower.contains("bestseller") ||
+            lower.contains("best seller") ||
+            lower.contains("guaranteed") ||
+            lower.contains("warranty") ||
+            lower.contains("shop rank") ||
+            lower.contains("review count")
     }
 
     fun hasFinishConflict(fingerprint: JSONObject?): Boolean {
@@ -196,10 +282,13 @@ object ProductIdentity {
     private fun addVisibleItems(fingerprint: JSONObject?, key: String, out: MutableList<String>, skipUnconfirmed: Boolean = false) {
         val arr = fingerprint?.optJSONArray(key) ?: return
         for (i in 0 until arr.length()) {
+            if (out.size >= 10) return
             val item = arr.optString(i).trim()
             if (item.isBlank() || isInternalLeak(item)) continue
             if (skipUnconfirmed && (item.contains("unconfirmed", true) || item.contains("hidden", true) || item.contains("uncertain", true))) continue
-            out.add(item)
+            val compact = compactFeature(item) ?: continue
+            if (out.any { similarFeature(it, compact) }) continue
+            out.add(compact)
         }
     }
 

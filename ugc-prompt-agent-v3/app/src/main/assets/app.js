@@ -412,6 +412,7 @@
         <button id="save">${t("save_project")}</button>
         <button id="adv" class="secondary">${t("advanced_details")}</button>
       </div>
+      ${veoRefsHtml()}
       <h3>${t("details")}</h3>
       <pre id="detailsBox">${escapeHtml(details)}</pre>
       <h3>${t("video_prompt")}</h3>
@@ -424,6 +425,40 @@
       ${!/\b(werbung|anzeige)\b/i.test(p.caption || "") && (p.caption || "") ? `<p class="muted">${t("disclosure_hint")}</p>` : ""}
       <pre id="advBox" class="hidden">${escapeHtml(advanced)}</pre>
     </section>`;
+  }
+
+  function veoRefsHtml() {
+    const refs = state.data.veoReferences || [];
+    if (!refs.length) return "";
+    const items = refs.map((ref) => {
+      const first = ref.role === "FIRST_FRAME";
+      return `<button type="button" class="veo-ref${first ? " first" : ""}" data-ref-id="${escapeHtml(ref.id || "")}">
+        <img src="${ref.thumb || ""}" alt="${escapeHtml(ref.label || "")}" />
+        <span>${escapeHtml(ref.label || "")}</span>
+      </button>`;
+    }).join("");
+    return `<div class="veo-refs">
+      <h3>${t("veo_refs")}</h3>
+      <p class="muted veo-refs-hint">${t("veo_refs_hint")}</p>
+      <div class="veo-ref-strip">${items}</div>
+    </div>`;
+  }
+
+  function showImagePreview(src, label) {
+    if (!src) return;
+    const wrap = $("imagePreview");
+    const img = $("imagePreviewImg");
+    if (!wrap || !img) return;
+    img.src = src;
+    img.alt = label || "";
+    wrap.classList.remove("hidden");
+  }
+
+  function hideImagePreview() {
+    const wrap = $("imagePreview");
+    const img = $("imagePreviewImg");
+    if (img) img.removeAttribute("src");
+    if (wrap) wrap.classList.add("hidden");
   }
 
   function historyHtml() {
@@ -576,6 +611,13 @@
       $("ca").onclick = () => call("copyText", state.data.copyAll || [details, prompt, p.caption || "", (p.hashtags || []).join(" ")].join("\n\n"));
       $("adv").onclick = () => $("advBox").classList.toggle("hidden");
       $("save").onclick = () => call("saveProjectNow");
+      document.querySelectorAll(".veo-ref").forEach((el) => {
+        el.onclick = () => {
+          const id = el.getAttribute("data-ref-id");
+          const ref = (state.data.veoReferences || []).find((item) => item.id === id) || {};
+          showImagePreview(ref.preview || ref.thumb || "", ref.label || "");
+        };
+      });
     }
     if (screen === "history") {
       document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => call("openProject", b.getAttribute("data-open")));
@@ -686,6 +728,12 @@
   };
 
   document.addEventListener("DOMContentLoaded", () => {
+    const preview = $("imagePreview");
+    const close = $("imagePreviewClose");
+    if (close) close.onclick = hideImagePreview;
+    if (preview) preview.onclick = (e) => {
+      if (e.target === preview || e.target === close) hideImagePreview();
+    };
     render();
     call("ready");
   });

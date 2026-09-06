@@ -119,6 +119,7 @@ class ProductLockRegressionTest {
         assertTrue(SystemPrompts.PRODUCT_IDENTITY_READINESS.contains("generation_risk"))
         assertTrue(SystemPrompts.FIRST_FRAME_RECOMMENDATION.contains("recommended_image_index"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("PRODUCT IDENTITY LOCK"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("5–10 unique identity-critical visible features"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("8.0 seconds"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("functionally equivalent but visually different"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("MOVING COMPONENT LOCK"))

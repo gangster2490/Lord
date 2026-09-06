@@ -384,12 +384,15 @@ REFERENCE:
 Start from the selected original First Frame. Other references are supporting identity evidence. First Frame is the primary source of truth.
 
 PRODUCT IDENTITY LOCK:
-Include every identity-critical visible component needed to keep the exact product unchanged. Do not stop at 10 items. Keep each line concise and material.
+Keep this lock short. Use only 5–10 unique identity-critical visible features needed to preserve the exact product.
+Reference images remain the primary source of truth.
+Do not write a full product description.
+Do not repeat geometry wording.
+Do not include uncertain dimensions, seller claims, or unnecessary micro-details.
 Keep exactly the same single physical product.
-Preserve exact component count, geometry and relative positions.
-Do not merge, split, remove, relocate, simplify or invent components.
-Do not generate a similar or generic category-equivalent product.
-Do not include listing, seller, marketplace or conflicting dimensions unless they are reliable, non-conflicting, and materially necessary.
+Do not merge, split, omit, relocate, simplify or invent components.
+Do not generate a similar product. Do not generate a generic product from the same category.
+A functionally similar but visually different product is a failed generation.
 
 MOVING COMPONENT LOCK:
 Preserve exact geometry, proportions, attachment points and mechanism. If exact motion is uncertain, keep the component static.

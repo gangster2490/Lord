@@ -61,3 +61,17 @@ pre { white-space: pre-wrap; word-break: break-word; font-size: 13px; color: var
 .copy-actions .primary-cta, .primary-cta { flex: 1 1 100%; min-height: 54px; font-size: 16px; }
 .lang-toggle button { flex: 1; min-height: 48px; }
 #pick { flex: 1; min-height: 48px; }
+.veo-refs { margin: 12px 0 8px; padding: 10px 0 0; border-top: 1px solid var(--line); }
+.veo-refs h3 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; margin: 0; }
+.veo-refs-hint { font-size: 12px; margin: 6px 0 8px; }
+.veo-ref-strip { display: flex; gap: 8px; align-items: flex-end; overflow-x: auto; }
+.veo-ref { flex: 0 0 auto; width: 58px; padding: 0; background: transparent; color: var(--muted); display: flex; flex-direction: column; gap: 4px; border-radius: 10px; }
+.veo-ref img { width: 58px; height: 58px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.veo-ref span { font-size: 9px; line-height: 1.2; font-weight: 700; text-align: center; }
+.veo-ref.first { width: 84px; }
+.veo-ref.first img { width: 84px; height: 84px; border: 2px solid var(--accent); box-shadow: 0 0 0 2px rgba(62,224,197,.28); }
+.veo-ref.first span { color: var(--accent); }
+.image-preview { position: fixed; inset: 0; background: rgba(0,0,0,.82); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.image-preview.hidden { display: none; }
+.image-preview img { max-width: 100%; max-height: 86vh; border-radius: 12px; }
+.image-preview-close { position: absolute; top: 12px; right: 12px; width: 42px; height: 42px; padding: 0; }

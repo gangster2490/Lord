@@ -196,4 +196,62 @@ One hand slides the pan on the stove.
             ProductLock.regressionFailures(out, ProductIdentity.cookwarePanFingerprint(), "VEO", "РУССКИЙ"),
         )
     }
+
+    @Test
+    fun identityLockStaysWithinFiveToTenUniqueFeatures() {
+        val bloated = org.json.JSONObject()
+            .put("overall_geometry", "small round kitchen gadget with a short side grip")
+            .put(
+                "identity_critical_components",
+                org.json.JSONArray()
+                    .put("round body")
+                    .put("short side grip")
+                    .put("flat base")
+                    .put("lid knob")
+                    .put("visible seam")
+                    .put("metal rim")
+                    .put("hinged latch")
+                    .put("steam hole")
+                    .put("rubber foot")
+                    .put("brand stamp")
+                    .put("extra unused micro-detail about internal coating")
+                    .put("seller bestseller claim from listing"),
+            )
+        val out = ProductLock.finalizeClean(
+            "ACTION:\nOne hand slides the referenced product on the counter.",
+            bloated,
+            "VEO",
+            "OFF",
+        )
+        val features = numberedIdentityFeatures(out)
+        assertTrue(features.size in 5..10)
+        assertFalse(out.contains("seller bestseller", ignoreCase = true))
+        assertFalse(out.contains("Keep the transparent low dome, green circular perimeter"))
+        assertFalse(out.contains("Keep the pan body, rounded deep sidewall, side handle assembly"))
+        PromptComposer.CANONICAL_HEADINGS.forEach { heading ->
+            assertEquals(heading, 1, PromptComposer.headingCounts(out)[heading] ?: 0)
+        }
+    }
+
+    @Test
+    fun microwaveIdentityStaysCompactWithoutLongProductEssay() {
+        val out = ProductLock.finalizeClean(
+            "ACTION:\none hand grips the handle.",
+            ProductIdentity.microwaveCoverFingerprint(),
+            "VEO",
+            "OFF",
+        )
+        val features = numberedIdentityFeatures(out)
+        assertTrue(features.size in 5..10)
+        assertEquals(10, features.size)
+        assertTrue(ProductLock.preservesMicrowaveCover(out))
+        assertFalse(out.contains("Keep the transparent low dome, green circular perimeter"))
+        assertTrue(out.contains("Do not merge, split, omit, relocate, simplify or invent"))
+        assertTrue(out.contains("Do not generate a similar product"))
+    }
+
+    private fun numberedIdentityFeatures(prompt: String): List<String> {
+        val body = prompt.substringAfter("PRODUCT IDENTITY LOCK:").substringBefore("MOVING COMPONENT LOCK:")
+        return body.lineSequence().map { it.trim() }.filter { it.matches(Regex("^\\d+\\.\\s+.+" )) }.toList()
+    }
 }

@@ -200,38 +200,22 @@ object PromptComposer {
         evidence: JSONObject?,
         reused: String?,
     ): String {
-        if (fingerprint == null && !reused.isNullOrBlank() && reused.length > 40) {
-            return semanticDedup(stripDimensions(reused, analysis, evidence))
-        }
-        val constraints = ProductIdentity.finalIdentityConstraints(fingerprint)
-            .filter { !looksLikeDimension(it) }
-            .toMutableList()
-        listOf(
-            "Keep exactly the same single physical product",
-            "Preserve the exact number, geometry and relative positions of all identity-critical visible components",
-            "Do not merge, split, omit, relocate, simplify or invent components",
-            "Do not generate a similar product",
-            "Do not generate a generic product from the same category",
-            "Do not substitute the reference with a functionally equivalent product",
-            "A functionally similar but visually different product is a failed generation",
-            "Do not redesign, reinterpret, replace, duplicate or morph it",
-        ).forEach { line ->
-            if (constraints.none { similarPhrase(it, line) }) constraints.add(line)
-        }
-        val numbered = constraints.distinctBy { normalizePhrase(it) }
-            .mapIndexed { index, line -> "${index + 1}. ${stripDimensions(line, analysis, evidence)}" }
-        val extras = mutableListOf<String>()
-        extras += ProductLock.COMPONENT_COUNT_LOCK
-        extras += ProductLock.GENERIC_SUBSTITUTION_BAN
-        if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) {
-            extras += ProductIdentity.MICROWAVE_COVER_LOCK
-            extras += "Keep two rectangular upper modules separate; never merge them into one cylindrical reservoir."
-        }
-        if (ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)) {
-            extras += ProductIdentity.COOKWARE_PAN_LOCK
-        }
-        val combined = (numbered + extras).joinToString("\n")
+        val extras = extractShortFeatures(reused)
+        val features = ProductIdentity.compactIdentityFeatures(fingerprint, extras)
+            .map { stripDimensions(it, analysis, evidence) }
+            .filter { it.isNotBlank() && !looksLikeDimension(it) }
+            .distinctBy { normalizePhrase(it) }
+            .take(10)
+        val numbered = features.mapIndexed { index, line -> "${index + 1}. $line" }
+        val combined = (numbered + ProductIdentity.IDENTITY_POLICY_LINES).joinToString("\n")
         return semanticDedup(stripDimensions(combined, analysis, evidence))
+    }
+
+    private fun extractShortFeatures(reused: String?): List<String> {
+        if (reused.isNullOrBlank()) return emptyList()
+        return reused.lineSequence().mapNotNull { line ->
+            ProductIdentity.compactFeature(line)
+        }.toList()
     }
 
     private fun movingBlock(fingerprint: JSONObject?, reused: String?): String {
