@@ -92,14 +92,15 @@ object CreativeStrategyEngine {
     }
 
     fun plan(analysis: JSONObject?, fingerprint: JSONObject? = null, firstFrameContext: String? = null): Plan {
-        val draft = CreativeConsistencyEngine.build(analysis, fingerprint, firstFrameContext)
-        return PurchaseAppealEngine.apply(draft, analysis, fingerprint)
+        val (cleanAnalysis, cleanFingerprint) = CrossProductGuard.clean(analysis, fingerprint)
+        val draft = CreativeConsistencyEngine.build(cleanAnalysis, cleanFingerprint, firstFrameContext)
+        return PurchaseAppealEngine.apply(draft, cleanAnalysis, cleanFingerprint)
     }
 
     fun looksLikeFishingChair(fingerprint: JSONObject?, analysis: JSONObject? = null): Boolean {
-        val blob = CreativeConsistencyEngine.blob(analysis, fingerprint)
-        val chair = listOf("chair", "stuhl", "кресл", "стул", "seat").any { blob.contains(it) }
-        val fishing = listOf("fish", "рыбал", "angel", "bait", "озера", "lake", "ufer", "берег").any { blob.contains(it) }
+        val id = CrossProductGuard.productScopeText(fingerprint, analysis)
+        val chair = listOf("chair", "stuhl", "кресл", "стул", "seat", "armchair").any { id.contains(it) }
+        val fishing = listOf("fish", "рыбал", "bait", "angel", "fishing").any { id.contains(it) }
         return chair && fishing
     }
 

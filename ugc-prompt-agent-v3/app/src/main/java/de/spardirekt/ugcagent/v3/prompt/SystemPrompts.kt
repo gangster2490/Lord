@@ -97,6 +97,7 @@ observed_* fields: only what images confirm.
 first_frame_context: the real-use environment visible in the most usable product photo (hero / likely First Frame). Empty if that photo is a packshot, infographic or marketplace crop.
 supporting_contexts: other real-use environments repeated across supporting photos. Do not invent a niche setting because the product could theoretically be used there.
 If use context is unclear, leave observed_context generic (indoor/outdoor/neutral). Do not default every product to a kitchen.
+Never copy leftover setting, speech or component names from another product into this JSON. Do not mention kitchens, lakesides, microwave covers or pans unless THIS product's photos actually show them.
 possible_* and inferred_use_case: inference, not fact.
 possible_actions: only safe actions confirmed by evidence.
 """.trimIndent()
@@ -129,6 +130,7 @@ The scene must make that desire feel true in 8 seconds.
 Derive setting from evidence, in this order: selected First Frame visible context, repeated supporting photos, verified product-use evidence, then category. If confidence is low, use a neutral realistic environment. Do not invent a niche story.
 If the First Frame already shows a realistic usable environment, keep it.
 Do not place every product in a generic kitchen. Do not swap home→camping or workshop→kitchen without evidence.
+Do not reuse leftover kitchen, fishing, microwave or pan context from another product.
 Do not create a technical demo, feature brochure, presenter pose or montage.
 
 Environment must follow evidence, not a category stereotype.

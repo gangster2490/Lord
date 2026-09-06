@@ -214,7 +214,7 @@ $SPEECH_END
         val fishingSpot = plan.settingType == CreativeStrategyEngine.SettingType.FISHING_SPOT
         val microwaveEvidence = ProductIdentity.looksLikeMicrowaveCover(fingerprint) ||
             listOf("microwave", "микроволн", "cover food").any {
-                analysis?.toString().orEmpty().lowercase().contains(it)
+                CrossProductGuard.productScopeText(fingerprint, analysis).contains(it)
             }
         val cookware = ProductIdentity.looksLikeCookwarePan(fingerprint, analysis) &&
             plan.settingType == CreativeStrategyEngine.SettingType.HOME_KITCHEN

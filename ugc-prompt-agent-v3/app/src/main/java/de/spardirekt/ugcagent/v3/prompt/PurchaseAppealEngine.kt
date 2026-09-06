@@ -79,8 +79,9 @@ object PurchaseAppealEngine {
     }
 
     fun evaluate(analysis: JSONObject?, fingerprint: JSONObject? = null): Brief {
-        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
-        val concepts = conceptsFor(plan, analysis, fingerprint)
+        val (cleanAnalysis, cleanFingerprint) = CrossProductGuard.clean(analysis, fingerprint)
+        val plan = CreativeStrategyEngine.plan(cleanAnalysis, cleanFingerprint)
+        val concepts = conceptsFor(plan, cleanAnalysis, cleanFingerprint)
         val winner = select(concepts)
         val refined = lock(plan, winner)
         return Brief(

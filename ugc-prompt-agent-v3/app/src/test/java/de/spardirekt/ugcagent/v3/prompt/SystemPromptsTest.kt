@@ -28,5 +28,7 @@ class SystemPromptsTest {
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("Write one native spoken line for THIS product"))
         assertFalse(SystemPrompts.VIDEO_PROMPT.contains("Kitchen example"))
         assertFalse(SystemPrompts.VIDEO_PROMPT.contains("Fishing example"))
+        assertTrue(SystemPrompts.PRODUCT_ANALYSIS.contains("Never copy leftover setting"))
+        assertTrue(SystemPrompts.SCENE.contains("Do not reuse leftover kitchen, fishing, microwave or pan context"))
     }
 }

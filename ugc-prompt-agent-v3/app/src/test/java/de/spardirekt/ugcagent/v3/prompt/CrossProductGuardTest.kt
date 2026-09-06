@@ -156,6 +156,82 @@ SPEECH:
         )
     }
 
+    @Test
+    fun pollutedAnalysisContextDoesNotTurnAnOfficeProductIntoKitchenOrFishing() {
+        val analysis = JSONObject()
+            .put("product_category", "office")
+            .put("observed_use_case", "desk organizer")
+            .put("observed_context", "desk")
+            .put("possible_scene", "Ordinary cozy home kitchen by the lakeside fishing spot")
+            .put("possible_pain_point", "circular upper vent and hanging ring leftover from another product")
+            .put("notes", "microwave cover, bait tray, frying pan, Mikrowelle, рыбалка")
+        val fingerprint = JSONObject()
+            .put("overall_geometry", "desktop organizer tray with rectangular compartments")
+            .put(
+                "identity_critical_components",
+                org.json.JSONArray()
+                    .put("desktop compartments")
+                    .put("circular upper vent")
+                    .put("side bait tray")
+                    .put("hanging ring"),
+            )
+        assertFalse(CreativeStrategyEngine.looksLikeFishingChair(fingerprint, analysis))
+        assertFalse(ProductIdentity.looksLikeMicrowaveCover(fingerprint))
+        assertFalse(ProductIdentity.looksLikeCookwarePan(fingerprint, analysis))
+        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+        assertEquals(CreativeStrategyEngine.SettingType.OFFICE, plan.settingType)
+        assertFalse(plan.primary == CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY)
+        assertFalse(plan.primary == CreativeStrategyEngine.Motivation.PROBLEM_SOLVER)
+        assertFalse(plan.setting.contains("lakeside", ignoreCase = true))
+        assertFalse(plan.setting.contains("kitchen", ignoreCase = true))
+        assertFalse(plan.formatTone.contains("lived-in kitchen", ignoreCase = true))
+        assertFalse(plan.formatTone.contains("outdoor hobby", ignoreCase = true))
+        val prompt = ProductLock.finalizeClean(
+            dirtyIdentity,
+            fingerprint,
+            "VEO",
+            "DEUTSCH",
+            "So sitzt sich's beim Angeln schon ganz anders.",
+            true,
+            analysis,
+        )
+        assertTrue(prompt.contains("desk", ignoreCase = true) || prompt.contains("office", ignoreCase = true))
+        assertNoMicrowaveFamily(prompt)
+        assertNoFishingFamily(prompt)
+        assertNoPanFamily(prompt)
+        assertFalse(prompt.contains("Ordinary cozy home kitchen"))
+        assertFalse(prompt.contains("Warm, homely"))
+    }
+
+    @Test
+    fun pollutedLivingRoomChairDoesNotBecomeAFishingScene() {
+        val analysis = JSONObject()
+            .put("product_category", "furniture")
+            .put("observed_use_case", "armchair")
+            .put("observed_context", "living room")
+            .put("possible_scene", "lakeside fishing chair with bait tray next to a microwave")
+        val fingerprint = JSONObject().put("overall_geometry", "upholstered armchair with armrests and stable legs")
+        assertFalse(CreativeStrategyEngine.looksLikeFishingChair(fingerprint, analysis))
+        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+        assertEquals(CreativeStrategyEngine.SettingType.LIVING_ROOM, plan.settingType)
+        assertEquals(CreativeStrategyEngine.Motivation.COMFORT, plan.primary)
+        assertFalse(plan.setting.contains("lakeside", ignoreCase = true))
+        assertFalse(plan.human.contains("tray"))
+        val prompt = ProductLock.finalizeClean(
+            "SETTING:\nReal lakeside or riverside fishing spot.\nACTION:\nalready seated with the bait tray.",
+            fingerprint,
+            "VEO",
+            "DEUTSCH",
+            null,
+            true,
+            analysis,
+        )
+        assertTrue(prompt.contains("living room", ignoreCase = true))
+        assertNoFishingFamily(prompt)
+        assertNoMicrowaveFamily(prompt)
+        assertFalse(prompt.contains("Ordinary cozy home kitchen"))
+    }
+
     private fun assertNoMicrowaveFamily(text: String) {
         assertFalse(text.contains("circular upper vent", ignoreCase = true))
         assertFalse(text.contains("rectangular modules", ignoreCase = true))

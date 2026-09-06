@@ -88,12 +88,12 @@ object SellingAngleSelector {
     )
 
     private fun signals(blob: String, fingerprint: JSONObject?, analysis: JSONObject?): Signals {
+        val scope = CrossProductGuard.productScopeText(fingerprint, analysis)
         val microwave = ProductIdentity.looksLikeMicrowaveCover(fingerprint) ||
-            listOf("microwave cover", "cover food", "микроволн", "mikrowelle").any { blob.contains(it) }
+            listOf("microwave cover", "cover food", "микроволн", "mikrowelle").any { scope.contains(it) }
         val cookware = ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)
-        val fishing = listOf("fish", "рыбал", "angeln", "bait", "озера", "lakeside", "riverside").any { blob.contains(it) } ||
-            CreativeStrategyEngine.looksLikeFishingChair(fingerprint, analysis)
-        val seated = listOf("chair", "stuhl", "кресл", "стул", "seat", "armchair").any { blob.contains(it) }
+        val fishing = CreativeStrategyEngine.looksLikeFishingChair(fingerprint, analysis)
+        val seated = listOf("chair", "stuhl", "кресл", "стул", "seat", "armchair").any { scope.contains(it) }
         val pain = strength(
             blob,
             listOf("mess", "splash", "брызг", "убор", "cover food", "leak", "clutter", "возн", "putzen", "spatter", "nacharbeit"),
@@ -104,8 +104,14 @@ object SellingAngleSelector {
                 else -> base
             }
         }
-        val outdoorHobby = strength(blob, listOf("fish", "рыбал", "angeln", "camp", "кемпинг", "hiking", "bait", "lakeside", "riverside"))
-            .let { if (fishing) maxOf(it, 0.9) else it }
+        val outdoorHobby = if (fishing) {
+            maxOf(
+                0.9,
+                strength(blob, listOf("fish", "рыбал", "angeln", "camp", "кемпинг", "hiking", "bait", "lakeside", "riverside")),
+            )
+        } else {
+            strength(blob, listOf("camp", "кемпинг", "hiking", "outdoor", "draußen"))
+        }
         val comfort = strength(blob, listOf("cushion", "подуш", "comfort", "комфорт", "armchair", "bequem", "удобн сид"))
             .let { base ->
                 val chairHit = seated && !blob.contains("car seat")

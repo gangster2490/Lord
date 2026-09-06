@@ -1,5 +1,6 @@
 package de.spardirekt.ugcagent.v3.prompt
 
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -35,11 +36,13 @@ object CrossProductGuard {
         val kitchenOk = kitchenAllowed(fam, plan)
         val fishingOk = fam == Family.FISHING_GEAR ||
             plan?.settingType == CreativeStrategyEngine.SettingType.FISHING_SPOT
+        val outdoorOk = fishingOk || plan?.settingType?.isOutdoor() == true
         val out = mutableListOf<String>()
         if (fam != Family.MICROWAVE_COVER) out += microwavePack
         if (fam != Family.COOKWARE_PAN) out += panPack
         if (!fishingOk) out += fishingPack
         if (!kitchenOk) out += kitchenScenePack
+        if (!outdoorOk) out += outdoorScenePack
         return out.distinct()
     }
 
@@ -143,7 +146,93 @@ object CrossProductGuard {
         ).sortedByDescending { it.second }
         val best = ranked.first()
         val second = ranked.getOrNull(1)?.second ?: 0
-        return if (best.second >= 2 && best.second > second) best.first else Family.GENERIC
+        return if (best.second >= 2 && second == 0) best.first else Family.GENERIC
+    }
+
+    fun clean(analysis: JSONObject?, fingerprint: JSONObject?): Pair<JSONObject?, JSONObject?> {
+        val cleanedAnalysis = cleanAnalysis(analysis, fingerprint)
+        val cleanedFingerprint = cleanFingerprint(fingerprint, cleanedAnalysis)
+        return cleanedAnalysis to cleanedFingerprint
+    }
+
+    fun productScopeText(fingerprint: JSONObject?, analysis: JSONObject?): String =
+        listOf(
+            fingerprint?.optString("overall_geometry").orEmpty(),
+            analysis?.optString("product_category").orEmpty(),
+            analysis?.optString("observed_use_case").orEmpty(),
+        ).joinToString(" ").lowercase()
+
+    fun planningText(
+        analysis: JSONObject?,
+        fingerprint: JSONObject?,
+        firstFrameContext: String? = null,
+    ): String = listOf(
+        firstFrameContext.orEmpty(),
+        analysis?.optString("first_frame_context").orEmpty(),
+        analysis?.optString("observed_context").orEmpty(),
+        analysis?.optString("observed_use_case").orEmpty(),
+        analysis?.optString("product_category").orEmpty(),
+        analysis?.optString("inferred_use_case").orEmpty(),
+        joinArray(analysis, "supporting_contexts"),
+        fingerprint?.optString("overall_geometry").orEmpty(),
+        joinArray(fingerprint, "identity_critical_components"),
+        joinArray(fingerprint, "must_not_change"),
+    ).joinToString(" ")
+
+    fun cleanAnalysis(analysis: JSONObject?, fingerprint: JSONObject?): JSONObject? {
+        if (analysis == null) return null
+        val copy = JSONObject(analysis.toString())
+        listOf(
+            "first_frame_context",
+            "observed_context",
+            "inferred_use_case",
+            "possible_pain_point",
+            "possible_scene",
+        ).forEach { key ->
+            val value = copy.optString(key)
+            if (value.isNotBlank() && containsLeak(value, fingerprint, copy)) {
+                copy.put(key, strip(value, fingerprint, copy).ifBlank { "" })
+            }
+        }
+        val support = copy.optJSONArray("supporting_contexts")
+        if (support != null) {
+            val next = JSONArray()
+            for (i in 0 until support.length()) {
+                val item = support.optString(i)
+                if (item.isBlank() || containsLeak(item, fingerprint, copy)) continue
+                next.put(item)
+            }
+            copy.put("supporting_contexts", next)
+        }
+        return copy
+    }
+
+    fun cleanFingerprint(fingerprint: JSONObject?, analysis: JSONObject?): JSONObject? {
+        if (fingerprint == null) return null
+        val copy = JSONObject(fingerprint.toString())
+        listOf(
+            "identity_critical_components",
+            "must_not_change",
+            "attachment_points",
+            "moving_or_removable_parts",
+            "component_layout",
+            "component_count_constraints",
+        ).forEach { key ->
+            val arr = copy.optJSONArray(key) ?: return@forEach
+            val next = JSONArray()
+            for (i in 0 until arr.length()) {
+                val item = arr.optString(i)
+                if (item.isBlank() || isForeignIdentityLine(item, copy, analysis)) continue
+                next.put(item)
+            }
+            copy.put(key, next)
+        }
+        return copy
+    }
+
+    private fun joinArray(obj: JSONObject?, key: String): String {
+        val arr = obj?.optJSONArray(key) ?: return ""
+        return (0 until arr.length()).joinToString(" ") { arr.optString(it) }
     }
 
     private val microwavePack = listOf(
@@ -165,6 +254,8 @@ object CrossProductGuard {
         "отмывать микроволновку",
         "nach jedem aufwärmen",
         "aufwärmen zu putzen",
+        "cover already over a plate",
+        "microwave context stays visible",
     )
 
     private val panPack = listOf(
@@ -199,10 +290,17 @@ object CrossProductGuard {
         "lived-in kitchen feeling",
         "in their own kitchen",
         "warm, homely, lived-in kitchen",
+        "warm, homely",
         "домашнюю кухню",
         "in der küche",
         "на кухне",
         "relaxed kitchen moment",
         "relaxed kitchen movement",
+    )
+
+    private val outdoorScenePack = listOf(
+        "natural outdoor hobby",
+        "real lakeside or riverside fishing spot",
+        "at a real fishing spot",
     )
 }

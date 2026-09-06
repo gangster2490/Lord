@@ -20,15 +20,17 @@ object CreativeConsistencyEngine {
         fingerprint: JSONObject? = null,
         firstFrameContext: String? = null,
     ): CreativeStrategyEngine.Plan {
-        val blob = blob(analysis, fingerprint, firstFrameContext)
-        val setting = resolveSetting(analysis, fingerprint, firstFrameContext, blob)
-        val angle = SellingAngleSelector.winner(analysis, fingerprint, setting, blob)
+        val cleanAnalysis = CrossProductGuard.cleanAnalysis(analysis, fingerprint)
+        val cleanFingerprint = CrossProductGuard.cleanFingerprint(fingerprint, cleanAnalysis)
+        val blob = blob(cleanAnalysis, cleanFingerprint, firstFrameContext)
+        val setting = resolveSetting(cleanAnalysis, cleanFingerprint, firstFrameContext, blob)
+        val angle = SellingAngleSelector.winner(cleanAnalysis, cleanFingerprint, setting, blob)
         val primary = angle.motivation
-        val secondary = SellingAngleSelector.secondary(angle, analysis, fingerprint, setting, blob)
+        val secondary = SellingAngleSelector.secondary(angle, cleanAnalysis, cleanFingerprint, setting, blob)
         val idea = angle.idea
         val hookType = angle.hookType
-        val action = CreativeStrategyEngine.safeAction(fingerprint, analysis, idea, setting.type)
-        val human = humanFor(setting.type, fingerprint, analysis)
+        val action = CreativeStrategyEngine.safeAction(cleanFingerprint, cleanAnalysis, idea, setting.type)
+        val human = humanFor(setting.type, cleanFingerprint, cleanAnalysis)
         val lighting = lightingFor(setting.type, blob)
         val kitchen = setting.type == CreativeStrategyEngine.SettingType.HOME_KITCHEN
         return CreativeStrategyEngine.Plan(
@@ -341,18 +343,8 @@ object CreativeConsistencyEngine {
         return listOf("white background", "studio", "seamless", "packshot", "infographic", "marketplace", "pure white").any { lower.contains(it) }
     }
 
-    fun blob(analysis: JSONObject?, fingerprint: JSONObject?, firstFrameContext: String? = null): String {
-        return listOf(
-            firstFrameContext.orEmpty(),
-            analysis?.optString("first_frame_context").orEmpty(),
-            analysis?.optString("observed_context").orEmpty(),
-            analysis?.optString("observed_use_case").orEmpty(),
-            analysis?.optString("product_category").orEmpty(),
-            analysis?.optString("inferred_use_case").orEmpty(),
-            analysis?.toString().orEmpty(),
-            fingerprint?.toString().orEmpty(),
-        ).joinToString(" ").lowercase()
-    }
+    fun blob(analysis: JSONObject?, fingerprint: JSONObject?, firstFrameContext: String? = null): String =
+        CrossProductGuard.planningText(analysis, fingerprint, firstFrameContext).lowercase()
 
     private val outdoorTokens = listOf("outdoor", "outside", "draußen", "улиц", "lake", "camp", "fish", "garden", "beach")
 }

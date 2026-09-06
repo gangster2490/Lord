@@ -147,19 +147,21 @@ object PromptComposer {
     ): String {
         val cleaned = stripNoise(raw)
         val sections = parseSections(cleaned)
-        val effectiveFingerprint = fingerprint ?: fingerprintFromIdentity(sections["PRODUCT IDENTITY LOCK"])
-        val plan = CreativeStrategyEngine.plan(analysis, effectiveFingerprint)
+        val hinted = fingerprint ?: fingerprintFromIdentity(sections["PRODUCT IDENTITY LOCK"])
+        val (cleanAnalysis, cleanFingerprint) = CrossProductGuard.clean(analysis, hinted)
+        val effectiveFingerprint = cleanFingerprint ?: hinted
+        val plan = CreativeStrategyEngine.plan(cleanAnalysis, effectiveFingerprint)
         val parsedAction = firstNonBlank(sections["ACTION"], extractLooseAction(cleaned), plan.action)
         val action = if (
             CreativeStrategyEngine.actionConflicts(parsedAction, plan) ||
-            CrossProductGuard.containsLeak(parsedAction, effectiveFingerprint, analysis, plan)
+            CrossProductGuard.containsLeak(parsedAction, effectiveFingerprint, cleanAnalysis, plan)
         ) plan.action else parsedAction
         val setting = plan.setting
-        val resolvedHook = resolveHook(cleaned, hook, speechLanguage, analysis, effectiveFingerprint, plan)
-        val identity = identityBlock(effectiveFingerprint, analysis, evidence, sections["PRODUCT IDENTITY LOCK"])
-        val moving = movingBlock(effectiveFingerprint, analysis, sections["MOVING COMPONENT LOCK"])
-        val settingBody = stripDimensions(setting, analysis, evidence)
-        val actionBody = stripDimensions(action, analysis, evidence)
+        val resolvedHook = resolveHook(cleaned, hook, speechLanguage, cleanAnalysis, effectiveFingerprint, plan)
+        val identity = identityBlock(effectiveFingerprint, cleanAnalysis, evidence, sections["PRODUCT IDENTITY LOCK"])
+        val moving = movingBlock(effectiveFingerprint, cleanAnalysis, sections["MOVING COMPONENT LOCK"])
+        val settingBody = stripDimensions(setting, cleanAnalysis, evidence)
+        val actionBody = stripDimensions(action, cleanAnalysis, evidence)
         val extraAllowed = "$identity\n$moving"
         val body = buildString {
             appendSection("FORMAT", formatBlock(generator, plan))
@@ -171,12 +173,12 @@ object PromptComposer {
             appendSection("ACTION", actionBody)
             appendSection("HUMAN BEHAVIOUR", plan.human)
             appendSection("LIGHTING", plan.lighting)
-            appendSection("SPEECH", speechBlock(speechLanguage, resolvedHook, plan, effectiveFingerprint, analysis))
-            appendSection("ANTI-MORPH", ProductLock.antiMorphFor(effectiveFingerprint, analysis))
+            appendSection("SPEECH", speechBlock(speechLanguage, resolvedHook, plan, effectiveFingerprint, cleanAnalysis))
+            appendSection("ANTI-MORPH", ProductLock.antiMorphFor(effectiveFingerprint, cleanAnalysis))
             appendSection("TIMING", timingBlock(plan))
         }.trim()
-        val guarded = CrossProductGuard.strip(body, effectiveFingerprint, analysis, plan)
-        return ProductLexicon.stripForeign(guarded, effectiveFingerprint, analysis, extraAllowed)
+        val guarded = CrossProductGuard.strip(body, effectiveFingerprint, cleanAnalysis, plan)
+        return ProductLexicon.stripForeign(guarded, effectiveFingerprint, cleanAnalysis, extraAllowed)
     }
 
     private fun fingerprintFromIdentity(identity: String?): JSONObject? = when (CrossProductGuard.family(null, null, identity.orEmpty())) {

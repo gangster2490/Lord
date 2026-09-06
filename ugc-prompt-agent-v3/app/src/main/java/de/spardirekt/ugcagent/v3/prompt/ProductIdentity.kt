@@ -167,17 +167,17 @@ object ProductIdentity {
             addSafeExtra()
             return padIdentityFeatures(features)
         }
-        if (looksLikeCookwarePan(fingerprint)) {
+        if (looksLikeCookwarePan(fingerprint, analysis)) {
             COOKWARE_PAN_FEATURES.forEach(::add)
             addSafeExtra()
             return padIdentityFeatures(features)
         }
-        addVisibleItems(fingerprint, "identity_critical_components", features)
-        addVisibleItems(fingerprint, "must_not_change", features)
-        addVisibleItems(fingerprint, "attachment_points", features, skipUnconfirmed = true)
+        addVisibleItems(fingerprint, "identity_critical_components", features, analysis)
+        addVisibleItems(fingerprint, "must_not_change", features, analysis)
+        addVisibleItems(fingerprint, "attachment_points", features, analysis, skipUnconfirmed = true)
         val geometry = fingerprint?.optString("overall_geometry").orEmpty().trim()
         if (geometry.length in 12..140) add(geometry)
-        addVisibleItems(fingerprint, "component_layout", features)
+        addVisibleItems(fingerprint, "component_layout", features, analysis)
         addSafeExtra()
         return padIdentityFeatures(features)
     }
@@ -254,9 +254,14 @@ object ProductIdentity {
 
     fun looksLikeMicrowaveCover(fingerprint: JSONObject?): Boolean {
         if (fingerprint == null) return false
-        val blob = fingerprint.toString().lowercase()
-        return blob.contains("dome") &&
-            blob.contains("rectangular") &&
+        val geometry = fingerprint.optString("overall_geometry").lowercase()
+        if (!geometry.contains("dome")) return false
+        val blob = listOf(
+            geometry,
+            fingerprint.optJSONArray("identity_critical_components")?.toString().orEmpty(),
+            fingerprint.optJSONArray("must_not_change")?.toString().orEmpty(),
+        ).joinToString(" ").lowercase()
+        return blob.contains("rectangular") &&
             blob.contains("vent") &&
             blob.contains("handle") &&
             blob.contains("green")
@@ -264,12 +269,7 @@ object ProductIdentity {
 
     fun looksLikeCookwarePan(fingerprint: JSONObject?, analysis: JSONObject? = null): Boolean {
         if (looksLikeMicrowaveCover(fingerprint)) return false
-        val blob = listOf(
-            fingerprint?.toString().orEmpty(),
-            analysis?.toString().orEmpty(),
-            analysis?.optString("product_category").orEmpty(),
-            analysis?.optString("observed_use_case").orEmpty(),
-        ).joinToString(" ").lowercase()
+        val blob = CrossProductGuard.productScopeText(fingerprint, analysis)
         if (blob.isBlank()) return false
         return blob.contains("skillet") ||
             blob.contains("saucepan") ||
@@ -288,12 +288,19 @@ object ProductIdentity {
 
     fun structuralLockBlock(fingerprint: JSONObject?): String = finalIdentityLockBlock(fingerprint)
 
-    private fun addVisibleItems(fingerprint: JSONObject?, key: String, out: MutableList<String>, skipUnconfirmed: Boolean = false) {
+    private fun addVisibleItems(
+        fingerprint: JSONObject?,
+        key: String,
+        out: MutableList<String>,
+        analysis: JSONObject? = null,
+        skipUnconfirmed: Boolean = false,
+    ) {
         val arr = fingerprint?.optJSONArray(key) ?: return
         for (i in 0 until arr.length()) {
             if (out.size >= 10) return
             val item = arr.optString(i).trim()
             if (item.isBlank() || isInternalLeak(item)) continue
+            if (CrossProductGuard.isForeignIdentityLine(item, fingerprint, analysis)) continue
             if (skipUnconfirmed && (item.contains("unconfirmed", true) || item.contains("hidden", true) || item.contains("uncertain", true))) continue
             val compact = compactFeature(item) ?: continue
             if (out.any { similarFeature(it, compact) }) continue
