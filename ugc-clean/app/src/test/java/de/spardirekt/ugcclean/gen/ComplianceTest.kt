@@ -30,6 +30,8 @@ class ComplianceTest {
     fun details_usePlanNotForeignProduct() {
         val details = Compliance.details(Fixtures.organizer, SpeechLanguage.DE)
         assertThat(details).contains("desk organizer")
+        assertThat(details).contains("First Frame")
+        assertThat(details).contains("Sichtbar:")
         assertThat(details.lowercase()).doesNotContain("microwave")
     }
 }

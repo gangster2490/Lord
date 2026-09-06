@@ -144,6 +144,7 @@ class V4AcceptanceTest {
         val prompt = PromptComposer.compose(cover, SpeechLanguage.DE)
         assertThat(prompt).contains("First uploaded photo is the First Frame")
         assertThat(prompt).contains("Recreate that exact physical product")
+        assertThat(SystemPrompts.ANALYZE).contains("ONE VIDEO = ONE DESIRE")
         assertThat(SystemPrompts.ANALYZE).contains("first photo is the First Frame")
     }
 
@@ -168,6 +169,9 @@ class V4AcceptanceTest {
         assertThat(pack).contains(result.copyPack.caption)
         assertThat(pack).contains(result.copyPack.hashtags.first())
         assertThat(pack).doesNotContain("Produkt:")
+        assertThat(record.copyAll()).contains("Produkt:")
+        assertThat(record.firstFrameUri()).isEqualTo("a")
+        assertThat(record.supportUris()).isEqualTo(listOf("b", "c"))
     }
 
     @Test

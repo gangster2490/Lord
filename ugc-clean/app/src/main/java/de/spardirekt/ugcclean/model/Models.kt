@@ -72,6 +72,37 @@ data class ProjectRecord(
             .filter { it.isNotBlank() }
             .joinToString("\n\n")
     }
+
+    fun copyAll(): String {
+        val tags = copyPack?.hashtags.orEmpty().joinToString(" ")
+        return listOf(
+            copyPack?.details.orEmpty().trim(),
+            veoPrompt.trim(),
+            copyPack?.caption.orEmpty().trim(),
+            tags,
+        ).filter { it.isNotBlank() }.joinToString("\n\n")
+    }
+
+    fun firstFrameUri(): String? = photoUris.firstOrNull()
+
+    fun supportUris(): List<String> = photoUris.drop(1).take(4)
+
+    fun advancedDetails(): String {
+        val plan = plan ?: return errorMessage ?: ""
+        return listOf(
+            "Produkt: ${plan.productName}",
+            "Kategorie: ${plan.category}",
+            "Visuell: ${plan.visibleFeatures.joinToString("; ")}",
+            "Bewegung: ${plan.movingParts.joinToString("; ")}",
+            "Nutzen: ${plan.useCase}",
+            "Kaufgrund: ${plan.desire}",
+            "Setting: ${plan.setting}",
+            "Aktion: ${plan.action}",
+            "First Frame: erstes Foto",
+            "Support: ${supportUris().size} Bilder",
+            "Sprache: ${language.name}",
+        ).joinToString("\n")
+    }
 }
 
 data class EncodedImage(

@@ -3,6 +3,7 @@ package de.spardirekt.ugcclean.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import de.spardirekt.ugcclean.R
 import de.spardirekt.ugcclean.UgcCleanApp
 import de.spardirekt.ugcclean.gen.StartGate
 import de.spardirekt.ugcclean.model.ProjectRecord
@@ -107,6 +108,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun closeResult() = _state.update { it.copy(showResult = false) }
+
+    fun showToast(message: String) = _state.update { it.copy(toast = message) }
+
+    fun markSaved() {
+        val record = _state.value.opened ?: return
+        val saved = record.copy(updatedAt = System.currentTimeMillis())
+        app.projects.save(saved)
+        _state.update {
+            it.copy(
+                opened = saved,
+                toast = getApplication<Application>().getString(R.string.project_saved),
+                history = app.projects.list(),
+            )
+        }
+    }
 
     fun deleteProject(id: String) {
         app.projects.delete(id)

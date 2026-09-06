@@ -46,20 +46,30 @@ object Compliance {
     }
 
     fun details(plan: ProductPlan, language: SpeechLanguage): String {
-        val labels = if (language == SpeechLanguage.DE) {
-            listOf("Produkt", "Kategorie", "Videoidée", "Kaufgrund", "Setting", "Aktion")
+        val visible = plan.visibleFeatures.map { it.trim() }.filter { it.isNotBlank() }.joinToString("; ")
+        return if (language == SpeechLanguage.DE) {
+            buildString {
+                appendLine("Produkt: ${plan.productName.trim()}")
+                appendLine("Kategorie: ${plan.category.trim()}")
+                appendLine("Nutzen: ${plan.useCase.trim()}")
+                if (visible.isNotBlank()) appendLine("Sichtbar: $visible")
+                appendLine("Kaufgrund: ${plan.desire.trim()}")
+                appendLine("First Frame: erstes hochgeladenes Foto")
+                appendLine("Aktion: ${plan.action.trim()}")
+                if (plan.setting.isNotBlank()) append("Setting: ${plan.setting.trim()}")
+            }.trim()
         } else {
-            listOf("Товар", "Категория", "Идея видео", "Зачем покупают", "Место", "Действие")
+            buildString {
+                appendLine("Товар: ${plan.productName.trim()}")
+                appendLine("Категория: ${plan.category.trim()}")
+                appendLine("Назначение: ${plan.useCase.trim()}")
+                if (visible.isNotBlank()) appendLine("Видно: $visible")
+                appendLine("Зачем покупают: ${plan.desire.trim()}")
+                appendLine("First Frame: первое загруженное фото")
+                appendLine("Действие: ${plan.action.trim()}")
+                if (plan.setting.isNotBlank()) append("Место: ${plan.setting.trim()}")
+            }.trim()
         }
-        val values = listOf(
-            plan.productName,
-            plan.category,
-            plan.desire,
-            plan.useCase,
-            plan.setting,
-            plan.action,
-        )
-        return labels.zip(values).joinToString("\n") { (k, v) -> "$k: ${v.trim()}" }
     }
 
     fun warnings(caption: String): List<String> {

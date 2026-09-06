@@ -91,7 +91,8 @@ class MainActivity : ComponentActivity() {
                             state.showResult && state.opened?.status == ProjectStatus.READY -> {
                                 ResultScreen(
                                     project = state.opened!!,
-                                    onCopied = {},
+                                    onCopied = vm::showToast,
+                                    onSave = { vm.markSaved() },
                                     onNewProject = { vm.newProject() },
                                     onBack = { vm.closeResult() },
                                 )

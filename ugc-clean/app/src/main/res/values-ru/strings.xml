@@ -31,8 +31,19 @@
     <string name="veo_prompt">VIDEO PROMPT</string>
     <string name="caption">CAPTION</string>
     <string name="hashtags">HASHTAGS</string>
-    <string name="copy">Копировать</string>
-    <string name="copy_package">Копировать VIDEO PACKAGE</string>
+    <string name="copy_package">COPY VIDEO PACKAGE</string>
+    <string name="copy_details">COPY DETAILS</string>
+    <string name="copy_prompt">COPY VIDEO PROMPT</string>
+    <string name="copy_caption">COPY CAPTION</string>
+    <string name="copy_hashtags">COPY HASHTAGS</string>
+    <string name="copy_all">COPY ALL</string>
+    <string name="save_project">SAVE PROJECT</string>
+    <string name="project_saved">Проект сохранён</string>
+    <string name="advanced_details">ADVANCED DETAILS</string>
+    <string name="veo_references">VEO REFERENCES</string>
+    <string name="first_frame">FIRST FRAME</string>
+    <string name="support_n">SUPPORT %1$d</string>
+    <string name="first_frame_hint">Первое фото = FIRST FRAME, дальше Support-изображения.</string>
     <string name="copied">Скопировано</string>
     <string name="new_project">Новый проект</string>
     <string name="history_empty">Пока нет проектов.</string>

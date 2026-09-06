@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -117,7 +117,7 @@ fun CreateScreen(
             userScrollEnabled = false,
             contentPadding = PaddingValues(bottom = 4.dp),
         ) {
-            items(photos, key = { it }) { uri ->
+            itemsIndexed(photos, key = { _, uri -> uri }) { index, uri ->
                 Box(
                     modifier = Modifier
                         .size(110.dp)
@@ -125,10 +125,28 @@ fun CreateScreen(
                 ) {
                     AsyncImage(
                         model = uri,
-                        contentDescription = null,
+                        contentDescription = if (index == 0) stringResource(R.string.first_frame) else null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
                     )
+                    if (index == 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .background(Accent.copy(alpha = 0.92f))
+                                .padding(vertical = 3.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                stringResource(R.string.first_frame),
+                                color = Background,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -165,6 +183,10 @@ fun CreateScreen(
             }
         }
 
+        if (photos.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.first_frame_hint), color = TextMid, fontSize = 12.sp)
+        }
         if (photos.size < StartGate.MIN_PHOTOS) {
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.need_three), color = TextDim, fontSize = 13.sp)

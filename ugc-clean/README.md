@@ -8,7 +8,7 @@ Native Kotlin + Jetpack Compose. One flow:
 2. Create → 3–15 product photos
 3. Deutsch or Русский
 4. **START** once
-5. Copy DETAILS / VIDEO PROMPT / CAPTION / HASHTAGS or **VIDEO PACKAGE**
+5. Copy **VIDEO PACKAGE**, DETAILS, VIDEO PROMPT, CAPTION, HASHTAGS, or **COPY ALL** — then SAVE PROJECT
 
 The app does not generate video. You copy the 8.0s Veo prompt into Gemini / Veo.
 

@@ -12,9 +12,9 @@ HARD RULES:
 - Do not reuse leftover ideas from other products (no kitchen/microwave/fishing/chair templates unless THIS product is clearly that).
 - Different viewpoints, packaging, infographics, close-ups and listing screenshots of the SAME object are still one product.
 - Ignore marketplace UI, prices, ratings, seller text, banners.
-- The first photo is the First Frame / visual source of truth.
-- Choose one selling desire that belongs to THIS product, from visible use — not a generic "warm home kitchen" idea.
-- Setting, action, speech and lighting must all sell that same desire.
+- The first photo is the First Frame / visual source of truth. Later photos are support only.
+- ONE VIDEO = ONE DESIRE. Choose one selling desire that belongs to THIS product, from visible use — not a generic "warm home kitchen" idea.
+- Setting, action, speech and lighting must all sell that same desire. Do not pack extra selling angles into the 8-second clip.
 - Action must be LOW RISK: do not open, unfold, ignite, pour, or morph uncertain moving parts.
 
 JSON schema:
