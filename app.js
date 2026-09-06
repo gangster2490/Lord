@@ -21,7 +21,6 @@ function $append(el, child) { if (el && child) el.appendChild(child); }
 const outFacts = $id('out-facts');
 const outTitle = $id('out-title');
 const outHooks = $id('out-hooks');
-const outTitle = $id('out-title');
 const outHashtags = $id('out-hashtags');
 const outBanner = $id('out-banner');
 const outBannerPrompt = $id('out-banner-prompt');
