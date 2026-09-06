@@ -313,10 +313,15 @@ class PipelineEngine(private val ai: PipelineAi) {
             finalIdentityLock = lock,
         )
         var prompt = ai.generatePrompt(ctx)
-        prompt = ProductLock.ensure(prompt, session.strictProductLock, fingerprint)
-        prompt = ProductLock.applyGenerator(prompt, session.targetGenerator)
-        prompt = ProductLock.normalizeSpeech(prompt, session.speechLanguage, session.hook)
-        session.finalPrompt = prompt
+        session.finalPrompt = ProductLock.finalizeClean(
+            prompt,
+            fingerprint,
+            session.targetGenerator,
+            session.speechLanguage,
+            session.hook,
+            session.strictProductLock,
+            session.analysis,
+        )
     }
 
     private fun hook(session: PipelineSession) {
@@ -332,21 +337,22 @@ class PipelineEngine(private val ai: PipelineAi) {
     private fun quality(session: PipelineSession) {
         val fingerprint = session.identityFingerprint
         var prompt = session.finalPrompt.orEmpty()
-        if (!session.repairApplied) {
-            prompt = ProductLock.repairOnce(
-                prompt,
-                fingerprint,
-                session.targetGenerator,
-                session.speechLanguage,
-                session.strictProductLock,
-            )
-            session.repairApplied = true
-        }
-        prompt = de.spardirekt.ugcagent.v3.prompt.EvidenceModel.sanitizePromptBody(prompt)
         if (session.hook.isNotBlank() && de.spardirekt.ugcagent.v3.prompt.HookEngine.isWeak(session.hook, session.speechLanguage)) {
             session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
         }
-        session.finalPrompt = ProductLock.normalizeSpeech(prompt, session.speechLanguage, session.hook)
+        if (ProductLock.hasConflictingSpokenHooks(prompt)) {
+            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
+        }
+        session.finalPrompt = ProductLock.finalizeClean(
+            prompt,
+            fingerprint,
+            session.targetGenerator,
+            session.speechLanguage,
+            session.hook,
+            session.strictProductLock,
+            session.analysis,
+        )
+        session.repairApplied = true
         ProductLock.regressionFailures(session.finalPrompt.orEmpty(), fingerprint, session.targetGenerator, session.speechLanguage).forEach {
             session.warnings.add("Prompt quality: $it")
         }
@@ -364,7 +370,15 @@ class PipelineEngine(private val ai: PipelineAi) {
             language = language,
             commercialCaption = de.spardirekt.ugcagent.v3.prompt.CaptionEngine.isCommercialLanguage(language),
         )
-        session.finalPrompt = ProductLock.normalizeSpeech(fixed.prompt, session.speechLanguage, session.hook)
+        session.finalPrompt = ProductLock.finalizeClean(
+            fixed.prompt,
+            session.identityFingerprint,
+            session.targetGenerator,
+            session.speechLanguage,
+            session.hook,
+            session.strictProductLock,
+            session.analysis,
+        )
         session.caption = fixed.caption
         session.hashtags = fixed.hashtags.toMutableList()
         session.compliance = fixed.review
@@ -432,6 +446,9 @@ class PipelineEngine(private val ai: PipelineAi) {
             .put("hashtags", de.spardirekt.ugcagent.v3.prompt.EvidenceModel.hashtagCountOk(session.hashtags))
             .put("no_hard_error", session.pausedReason == null)
             .put("speech_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.speechHeadingCount(prompt) <= 1)
+            .put("moving_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.movingLockCount(prompt) <= 1)
+            .put("duration_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.durationHeadingCount(prompt) <= 1)
+            .put("one_spoken_hook", !de.spardirekt.ugcagent.v3.prompt.ProductLock.hasConflictingSpokenHooks(prompt))
             .put("compliance_pass", session.compliance?.optString("status") != "BLOCK")
         session.selfCheck = checks
         if (!checks.optBoolean("hook")) {

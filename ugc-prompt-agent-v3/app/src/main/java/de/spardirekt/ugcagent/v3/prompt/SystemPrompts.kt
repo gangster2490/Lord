@@ -359,6 +359,7 @@ Ordinary available light.
 Natural human movement.
 
 Avoid polished studio-commercial aesthetics.
+Keep a warm, homely, lived-in kitchen UGC feeling. Cozy ordinary home, not a showroom.
 
 PHOTO SHOWS WHAT THE PRODUCT IS. PROMPT EXPLAINS WHAT HAPPENS, PLUS THE MINIMUM GEOMETRY LOCK.
 
@@ -411,20 +412,27 @@ If speech = OFF:
 Include exactly: No spoken dialogue.
 
 If German:
-The person speaks naturally in German.
-Include one short natural German spoken HOOK. Conversational problem/curiosity/friction in the first 1.5 seconds, one short sentence, no long introduction, no second sentence unless extremely short, no unsupported claims, no fake enthusiasm, no generic AI clichés. Do not overuse: krass, Leute, ehrlich gesagt, mega, Game Changer.
+The person speaks naturally in German, like chatting at home, not like a product presenter.
+Include one short warm homely spoken line. Casual, human, cozy. No robotic or overly technical voiceover. No polished commercial showroom tone. No unsupported claims. Do not overuse: krass, Leute, ehrlich gesagt, mega, Game Changer.
 Do not use purely descriptive hooks such as where a handle is placed.
+Examples of the desired tone: "Ich mag's, wenn in der Küche alles einfach bleibt." / "So was hat man gern zu Hause."
 The spoken hook begins around 0.3–0.8 seconds and must finish before the 8.0-second endpoint. No speech continuing after the main action ends.
+Include exactly one SPEECH section and exactly one spoken line.
 
 If Russian:
-The person speaks naturally in Russian.
-Include one short natural Russian spoken HOOK, not a literal translation of a German line. Problem, curiosity or relatable friction in the first 1.5 seconds. No ad-robot tone. No unknown characteristics. One short sentence; no long introduction; no speech after the main action ends.
+The person speaks naturally in Russian, like chatting in their own kitchen, not like a product presenter.
+Include one short warm homely spoken line. Casual, human, cozy. Not a literal translation of a German line. No ad-robot tone. No unknown characteristics. One short sentence.
 Do not use weak descriptive lines such as "Ручка удобно расположена сбоку."
+Prefer lines such as:
+"Люблю, когда на кухне всё просто и удобно."
+"Вот такую вещь приятно иметь дома."
+"Для кухни — очень уютная и удобная вещь."
 The spoken hook begins around 0.3–0.8 seconds and must finish before the 8.0-second endpoint.
+Include exactly one SPEECH section and exactly one spoken line.
 
-Speech may refer to action, situation, convenience, reaction. Never certifications, performance, medical, material, durability, guarantees, unknown functions.
+Speech may refer to action, situation, convenience, a homely feeling. Never certifications, performance, medical, material, durability, guarantees, unknown functions.
 
-Clarity over word count. Never omit the final identity lock. Product Lock appears ONCE plus one concise anti-morph block.
+Clarity over word count. Never omit the final identity lock. FINAL IDENTITY LOCK, MOVING COMPONENT LOCK, SPEECH and DURATION each appear exactly once. No repeated policy boilerplate.
 
 OUTPUT:
 Return only the final video-generation prompt.

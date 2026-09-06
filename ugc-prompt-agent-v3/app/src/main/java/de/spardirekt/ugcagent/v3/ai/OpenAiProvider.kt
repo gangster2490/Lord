@@ -161,11 +161,16 @@ class OpenAiProvider(
     private fun finalizePrompt(raw: String, ctx: PromptContext): String {
         var prompt = raw.trim().removePrefix("```").removeSuffix("```").trim()
         val fingerprint = try { JSONObject(ctx.fingerprint) } catch (_: Exception) { null }
-        prompt = ProductLock.ensure(prompt, ctx.strictProductLock, fingerprint)
-        prompt = ProductLock.applyGenerator(prompt, ctx.targetGenerator)
-        prompt = ProductLock.ensureSpeechTiming(prompt, ctx.speechLanguage)
-        prompt = ProductLock.repairOnce(prompt, fingerprint, ctx.targetGenerator, ctx.speechLanguage, ctx.strictProductLock)
-        return prompt
+        val analysis = try { JSONObject(ctx.analysis) } catch (_: Exception) { null }
+        return ProductLock.finalizeClean(
+            prompt,
+            fingerprint,
+            ctx.targetGenerator,
+            ctx.speechLanguage,
+            hook = null,
+            lockOn = ctx.strictProductLock,
+            analysis = analysis,
+        )
     }
 
     private fun userContext(ctx: PromptContext): String = buildString {

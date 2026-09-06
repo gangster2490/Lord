@@ -150,7 +150,7 @@ object EvidenceModel {
 
     fun sanitizePromptBody(prompt: String): String {
         val speech = Regex(
-            "(?is)(?:^|\\n)SPEECH:\\s*.*?(?=\\n(?:FORMAT|REFERENCE|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|ANTI-MORPH|DURATION|Target generator)\\b|$)",
+            "(?is)(?:^|\\n)SPEECH:\\s*.*?(?=\\n(?:FORMAT|REFERENCE|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|ANTI-MORPH|DURATION|STYLE|Target generator)\\b|$)",
         )
         val speechBlocks = speech.findAll(prompt).map { it.value }.toList()
         var body = speech.replace(prompt, "\n")

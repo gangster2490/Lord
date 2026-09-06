@@ -38,6 +38,12 @@ class PipelineEngineTest {
         assertFalse(result.caption.orEmpty().contains("BPA"))
         assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.speechHeadingCount(result.finalPrompt.orEmpty()))
         assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.speechEndTimingCount(result.finalPrompt.orEmpty()))
+        assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.identityLockCount(result.finalPrompt.orEmpty()))
+        assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.movingLockCount(result.finalPrompt.orEmpty()))
+        assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.durationHeadingCount(result.finalPrompt.orEmpty()))
+        assertFalse(de.spardirekt.ugcagent.v3.prompt.ProductLock.hasConflictingSpokenHooks(result.finalPrompt.orEmpty()))
+        assertTrue(result.hook.contains("mag") || result.hook.contains("Hause") || result.hook.contains("gemütlich") || result.hook.contains("Küche"))
+        assertTrue(result.finalPrompt.orEmpty().contains("Warm, homely") || result.finalPrompt.orEmpty().contains("STYLE:"))
     }
 
     @Test

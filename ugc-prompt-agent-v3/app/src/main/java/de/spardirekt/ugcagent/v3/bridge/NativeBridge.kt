@@ -329,12 +329,14 @@ class NativeBridge(
         project.identityReadiness = ProductIdentity.mergeReadiness(localReady, aiReady)
         persist()
         val prompt = provider().generateVideoPrompt(apiKey(), imagesForPrompt(), ctx())
-        project.finalPrompt = ProductLock.repairOnce(
+        project.finalPrompt = ProductLock.finalizeClean(
             prompt,
             fingerprint,
             project.targetGenerator,
             project.speechLanguage,
+            project.hook,
             project.strictProductLock,
+            project.analysis,
         )
         project.repairApplied = true
         persist()
@@ -392,10 +394,14 @@ class NativeBridge(
             language = language,
             commercialCaption = de.spardirekt.ugcagent.v3.prompt.CaptionEngine.isCommercialLanguage(language),
         )
-        project.finalPrompt = de.spardirekt.ugcagent.v3.prompt.ProductLock.normalizeSpeech(
+        project.finalPrompt = de.spardirekt.ugcagent.v3.prompt.ProductLock.finalizeClean(
             fixed.prompt,
+            project.identityFingerprint,
+            project.targetGenerator,
             project.speechLanguage,
             project.hook,
+            project.strictProductLock,
+            project.analysis,
         )
         project.caption = fixed.caption
         project.hashtags = fixed.hashtags.toMutableList()

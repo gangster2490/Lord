@@ -12,19 +12,27 @@ class HookEngineTest {
     }
 
     @Test
-    fun microwaveRussianHookIsStrong() {
+    fun kitchenRussianHookIsWarmAndHomely() {
         val analysis = JSONObject().put("observed_use_case", "microwave cover").put("product_category", "kitchen")
         val hook = HookEngine.generate(analysis, "РУССКИЙ")
         assertFalse(HookEngine.isWeak(hook, "РУССКИЙ"))
-        assertTrue(hook.contains("микроволн") || hook.contains("брызг") || hook.contains("вытир") || hook.contains("Надоело"))
+        assertTrue(HookEngine.isWarm(hook, "РУССКИЙ"))
+        assertTrue(
+            hook.contains("просто и удобно") ||
+                hook.contains("приятно иметь дома") ||
+                hook.contains("уютн") ||
+                hook.contains("Люблю"),
+        )
         assertTrue(HookEngine.qualityScore(hook, "РУССКИЙ") >= 0.7)
     }
 
     @Test
-    fun germanHookHasFriction() {
+    fun germanKitchenHookIsWarmNotPresenter() {
         val analysis = JSONObject().put("observed_use_case", "cover food").put("product_category", "kitchen")
         val hook = HookEngine.generate(analysis, "DEUTSCH")
         assertFalse(HookEngine.isWeak(hook, "DEUTSCH"))
-        assertTrue(hook.contains("?") || hook.contains("Wenn") || hook.contains("Deshalb") || hook.contains("Lust"))
+        assertTrue(HookEngine.isWarm(hook, "DEUTSCH"))
+        assertFalse(hook.contains("Produktpresenter", ignoreCase = true))
+        assertTrue(hook.contains("Küche") || hook.contains("Hause") || hook.contains("gemütlich") || hook.contains("mag"))
     }
 }
