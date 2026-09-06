@@ -1,1 +1,4 @@
 .claude/
+
+# Node dependencies (installed by the Cloud Agent environment `install` step)
+node_modules/
