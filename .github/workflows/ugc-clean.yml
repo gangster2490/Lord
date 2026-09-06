@@ -40,6 +40,7 @@ jobs:
           grep -q 'INTERNET' "$ROOT/AndroidManifest.xml"
           test -f "$ROOT/java/de/spardirekt/ugcclean/gen/PromptComposer.kt"
           test -f "$ROOT/java/de/spardirekt/ugcclean/MainActivity.kt"
+          test -f ugc-clean/app/src/test/java/de/spardirekt/ugcclean/gen/V4AcceptanceTest.kt
           if grep -R -n --include='*.kt' --include='*.js' --include='*.html' 'localStorage.getItem' "$ROOT"; then
             echo "SOURCE AUDIT FAIL: localStorage"; exit 1
           fi
