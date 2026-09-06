@@ -141,7 +141,7 @@ private fun HistoryCard(entry: HistoryEntry, onEvent: (StudioEvent) -> Unit) {
                 tint = TextMid,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable { onEvent(StudioEvent.DeleteHistory(entry.id)) }
+                    .clickable { onEvent(StudioEvent.RequestDeleteHistory(entry.id)) }
                     .padding(6.dp)
                     .size(18.dp),
             )

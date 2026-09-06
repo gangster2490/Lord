@@ -23,6 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,9 +80,10 @@ fun ChoiceChip(
     accent: Color = Magenta,
     onClick: () -> Unit,
 ) {
-    val bg = if (selected) accent.copy(alpha = 0.18f) else Surface2
-    val border = if (selected) accent.copy(alpha = 0.7f) else Hairline
-    val fg = if (selected) TextPrimary else TextMid
+    val isSelected = selected
+    val bg = if (isSelected) accent.copy(alpha = 0.18f) else Surface2
+    val border = if (isSelected) accent.copy(alpha = 0.7f) else Hairline
+    val fg = if (isSelected) TextPrimary else TextMid
     Text(
         text = label,
         modifier = Modifier
@@ -85,10 +91,14 @@ fun ChoiceChip(
             .background(bg)
             .border(1.dp, border, ChipShape)
             .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                role = Role.RadioButton
+                this.selected = isSelected
+            }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         color = fg,
         fontSize = 13.sp,
-        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
     )
 }
 
@@ -195,6 +205,10 @@ fun RowScope.PrimaryAction(
             )
             .border(1.dp, if (enabled) MagentaBorder else Hairline, shape)
             .clickable(enabled = enabled && !loading, onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                if (!enabled || loading) disabled()
+            }
             .padding(vertical = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -208,14 +222,17 @@ fun RowScope.PrimaryAction(
 }
 
 @Composable
-fun ErrorBanner(message: String, onDismiss: () -> Unit) {
+fun ErrorBanner(
+    message: String,
+    onRetry: (() -> Unit)? = null,
+    onDismiss: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(de.spardirekt.clipforge.ui.theme.ErrorBg)
             .border(1.dp, de.spardirekt.clipforge.ui.theme.ErrorBorder, RoundedCornerShape(12.dp))
-            .clickable(onClick = onDismiss)
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -225,7 +242,27 @@ fun ErrorBanner(message: String, onDismiss: () -> Unit) {
             fontSize = 13.sp,
             modifier = Modifier.weight(1f),
         )
-        Text("✕", color = TextMid, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
+        if (onRetry != null) {
+            Text(
+                "Ещё раз",
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onRetry)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        }
+        Text(
+            "✕",
+            color = TextMid,
+            fontSize = 12.sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onDismiss)
+                .padding(start = 8.dp),
+        )
     }
 }
 

@@ -1,5 +1,6 @@
 package de.spardirekt.clipforge.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -21,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import de.spardirekt.clipforge.ui.components.ConfirmDestructiveDialog
 import de.spardirekt.clipforge.ui.create.StudioScreen
 import de.spardirekt.clipforge.ui.history.HistoryScreen
 import de.spardirekt.clipforge.ui.result.ResultScreen
@@ -39,6 +41,10 @@ fun ClipForgeApp(
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(state.copiedLabel) {
         state.copiedLabel?.let { snackbar.showSnackbar(it) }
+    }
+
+    BackHandler(enabled = state.showResult) {
+        onEvent(StudioEvent.CloseResult)
     }
 
     Scaffold(
@@ -84,6 +90,38 @@ fun ClipForgeApp(
                 else -> StudioScreen(state, onEvent)
             }
         }
+    }
+
+    when (val pending = state.pendingConfirm) {
+        PendingConfirm.NewProject -> ConfirmDestructiveDialog(
+            title = "Новый проект?",
+            message = "Фото и текущий пакет на экране сбросятся. Архив не трогаем.",
+            confirmLabel = "Сбросить",
+            onConfirm = { onEvent(StudioEvent.ConfirmPending) },
+            onDismiss = { onEvent(StudioEvent.DismissConfirm) },
+        )
+        PendingConfirm.ClearKey -> ConfirmDestructiveDialog(
+            title = "Удалить ключ?",
+            message = "Ключ сотрётся с устройства. Без ключа или sk-demo генерация недоступна.",
+            confirmLabel = "Удалить",
+            onConfirm = { onEvent(StudioEvent.ConfirmPending) },
+            onDismiss = { onEvent(StudioEvent.DismissConfirm) },
+        )
+        PendingConfirm.ClearArchive -> ConfirmDestructiveDialog(
+            title = "Очистить архив?",
+            message = "Все сохранённые пакеты и превью будут удалены. Отменить нельзя.",
+            confirmLabel = "Очистить",
+            onConfirm = { onEvent(StudioEvent.ConfirmPending) },
+            onDismiss = { onEvent(StudioEvent.DismissConfirm) },
+        )
+        is PendingConfirm.DeleteHistory -> ConfirmDestructiveDialog(
+            title = "Удалить пакет?",
+            message = "«${pending.name}» исчезнет из архива.",
+            confirmLabel = "Удалить",
+            onConfirm = { onEvent(StudioEvent.ConfirmPending) },
+            onDismiss = { onEvent(StudioEvent.DismissConfirm) },
+        )
+        null -> Unit
     }
 }
 

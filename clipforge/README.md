@@ -4,10 +4,12 @@
 
 ClipForge **не рендерит видеофайл**. Он собирает продакшн-пакет: хуки, подпись, хештеги, раскадровку, voiceover и готовый промпт **Veo 3.1**, который копируется в Gemini / Veo.
 
-| Поле | Значение |
+## Version
+
+| Field | Value |
 |---|---|
 | applicationId | `de.spardirekt.clipforge` |
-| versionName | `1.0.0` |
+| versionName | `1.1.0` |
 | minSdk | 26 |
 | targetSdk | 35 |
 
@@ -22,6 +24,8 @@ ClipForge **не рендерит видеофайл**. Он собирает п
 - Язык ролика: RU / DE / EN (Veo-промпт всегда на английском)
 - Архив готовых пакетов на устройстве
 - Демо без сети: ключ `sk-demo`
+- Ключ OpenAI в EncryptedSharedPreferences
+- Подтверждение опасных действий, Share, отмена генерации
 
 Правила пакета:
 
@@ -51,7 +55,7 @@ Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
 3. **Собрать ролик** → экран пакета.
 4. Скопируйте Veo-пакет в Gemini / Veo, подпись — в TikTok / Reels / Shorts.
 
-Модель по умолчанию: `gpt-4o` (vision). Ключ хранится локально в DataStore.
+Модель по умолчанию: `gpt-4o` (vision). Ключ хранится локально в EncryptedSharedPreferences.
 
 ## Тесты
 
@@ -60,4 +64,4 @@ cd clipforge
 ./gradlew testDebugUnitTest
 ```
 
-Покрыты: системный промпт, парсер JSON, лимиты площадок, CTA, демо-генератор, масштабирование фото.
+Покрыты: системный промпт, парсер JSON, лимиты площадок, CTA, замок Veo, раскадровка, демо-генератор, масштабирование фото.

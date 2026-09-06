@@ -38,6 +38,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -207,34 +211,51 @@ fun StudioScreen(
                 )
             }
 
-            state.error?.let { ErrorBanner(it) { onEvent(StudioEvent.DismissError) } }
-            if (state.apiKey.isBlank()) {
-                Text(
-                    text = "Чтобы генерировать, вставьте OpenAI ключ в Настройках или sk-demo для офлайн-пакета.",
-                    color = TextMid,
+            state.error?.let {
+                ErrorBanner(
+                    message = it,
+                    onRetry = { onEvent(StudioEvent.Generate) },
+                ) { onEvent(StudioEvent.DismissError) }
+            }
+            when {
+                state.isDemo -> Text(
+                    "Демо-режим: пакет соберётся локально, без сети.",
+                    color = Cyan,
                     fontSize = 12.sp,
                 )
-            } else if (state.isDemo) {
-                Text(
-                    text = "Демо-режим: пакет соберётся локально, без сети.",
-                    color = Cyan,
+                state.generateBlockedReason != null -> Text(
+                    state.generateBlockedReason!!,
+                    color = TextMid,
                     fontSize = 12.sp,
                 )
             }
         }
 
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         ) {
-            PrimaryAction(
-                enabled = state.canGenerate,
-                loading = state.isGenerating,
-                label = "Собрать ролик",
-                loadingLabel = "Собираю раскадровку…",
-                onClick = { onEvent(StudioEvent.Generate) },
-            )
+            Row {
+                PrimaryAction(
+                    enabled = state.canGenerate,
+                    loading = state.isGenerating,
+                    label = "Собрать ролик",
+                    loadingLabel = state.generateStage ?: "Собираю раскадровку…",
+                    onClick = { onEvent(StudioEvent.Generate) },
+                )
+            }
+            if (state.isGenerating) {
+                Text(
+                    text = "Отменить",
+                    color = TextMid,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .clickable { onEvent(StudioEvent.CancelGenerate) }
+                        .testTag("cancel_generate"),
+                )
+            }
         }
     }
 }
@@ -250,7 +271,7 @@ private fun PhotoStrip(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        photos.forEach { photo ->
+        photos.forEachIndexed { index, photo ->
             Box(
                 modifier = Modifier
                     .size(84.dp)
@@ -259,7 +280,7 @@ private fun PhotoStrip(
             ) {
                 AsyncImage(
                     model = photo.uri,
-                    contentDescription = photo.fileName ?: "Фото товара",
+                    contentDescription = "Фото товара ${index + 1}",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
@@ -275,7 +296,7 @@ private fun PhotoStrip(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Close,
-                        contentDescription = "Удалить фото",
+                        contentDescription = "Удалить фото ${index + 1}",
                         tint = TextPrimary,
                         modifier = Modifier.size(12.dp),
                     )
@@ -317,7 +338,8 @@ private fun PlatformRow(
                 Platform.REELS -> "CTA в профиле · эстетичная подпись"
                 Platform.SHORTS -> "CTA в описании · короткий заголовок"
             }
-            val selectedBg = if (selected == platform) accent.copy(alpha = 0.14f) else Surface2
+            val isChosen = selected == platform
+            val selectedBg = if (isChosen) accent.copy(alpha = 0.14f) else Surface2
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -325,10 +347,14 @@ private fun PlatformRow(
                     .background(selectedBg)
                     .border(
                         1.dp,
-                        if (selected == platform) accent.copy(alpha = 0.7f) else Hairline,
+                        if (isChosen) accent.copy(alpha = 0.7f) else Hairline,
                         RoundedCornerShape(12.dp),
                     )
                     .clickable { onSelect(platform) }
+                    .semantics(mergeDescendants = true) {
+                        role = Role.RadioButton
+                        this.selected = isChosen
+                    }
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

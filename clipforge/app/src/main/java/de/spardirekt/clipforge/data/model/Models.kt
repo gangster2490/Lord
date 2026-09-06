@@ -268,26 +268,6 @@ fun AdPackage.copyAll(
     appendLine(thumbnailPrompt)
 }
 
-fun AdPackage.guarded(brief: GenerateBrief): AdPackage {
-    val cta = this.cta.ifBlank { brief.platform.canonicalCta(brief.language) }
-    val hooks = hooks.map { it.trim() }.filter { it.isNotEmpty() }.take(5)
-    val hashtags = hashtags.map { normalizeHashtag(it) }.filter { it.isNotEmpty() }
-        .distinct()
-        .take(brief.platform.hashtagCount)
-    val caption = caption.trim().take(brief.platform.captionMax)
-    val overlays = onScreenTexts.map { it.trim().take(brief.platform.overlayMax) }
-        .filter { it.isNotEmpty() }
-    val veo = ensureVeoDuration(veoPrompt, brief.length, brief.platform)
-    return copy(
-        hooks = hooks,
-        caption = caption,
-        hashtags = hashtags,
-        onScreenTexts = overlays,
-        cta = cta,
-        veoPrompt = veo,
-    )
-}
-
 fun normalizeHashtag(raw: String): String {
     val trimmed = raw.trim()
     if (trimmed.isEmpty()) return ""

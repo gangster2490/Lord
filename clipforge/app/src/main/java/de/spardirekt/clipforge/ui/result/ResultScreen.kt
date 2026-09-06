@@ -92,7 +92,7 @@ fun ResultScreen(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable { onEvent(StudioEvent.NewProject) }
+                    .clickable { onEvent(StudioEvent.RequestNewProject) }
                     .padding(8.dp),
             )
         }
@@ -102,7 +102,7 @@ fun ResultScreen(
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp)
-                .padding(bottom = 16.dp),
+                .padding(bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             state.error?.let { ErrorBanner(it) { onEvent(StudioEvent.DismissError) } }
@@ -216,12 +216,20 @@ fun ResultScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(ad.thumbnailPrompt, color = TextPrimary, fontSize = 14.sp, lineHeight = 20.sp)
             }
+        }
 
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                ActionButton("Подпись", Modifier.weight(1f)) { onEvent(StudioEvent.CopyCaption) }
-                ActionButton("Veo пакет", Modifier.weight(1f)) { onEvent(StudioEvent.CopyVeo) }
+                ActionButton("Veo пакет", Modifier.weight(1f), Magenta) { onEvent(StudioEvent.CopyVeo) }
+                ActionButton("Поделиться", Modifier.weight(1f)) { onEvent(StudioEvent.ShareVeo) }
             }
-            ActionButton("Скопировать всё", Modifier.fillMaxWidth(), Magenta) {
+            ActionButton("Скопировать всё", Modifier.fillMaxWidth()) {
                 onEvent(StudioEvent.CopyAll)
             }
         }

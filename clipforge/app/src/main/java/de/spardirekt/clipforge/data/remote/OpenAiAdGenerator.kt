@@ -3,9 +3,11 @@ package de.spardirekt.clipforge.data.remote
 import de.spardirekt.clipforge.data.model.AdPackage
 import de.spardirekt.clipforge.data.model.EncodedImage
 import de.spardirekt.clipforge.data.model.GenerateBrief
+import de.spardirekt.clipforge.data.model.PackageGuard
 import de.spardirekt.clipforge.data.model.guarded
 import de.spardirekt.clipforge.data.prompt.AdSystemPrompt
 import de.spardirekt.clipforge.data.prompt.asUserMessage
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -37,6 +39,29 @@ class OpenAiAdGenerator(
         if (key.isEmpty()) {
             throw GenerateException("Добавьте OpenAI ключ в Настройках.")
         }
+
+        var lastError: GenerateException? = null
+        repeat(MAX_ATTEMPTS) { attempt ->
+            try {
+                val content = executeChat(key, images, brief)
+                if (content.isBlank()) {
+                    throw GenerateException("Пустой ответ модели.")
+                }
+                return parseAdPackage(content, json).guarded(brief)
+            } catch (e: GenerateException) {
+                lastError = e
+                if (!isRetryable(e) || attempt == MAX_ATTEMPTS - 1) throw e
+                delay(1200L * (attempt + 1))
+            }
+        }
+        throw lastError ?: GenerateException("OpenAI недоступен.")
+    }
+
+    private fun executeChat(
+        key: String,
+        images: List<EncodedImage>,
+        brief: GenerateBrief,
+    ): String {
 
         val userContent = buildJsonArray {
             add(
@@ -109,11 +134,14 @@ class OpenAiAdGenerator(
             throw GenerateException("OpenAI недоступен. ${e.message ?: ""}".trim())
         }
 
-        val content = extractMessageContent(body)
-        if (content.isBlank()) {
-            throw GenerateException("Пустой ответ модели.")
-        }
-        return parseAdPackage(content, json).guarded(brief)
+        return extractMessageContent(body)
+    }
+
+    private fun isRetryable(error: GenerateException): Boolean {
+        val message = error.message.orEmpty()
+        if (message.contains("недоступен", ignoreCase = true)) return true
+        val code = Regex("""Ошибка API (\d+)""").find(message)?.groupValues?.get(1)?.toIntOrNull()
+        return code != null && PackageGuard.isRetryableHttp(code)
     }
 
     fun testConnection(apiKey: String): String {
@@ -155,6 +183,7 @@ class OpenAiAdGenerator(
 
     companion object {
         const val DEFAULT_MODEL = "gpt-4o"
+        private const val MAX_ATTEMPTS = 3
         private const val CHAT_URL = "https://api.openai.com/v1/chat/completions"
         private val JSON = "application/json; charset=utf-8".toMediaType()
 

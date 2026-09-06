@@ -4,12 +4,15 @@ import android.app.Application
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import de.spardirekt.clipforge.data.image.ImageEncoder
 import de.spardirekt.clipforge.data.local.HistoryStore
+import de.spardirekt.clipforge.data.local.PhotoStore
+import de.spardirekt.clipforge.data.local.SecureApiKeyStore
 import de.spardirekt.clipforge.data.local.SettingsStore
 import de.spardirekt.clipforge.data.model.AdFormula
 import de.spardirekt.clipforge.data.model.AdLanguage
@@ -29,7 +32,9 @@ import de.spardirekt.clipforge.data.remote.GenerateException
 import de.spardirekt.clipforge.data.remote.OpenAiAdGenerator
 import de.spardirekt.clipforge.data.remote.adGeneratorFor
 import de.spardirekt.clipforge.data.remote.isDemoKey
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +45,13 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 
 enum class Tab { STUDIO, ARCHIVE, SETTINGS }
+
+sealed interface PendingConfirm {
+    data object NewProject : PendingConfirm
+    data object ClearKey : PendingConfirm
+    data object ClearArchive : PendingConfirm
+    data class DeleteHistory(val id: String, val name: String) : PendingConfirm
+}
 
 data class StudioUiState(
     val tab: Tab = Tab.STUDIO,
@@ -54,6 +66,7 @@ data class StudioUiState(
     val language: AdLanguage = AdLanguage.RU,
     val wish: String = "",
     val isGenerating: Boolean = false,
+    val generateStage: String? = null,
     val isTestingKey: Boolean = false,
     val error: String? = null,
     val settingsMessage: String? = null,
@@ -61,9 +74,18 @@ data class StudioUiState(
     val resultId: String? = null,
     val history: List<HistoryEntry> = emptyList(),
     val copiedLabel: String? = null,
+    val pendingConfirm: PendingConfirm? = null,
 ) {
     val canGenerate: Boolean
         get() = !isGenerating && apiKey.isNotBlank() && photos.isNotEmpty()
+
+    val generateBlockedReason: String?
+        get() = when {
+            isGenerating -> null
+            apiKey.isBlank() -> "Нужен ключ в Настройках или sk-demo"
+            photos.isEmpty() -> "Добавьте хотя бы одно фото товара"
+            else -> null
+        }
 
     val isDemo: Boolean
         get() = isDemoKey(apiKey)
@@ -83,11 +105,11 @@ data class StudioUiState(
 sealed interface StudioEvent {
     data class OpenTab(val tab: Tab) : StudioEvent
     data object CloseResult : StudioEvent
-    data object NewProject : StudioEvent
+    data object RequestNewProject : StudioEvent
     data class ApiKeyChanged(val value: String) : StudioEvent
     data object ToggleApiKeyVisibility : StudioEvent
     data object SaveApiKey : StudioEvent
-    data object ClearApiKey : StudioEvent
+    data object RequestClearApiKey : StudioEvent
     data object TestApiKey : StudioEvent
     data class PhotosPicked(val uris: List<Uri>, val names: List<String?>) : StudioEvent
     data class PhotoRemoved(val uri: String) : StudioEvent
@@ -99,29 +121,34 @@ sealed interface StudioEvent {
     data class LanguageChanged(val value: AdLanguage) : StudioEvent
     data class WishChanged(val value: String) : StudioEvent
     data object Generate : StudioEvent
+    data object CancelGenerate : StudioEvent
     data object DismissError : StudioEvent
     data class Copy(val text: String, val label: String) : StudioEvent
     data object CopyCaption : StudioEvent
     data object CopyVeo : StudioEvent
     data object CopyAll : StudioEvent
+    data object ShareVeo : StudioEvent
+    data object ShareAll : StudioEvent
     data class OpenHistory(val id: String) : StudioEvent
-    data class DeleteHistory(val id: String) : StudioEvent
+    data class RequestDeleteHistory(val id: String) : StudioEvent
+    data object RequestClearArchive : StudioEvent
+    data object ConfirmPending : StudioEvent
+    data object DismissConfirm : StudioEvent
 }
 
 class StudioViewModel(
     private val app: Application,
     private val settings: SettingsStore,
+    private val keys: SecureApiKeyStore,
     private val history: HistoryStore,
     private val liveGenerator: AdGenerator = OpenAiAdGenerator(),
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(StudioUiState())
+    private val _state = MutableStateFlow(StudioUiState(apiKey = keys.getKey()))
     val state: StateFlow<StudioUiState> = _state.asStateFlow()
+    private var generateJob: Job? = null
 
     init {
-        viewModelScope.launch {
-            settings.apiKey.collect { key -> _state.update { it.copy(apiKey = key) } }
-        }
         viewModelScope.launch {
             settings.platformId.collect { id ->
                 _state.update { it.copy(platform = Platform.fromId(id)) }
@@ -156,35 +183,20 @@ class StudioViewModel(
         when (event) {
             is StudioEvent.OpenTab -> _state.update { it.copy(tab = event.tab, showResult = false) }
             StudioEvent.CloseResult -> _state.update { it.copy(showResult = false) }
-            StudioEvent.NewProject -> _state.update {
-                it.copy(
-                    showResult = false,
-                    tab = Tab.STUDIO,
-                    result = null,
-                    resultId = null,
-                    error = null,
-                    photos = emptyList(),
-                    wish = "",
-                )
-            }
+            StudioEvent.RequestNewProject -> _state.update { it.copy(pendingConfirm = PendingConfirm.NewProject) }
             is StudioEvent.ApiKeyChanged -> _state.update {
                 it.copy(apiKey = event.value, error = null, settingsMessage = null)
             }
             StudioEvent.ToggleApiKeyVisibility -> _state.update { it.copy(showApiKey = !it.showApiKey) }
-            StudioEvent.SaveApiKey -> viewModelScope.launch {
-                settings.setApiKey(_state.value.apiKey)
-                flashSettings("Ключ сохранён на этом устройстве.")
+            StudioEvent.SaveApiKey -> {
+                keys.saveKey(_state.value.apiKey)
+                flashSettings("Ключ сохранён в защищённом хранилище.")
             }
-            StudioEvent.ClearApiKey -> viewModelScope.launch {
-                settings.setApiKey("")
-                _state.update { it.copy(apiKey = "", settingsMessage = "Ключ удалён.") }
-            }
+            StudioEvent.RequestClearApiKey -> _state.update { it.copy(pendingConfirm = PendingConfirm.ClearKey) }
             StudioEvent.TestApiKey -> testKey()
             is StudioEvent.PhotosPicked -> onPhotosPicked(event.uris, event.names)
-            is StudioEvent.PhotoRemoved -> _state.update { current ->
-                current.copy(photos = current.photos.filterNot { it.uri == event.uri })
-            }
-            StudioEvent.ClearPhotos -> _state.update { it.copy(photos = emptyList()) }
+            is StudioEvent.PhotoRemoved -> removePhoto(event.uri)
+            StudioEvent.ClearPhotos -> clearStudioPhotos()
             is StudioEvent.PlatformChanged -> {
                 _state.update { it.copy(platform = event.value) }
                 viewModelScope.launch { settings.setPlatform(event.value) }
@@ -207,6 +219,7 @@ class StudioViewModel(
             }
             is StudioEvent.WishChanged -> _state.update { it.copy(wish = event.value.take(280)) }
             StudioEvent.Generate -> generate()
+            StudioEvent.CancelGenerate -> cancelGenerate()
             StudioEvent.DismissError -> _state.update { it.copy(error = null) }
             is StudioEvent.Copy -> copy(event.text, event.label)
             StudioEvent.CopyCaption -> _state.value.result?.let {
@@ -219,27 +232,71 @@ class StudioViewModel(
                 val s = _state.value
                 copy(ad.copyAll(s.platform, s.length, s.formula, s.language), "Весь пакет скопирован")
             }
+            StudioEvent.ShareVeo -> _state.value.result?.let {
+                share(it.copyVeoPack(_state.value.length), "ClipForge Veo")
+            }
+            StudioEvent.ShareAll -> _state.value.result?.let { ad ->
+                val s = _state.value
+                share(ad.copyAll(s.platform, s.length, s.formula, s.language), "ClipForge пакет")
+            }
             is StudioEvent.OpenHistory -> openHistory(event.id)
-            is StudioEvent.DeleteHistory -> viewModelScope.launch { history.remove(event.id) }
+            is StudioEvent.RequestDeleteHistory -> {
+                val entry = _state.value.history.firstOrNull { it.id == event.id } ?: return
+                _state.update {
+                    it.copy(pendingConfirm = PendingConfirm.DeleteHistory(entry.id, entry.productName))
+                }
+            }
+            StudioEvent.RequestClearArchive -> _state.update {
+                it.copy(pendingConfirm = PendingConfirm.ClearArchive)
+            }
+            StudioEvent.ConfirmPending -> confirmPending()
+            StudioEvent.DismissConfirm -> _state.update { it.copy(pendingConfirm = null) }
+        }
+    }
+
+    private fun confirmPending() {
+        val pending = _state.value.pendingConfirm ?: return
+        _state.update { it.copy(pendingConfirm = null) }
+        when (pending) {
+            PendingConfirm.NewProject -> resetProject()
+            PendingConfirm.ClearKey -> {
+                keys.removeKey()
+                _state.update { it.copy(apiKey = "", settingsMessage = "Ключ удалён.") }
+            }
+            PendingConfirm.ClearArchive -> viewModelScope.launch {
+                history.clear()
+                PhotoStore.clearThumbs(app)
+            }
+            is PendingConfirm.DeleteHistory -> viewModelScope.launch {
+                history.remove(pending.id)
+                PhotoStore.deleteThumb(app, pending.id)
+            }
+        }
+    }
+
+    private fun resetProject() {
+        clearStudioPhotos()
+        _state.update {
+            it.copy(
+                showResult = false,
+                tab = Tab.STUDIO,
+                result = null,
+                resultId = null,
+                error = null,
+                wish = "",
+                generateStage = null,
+            )
         }
     }
 
     private fun onPhotosPicked(uris: List<Uri>, names: List<String?>) {
         val existing = _state.value.photos.map { it.uri }.toSet()
         val added = uris.mapIndexedNotNull { index, uri ->
-            val value = uri.toString()
-            if (value in existing) {
+            val persisted = PhotoStore.persistPicked(app, uri)
+            if (persisted in existing) {
                 null
             } else {
-                try {
-                    app.contentResolver.takePersistableUriPermission(
-                        uri,
-                        android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                    )
-                } catch (_: SecurityException) {
-                    // Photo picker URIs are readable for the current session.
-                }
-                ProductPhoto(uri = value, fileName = names.getOrNull(index))
+                ProductPhoto(uri = persisted, fileName = names.getOrNull(index))
             }
         }
         _state.update { current ->
@@ -250,54 +307,99 @@ class StudioViewModel(
         }
     }
 
+    private fun removePhoto(uri: String) {
+        PhotoStore.deleteLocal(app, uri)
+        _state.update { current ->
+            current.copy(photos = current.photos.filterNot { it.uri == uri })
+        }
+    }
+
+    private fun clearStudioPhotos() {
+        _state.value.photos.forEach { PhotoStore.deleteLocal(app, it.uri) }
+        _state.update { it.copy(photos = emptyList()) }
+    }
+
     private fun generate() {
         val current = _state.value
         val problem = validateGenerate(current.apiKey, current.photos.size)
         if (problem != null) {
-            _state.update { it.copy(error = problem, tab = Tab.STUDIO) }
+            _state.update { it.copy(error = problem, tab = Tab.STUDIO, showResult = false) }
             return
         }
-        viewModelScope.launch {
-            _state.update { it.copy(isGenerating = true, error = null, copiedLabel = null) }
+        generateJob?.cancel()
+        generateJob = viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    isGenerating = true,
+                    generateStage = "Читаю фото…",
+                    error = null,
+                    copiedLabel = null,
+                )
+            }
             try {
                 val images = current.photos.map { photo ->
                     withContext(Dispatchers.IO) {
                         ImageEncoder.encode(app, Uri.parse(photo.uri))
                     }
                 }
+                _state.update { it.copy(generateStage = "Собираю ролик…") }
                 val generator = adGeneratorFor(current.apiKey, liveGenerator)
                 val result = withContext(Dispatchers.IO) {
                     generator.generate(current.apiKey, images, current.brief)
                 }
+                _state.update { it.copy(generateStage = "Сохраняю пакет…") }
+                val id = UUID.randomUUID().toString()
+                val thumb = current.photos.firstOrNull()?.let { photo ->
+                    PhotoStore.persistThumb(app, id, Uri.parse(photo.uri))
+                }
                 val entry = HistoryEntry(
-                    id = UUID.randomUUID().toString(),
+                    id = id,
                     createdAt = System.currentTimeMillis(),
                     platformId = current.platform.id,
                     lengthSeconds = current.length.seconds,
                     formulaId = current.formula.id,
                     languageId = current.language.id,
                     productName = result.product.name,
-                    thumbnailUri = current.photos.firstOrNull()?.uri,
+                    thumbnailUri = thumb,
                     ad = result,
                 )
                 history.upsert(entry)
                 _state.update {
                     it.copy(
                         isGenerating = false,
+                        generateStage = null,
                         result = result,
                         resultId = entry.id,
                         showResult = true,
                         tab = Tab.STUDIO,
                     )
                 }
+            } catch (e: CancellationException) {
+                _state.update {
+                    it.copy(isGenerating = false, generateStage = null)
+                }
+                throw e
             } catch (e: GenerateException) {
-                _state.update { it.copy(isGenerating = false, error = e.message, showResult = false) }
+                _state.update {
+                    it.copy(isGenerating = false, generateStage = null, error = e.message, showResult = false)
+                }
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(isGenerating = false, error = e.message ?: "Неизвестная ошибка.", showResult = false)
+                    it.copy(
+                        isGenerating = false,
+                        generateStage = null,
+                        error = e.message ?: "Неизвестная ошибка.",
+                        showResult = false,
+                    )
                 }
             }
         }
+    }
+
+    private fun cancelGenerate() {
+        generateJob?.cancel()
+        generateJob = null
+        _state.update { it.copy(isGenerating = false, generateStage = null) }
     }
 
     private fun testKey() {
@@ -312,8 +414,8 @@ class StudioViewModel(
                         OpenAiAdGenerator().testConnection(key)
                     }
                 }
-                settings.setApiKey(key)
-                _state.update { it.copy(isTestingKey = false, settingsMessage = message) }
+                keys.saveKey(key)
+                _state.update { it.copy(apiKey = key, isTestingKey = false, settingsMessage = message) }
             } catch (e: Exception) {
                 _state.update {
                     it.copy(isTestingKey = false, error = e.message ?: "Ключ не принят.")
@@ -349,6 +451,16 @@ class StudioViewModel(
         }
     }
 
+    private fun share(text: String, title: String) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, title)
+            putExtra(Intent.EXTRA_TEXT, text)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        app.startActivity(Intent.createChooser(intent, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
     private fun flashSettings(message: String) {
         _state.update { it.copy(settingsMessage = message) }
         viewModelScope.launch {
@@ -367,6 +479,7 @@ class StudioViewModel(
                     return StudioViewModel(
                         app = application,
                         settings = SettingsStore(application),
+                        keys = SecureApiKeyStore(application),
                         history = HistoryStore(application),
                     ) as T
                 }

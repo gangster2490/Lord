@@ -22,7 +22,6 @@ private val Context.historyStore: DataStore<Preferences> by preferencesDataStore
 
 class SettingsStore(private val context: Context) {
 
-    val apiKey: Flow<String> = context.settingsStore.data.map { it[API_KEY].orEmpty() }
     val platformId: Flow<String> = context.settingsStore.data.map { it[PLATFORM] ?: Platform.TIKTOK_SHOP.id }
     val lengthSeconds: Flow<Int> = context.settingsStore.data.map {
         it[LENGTH]?.toIntOrNull() ?: AdLength.EIGHT.seconds
@@ -30,10 +29,6 @@ class SettingsStore(private val context: Context) {
     val formulaId: Flow<String> = context.settingsStore.data.map { it[FORMULA] ?: AdFormula.HOOK_DEMO_CTA.id }
     val styleId: Flow<String> = context.settingsStore.data.map { it[STYLE] ?: VisualStyle.CINEMATIC.id }
     val languageId: Flow<String> = context.settingsStore.data.map { it[LANGUAGE] ?: AdLanguage.RU.id }
-
-    suspend fun setApiKey(value: String) {
-        context.settingsStore.edit { it[API_KEY] = value.trim() }
-    }
 
     suspend fun setPlatform(value: Platform) {
         context.settingsStore.edit { it[PLATFORM] = value.id }
@@ -56,7 +51,6 @@ class SettingsStore(private val context: Context) {
     }
 
     companion object {
-        private val API_KEY = stringPreferencesKey("api_key")
         private val PLATFORM = stringPreferencesKey("platform")
         private val LENGTH = stringPreferencesKey("length_seconds")
         private val FORMULA = stringPreferencesKey("formula")

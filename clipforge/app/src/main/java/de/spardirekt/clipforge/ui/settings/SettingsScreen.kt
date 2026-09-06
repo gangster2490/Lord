@@ -70,7 +70,7 @@ fun SettingsScreen(
         ForgeCard {
             SectionLabel("OpenAI API")
             Text(
-                text = "Ключ остаётся на устройстве. Для проверки без сети вставьте sk-demo — ClipForge соберёт полный демо-пакет.",
+                text = "Ключ хранится в EncryptedSharedPreferences. Для проверки без сети вставьте sk-demo — ClipForge соберёт полный демо-пакет.",
                 color = TextMid,
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
@@ -123,7 +123,7 @@ fun SettingsScreen(
                         fontWeight = FontWeight.Bold,
                     )
                 }
-                TextButton(onClick = { onEvent(StudioEvent.ClearApiKey) }) {
+                TextButton(onClick = { onEvent(StudioEvent.RequestClearApiKey) }) {
                     Text("Удалить", color = TextMid)
                 }
             }
@@ -131,6 +131,19 @@ fun SettingsScreen(
                 Text(it, color = Cyan, fontSize = 13.sp)
             }
             state.error?.let { ErrorBanner(it) { onEvent(StudioEvent.DismissError) } }
+        }
+
+        ForgeCard {
+            SectionLabel("Архив")
+            Text(
+                text = "Пакеты хранятся на этом устройстве. Очистка удаляет все записи и превью.",
+                color = TextMid,
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+            )
+            TextButton(onClick = { onEvent(StudioEvent.RequestClearArchive) }) {
+                Text("Очистить архив", color = Magenta, fontWeight = FontWeight.Bold)
+            }
         }
 
         ForgeCard {
