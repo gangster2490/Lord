@@ -32,7 +32,7 @@ class PipelineEngineTest {
         assertEquals(1, fake.calls.count { it == PipelineStage.CONSISTENCY_CHECK })
         assertTrue(fake.calls.contains(PipelineStage.PRODUCT_ANALYSIS))
         assertTrue(result.details.orEmpty().contains("Produktkategorie"))
-        assertTrue(result.hook.isNotBlank())
+        assertTrue(result.details.orEmpty().contains("Videoidée"))
         assertEquals("PASS", result.compliance?.optString("status"))
         assertEquals(de.spardirekt.ugcagent.v3.prompt.CaptionEngine.DE_FALLBACK + "\nWerbung", result.caption)
         assertFalse(result.caption.orEmpty().contains("Feuchtigkeit"))
@@ -43,7 +43,7 @@ class PipelineEngineTest {
         assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.movingLockCount(result.finalPrompt.orEmpty()))
         assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.durationHeadingCount(result.finalPrompt.orEmpty()))
         assertFalse(de.spardirekt.ugcagent.v3.prompt.ProductLock.hasConflictingSpokenHooks(result.finalPrompt.orEmpty()))
-        assertTrue(result.hook.contains("mag") || result.hook.contains("Hause") || result.hook.contains("gemütlich") || result.hook.contains("Küche"))
+        assertTrue(result.hook.contains("mag") || result.hook.contains("Hause") || result.hook.contains("gemütlich") || result.hook.contains("Küche") || result.hook.contains("Mikrowelle") || result.hook.contains("putzen") || result.hook.contains("Aufwärm"))
         assertTrue(result.finalPrompt.orEmpty().contains("Warm, homely"))
         assertFalse(result.finalPrompt.orEmpty().contains("STYLE:"))
         de.spardirekt.ugcagent.v3.prompt.PromptComposer.CANONICAL_HEADINGS.forEach { heading ->
@@ -205,8 +205,8 @@ class PipelineEngineTest {
         session.captionLanguage = "РУССКИЙ"
         val result = PipelineEngine(FakePipelineAi()).start(session)
         assertTrue(result.details.orEmpty().contains("Категория товара"))
-        assertTrue(result.hook.contains("дом") || result.hook.contains("кух") || result.hook.contains("Любл") || result.hook.contains("приятн") || result.hook.contains("уют"))
-        assertTrue(de.spardirekt.ugcagent.v3.prompt.HookEngine.isWarm(result.hook, "РУССКИЙ"))
+        assertTrue(result.hook.contains("дом") || result.hook.contains("кух") || result.hook.contains("Любл") || result.hook.contains("приятн") || result.hook.contains("уют") || result.hook.contains("микроволн") || result.hook.contains("разогрев") || result.hook.contains("Надоел"))
+        assertTrue(result.details.orEmpty().contains("Идея ролика"))
         val pack = de.spardirekt.ugcagent.v3.prompt.DetailsBuilder.videoPackage(
             result.finalPrompt.orEmpty(),
             result.caption.orEmpty(),

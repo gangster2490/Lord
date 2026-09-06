@@ -13,34 +13,35 @@ class HookEngineTest {
     }
 
     @Test
-    fun kitchenRussianHookIsWarmAndHomely() {
+    fun kitchenRussianHookMatchesMicrowaveProblem() {
         val analysis = JSONObject().put("observed_use_case", "microwave cover").put("product_category", "kitchen")
         val hook = HookEngine.generate(analysis, "РУССКИЙ")
         val options = HookEngine.candidates(analysis, "РУССКИЙ")
         assertEquals(3, options.size)
         assertTrue(options.contains(hook))
-        assertFalse(HookEngine.isWeak(hook, "РУССКИЙ"))
-        assertTrue(HookEngine.isWarm(hook, "РУССКИЙ"))
-        assertTrue(
-            hook.contains("просто и удобно") ||
-                hook.contains("приятно иметь дома") ||
-                hook.contains("уютн") ||
-                hook.contains("Люблю"),
-        )
-        assertTrue(HookEngine.qualityScore(hook, "РУССКИЙ") >= 0.7)
+        assertFalse(HookEngine.isWeak(hook, "РУССКИЙ", analysis))
+        assertTrue(hook.contains("микроволн") || hook.contains("разогрев") || hook.contains("убор") || hook.contains("Надоел"))
+        assertTrue(HookEngine.qualityScore(hook, "РУССКИЙ", analysis) >= 0.7)
     }
 
     @Test
-    fun germanKitchenHookIsWarmNotPresenter() {
+    fun germanKitchenHookIsHumanNotPresenter() {
         val analysis = JSONObject().put("observed_use_case", "cover food").put("product_category", "kitchen")
         val hook = HookEngine.generate(analysis, "DEUTSCH")
-        assertFalse(HookEngine.isWeak(hook, "DEUTSCH"))
-        assertTrue(HookEngine.isWarm(hook, "DEUTSCH"))
+        assertFalse(HookEngine.isWeak(hook, "DEUTSCH", analysis))
         assertFalse(hook.contains("Produktpresenter", ignoreCase = true))
-        assertTrue(hook.contains("Küche") || hook.contains("Hause") || hook.contains("gemütlich") || hook.contains("mag"))
+        assertTrue(hook.contains("Mikrowelle") || hook.contains("Küche") || hook.contains("Aufwärm") || hook.contains("putzen") || hook.contains("mag"))
         val options = HookEngine.candidates(analysis, "DEUTSCH")
         assertEquals(3, options.size)
         assertTrue(options.contains(hook))
+    }
+
+    @Test
+    fun panHookStaysWarmAndHomely() {
+        val analysis = JSONObject().put("observed_use_case", "frying pan").put("product_category", "kitchen")
+        val hook = HookEngine.generate(analysis, "РУССКИЙ", ProductIdentity.cookwarePanFingerprint())
+        assertTrue(HookEngine.isWarm(hook, "РУССКИЙ") || hook.contains("кухн") || hook.contains("посуд"))
+        assertFalse(HookEngine.isWeak(hook, "РУССКИЙ", analysis))
     }
 
     @Test

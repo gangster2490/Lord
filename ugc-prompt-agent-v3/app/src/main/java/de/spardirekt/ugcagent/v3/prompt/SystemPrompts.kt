@@ -356,7 +356,11 @@ Ordinary available light.
 Natural human movement.
 
 Avoid polished studio-commercial aesthetics.
-Keep a warm, homely, lived-in kitchen UGC feeling. Cozy ordinary home, not a showroom.
+Match the UGC feeling to the product's real use: kitchen products feel homely; outdoor products feel like a real hobby moment; tools feel like a real home repair corner. Never default every product to a kitchen.
+
+Choose ONE selling idea before writing: problem relief, comfort, convenience, home feeling, a single useful function, portability, or visual appeal. Do not sell a feature list.
+
+The first 1.5 seconds must already make the selling idea clear. One continuous clip. One LOW-RISK action.
 
 PHOTO SHOWS WHAT THE PRODUCT IS. PROMPT EXPLAINS WHAT HAPPENS, PLUS THE MINIMUM GEOMETRY LOCK.
 
@@ -378,7 +382,7 @@ ANTI-MORPH
 TIMING
 
 FORMAT:
-Vertical 9:16. One continuous natural smartphone-style UGC clip. Warm, homely, lived-in kitchen feeling. Not a showroom.
+Vertical 9:16. One continuous natural smartphone-style UGC clip. Feeling matches the product's real use. Not a showroom.
 
 REFERENCE:
 Start from the selected original First Frame. Other references are supporting identity evidence. First Frame is the primary source of truth.
@@ -397,16 +401,22 @@ A functionally similar but visually different product is a failed generation.
 MOVING COMPONENT LOCK:
 Preserve exact geometry, proportions, attachment points and mechanism. If exact motion is uncertain, keep the component static.
 
+SETTING:
+Use the product's real-use context. Kitchen: real kitchen. Fishing: lake/riverside. Camping: camp. Cleaning: bathroom/kitchen. Tool: garage/workshop. Do not place every product in a generic kitchen.
+
 ACTION:
-Use only the selected LOW-RISK evidence-supported action.
+Use only the selected LOW-RISK evidence-supported action. The selling angle must not override identity safety. If the strongest sales action is HIGH-RISK, use a simpler visual moment and let the hook carry the idea.
+
+HUMAN BEHAVIOUR:
+Natural real-use posture that supports the selling idea. No presenter poses, pointing at features, fake influencer gestures, excessive smiling or theatrical reactions.
 
 ANTI-MORPH:
 Universal only: no product redesign, substitution, morphing, duplication, component merging, component deletion, invented parts, geometry drift, moving-part deformation, proportion changes, texture drift, impossible physics, malformed hands or extra fingers.
 Then add only product-specific identity from THIS product. Never copy component names from another product or from a leftover template (no invented reservoirs, steam vents, clips, hinges, batteries or motors unless they belong to the current product).
 
 TIMING:
-0.0–1.5 s: hook and establish product
-1.5–6.5 s: one LOW-RISK natural interaction
+0.0–1.5 s: hook and immediate use context so the selling idea is already clear
+1.5–6.5 s: one LOW-RISK natural interaction that supports that single idea
 6.5–8.0 s: natural settle
 End exactly at 8.0 seconds.
 No intro, outro, CTA, additional scene, freeze-frame or transition tail.
@@ -418,18 +428,22 @@ If speech = OFF:
 Include exactly: No spoken dialogue.
 
 If German:
-The person speaks naturally in German, like chatting at home, not like a product presenter.
-Include one short warm homely spoken line. Casual, human, cozy. No robotic or overly technical voiceover. No polished commercial showroom tone. No unsupported claims. Do not overuse: krass, Leute, ehrlich gesagt, mega, Game Changer.
+The person speaks naturally in German, like a real person in this product's actual use setting, not like a product presenter.
+Include one short spoken line that matches the selling idea. Casual, human. No robotic or overly technical voiceover. No polished commercial showroom tone. No unsupported claims. Do not overuse: krass, Leute, ehrlich gesagt, mega, Game Changer.
 Do not use purely descriptive hooks such as where a handle is placed.
-Examples of the desired tone: "Ich mag's, wenn in der Küche alles einfach bleibt." / "So was hat man gern zu Hause."
+Do not force a cozy-home hook on outdoor or technical products. Do not force a problem hook if the product has no natural pain point.
+Kitchen example: "Ich mag's, wenn in der Küche alles einfach bleibt."
+Fishing example: "So sitzt sich's beim Angeln schon ganz anders."
 The spoken hook begins around 0.3–0.8 seconds and must finish before the 8.0-second endpoint. No speech continuing after the main action ends.
 Include exactly one SPEECH section and exactly one spoken line.
 
 If Russian:
-The person speaks naturally in Russian, like chatting in their own kitchen, not like a product presenter.
-Include one short warm homely spoken line. Casual, human, cozy. Not a literal translation of a German line. No ad-robot tone. No unknown characteristics. One short sentence.
+The person speaks naturally in Russian, like a real person in this product's actual use setting, not like a product presenter.
+Include one short spoken line that matches the selling idea. Casual, human. Not a literal translation of a German line. No ad-robot tone. No unknown characteristics. One short sentence.
 Do not use weak descriptive lines such as "Ручка удобно расположена сбоку."
-Generate one short warm homely spoken line that sounds like a real person at home. Casual, lightly persuasive, not a presenter and not a feature list.
+Do not force a cozy-home hook on outdoor products.
+Kitchen example: "Вот за такие вещи я и люблю домашнюю кухню."
+Fishing example: "Вот так на рыбалке сидеть уже совсем другое дело."
 The spoken hook must finish before the 8.0-second endpoint.
 Include exactly one SPEECH section and exactly one spoken line.
 

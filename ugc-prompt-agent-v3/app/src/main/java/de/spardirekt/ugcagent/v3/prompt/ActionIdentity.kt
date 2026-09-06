@@ -19,6 +19,7 @@ object ActionIdentity {
         Regex("""invent(ed)? (a )?(hinge|reservoir|compartment|mechanism)""", RegexOption.IGNORE_CASE),
         Regex("""open(ing)? (a )?(hidden|unseen)""", RegexOption.IGNORE_CASE),
         Regex("""fold(ing)?|unfold""", RegexOption.IGNORE_CASE),
+        Regex("""180[- ]degree|recline|leg height|height adjustment""", RegexOption.IGNORE_CASE),
         Regex("""\b(open(ing)?|rotat(e|ing)|pull(ing)?|detach(ing)?|disassemble)\b""", RegexOption.IGNORE_CASE),
         Regex("""changing mechanism|lift(ing)? (a |the )?(structural|upper|top)""", RegexOption.IGNORE_CASE),
     )
@@ -148,9 +149,8 @@ object ActionIdentity {
 
     fun isHighMotionAction(action: String): Boolean = movesCircularUpper.containsMatchIn(action)
 
-    fun recommendedSafeAction(fingerprint: JSONObject?): String {
-        return if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) MICROWAVE_SAFE_ACTION else DEFAULT_SAFE_ACTION
-    }
+    fun recommendedSafeAction(fingerprint: JSONObject?, analysis: JSONObject? = null): String =
+        CreativeStrategyEngine.safeAction(fingerprint, analysis)
 
     fun geometryClearlySupported(risk: JSONObject, fingerprint: JSONObject?): Boolean {
         if (risk.optString("risk") == "HIGH" || risk.optString("motion_geometry_risk") == "HIGH") return false

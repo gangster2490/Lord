@@ -194,6 +194,7 @@ class OpenAiProvider(
         appendLine(ctx.scene)
         appendLine("Use ALL uploaded reference images as supporting identity evidence.")
         appendLine("Use only the selected LOW-RISK action. If the action is HIGH risk, replace it with the recommended safer action.")
+        appendLine("Choose setting, hook and human behaviour from the product's real use context and ONE selling idea. Do not default every product to a kitchen.")
         appendLine("If motion_geometry_risk is HIGH, keep identity-critical moving components static.")
         appendLine("Generate exactly 8.0 seconds. The spoken line must finish before the 8.0-second endpoint.")
     }

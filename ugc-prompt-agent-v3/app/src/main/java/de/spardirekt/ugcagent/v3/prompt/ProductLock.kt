@@ -55,6 +55,9 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         if (ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)) {
             extra += "Do not invent extra handles, extra lids, extra rings, or replace the wooden grip, collar, tang or hanging ring."
         }
+        if (CreativeStrategyEngine.looksLikeFishingChair(fingerprint, analysis)) {
+            extra += "Do not fold the chair, animate a 180-degree backrest, change leg height, or invent extra mechanisms."
+        }
         return if (extra.isEmpty()) ANTI_MORPH else ANTI_MORPH + "\n" + extra.joinToString("\n")
     }
 
@@ -399,8 +402,8 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         val lower = prompt.lowercase()
         return when {
             lower.contains("no spoken dialogue") -> "OFF"
-            lower.contains("casual home russian") || lower.contains("speaks naturally in russian") -> "РУССКИЙ"
-            lower.contains("casual home german") || lower.contains("speaks naturally in german") -> "DEUTSCH"
+            lower.contains("casual home russian") || lower.contains("speaks naturally in casual russian") || lower.contains("speaks naturally in russian") -> "РУССКИЙ"
+            lower.contains("casual home german") || lower.contains("speaks naturally in casual german") || lower.contains("speaks naturally in german") -> "DEUTSCH"
             else -> "OFF"
         }
     }

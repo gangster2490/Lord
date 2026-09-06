@@ -6,6 +6,7 @@ import de.spardirekt.ugcagent.v3.compliance.TikTokShopPolicyConfig
 import de.spardirekt.ugcagent.v3.data.ImageRules
 import de.spardirekt.ugcagent.v3.image.FirstFrameHeuristics
 import de.spardirekt.ugcagent.v3.prompt.ActionIdentity
+import de.spardirekt.ugcagent.v3.prompt.CreativeStrategyEngine
 import de.spardirekt.ugcagent.v3.prompt.DetailsBuilder
 import de.spardirekt.ugcagent.v3.prompt.ProductIdentity
 import de.spardirekt.ugcagent.v3.prompt.ProductLock
@@ -266,17 +267,27 @@ class PipelineEngine(private val ai: PipelineAi) {
         val fingerprint = session.identityFingerprint ?: JSONObject()
         val generated = if (session.forceStaticAction) {
             JSONObject()
-                .put("environment", analysis.optString("observed_context").ifBlank { "ordinary indoor setting" })
+                .put("environment", CreativeStrategyEngine.plan(analysis, fingerprint).setting)
                 .put("camera_entry", "natural handheld smartphone")
-                .put("main_action", ActionIdentity.recommendedSafeAction(fingerprint))
+                .put("main_action", ActionIdentity.recommendedSafeAction(fingerprint, analysis))
                 .put("human_interaction", "simple contact")
                 .put("rationale", "static LOW-RISK fallback")
         } else {
             ai.generateScene(analysis, fingerprint, session.scene)
         }
+        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
         val local = ActionIdentity.localCheck(generated.optString("main_action"), fingerprint)
         val merged = ActionIdentity.merge(local, ai.actionRisk(fingerprint, generated))
         var applied = ActionIdentity.applyIfHighRisk(generated, merged)
+        if (CreativeStrategyEngine.settingConflicts(applied.optString("environment"), plan)) {
+            applied.put("environment", plan.setting)
+        }
+        if (applied.optString("environment").isBlank()) applied.put("environment", plan.setting)
+        applied.put("human_interaction", plan.human)
+        val currentAction = applied.optString("main_action")
+        if (CreativeStrategyEngine.actionConflicts(currentAction, plan) || currentAction.isBlank()) {
+            applied.put("main_action", plan.action)
+        }
         val safer = merged.optString("recommended_safe_action")
         val stillUnsafe = ActionIdentity.selectedActionIsUnsafe(applied) || ActionIdentity.isHighMotionAction(applied.optString("main_action"))
         if (stillUnsafe || (merged.optString("risk") == "HIGH" && ActionIdentity.isUnsafeAction(safer))) {
@@ -326,23 +337,24 @@ class PipelineEngine(private val ai: PipelineAi) {
     }
 
     private fun hook(session: PipelineSession) {
-        val raw = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
-        session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.ensureStrong(raw, session.analysis, session.speechLanguage)
-        session.hookScore = de.spardirekt.ugcagent.v3.prompt.HookEngine.qualityScore(session.hook, session.speechLanguage)
+        val plan = CreativeStrategyEngine.plan(session.analysis, session.identityFingerprint)
+        val raw = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage, session.identityFingerprint, plan)
+        session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.ensureStrong(raw, session.analysis, session.speechLanguage, session.identityFingerprint, plan)
+        session.hookScore = de.spardirekt.ugcagent.v3.prompt.HookEngine.qualityScore(session.hook, session.speechLanguage, session.analysis)
         if (session.hookScore < 0.6) {
-            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
-            session.hookScore = de.spardirekt.ugcagent.v3.prompt.HookEngine.qualityScore(session.hook, session.speechLanguage)
+            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage, session.identityFingerprint, plan)
+            session.hookScore = de.spardirekt.ugcagent.v3.prompt.HookEngine.qualityScore(session.hook, session.speechLanguage, session.analysis)
         }
     }
 
     private fun quality(session: PipelineSession) {
         val fingerprint = session.identityFingerprint
         var prompt = session.finalPrompt.orEmpty()
-        if (session.hook.isNotBlank() && de.spardirekt.ugcagent.v3.prompt.HookEngine.isWeak(session.hook, session.speechLanguage)) {
-            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
+        if (session.hook.isNotBlank() && de.spardirekt.ugcagent.v3.prompt.HookEngine.isWeak(session.hook, session.speechLanguage, session.analysis)) {
+            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage, session.identityFingerprint)
         }
         if (ProductLock.hasConflictingSpokenHooks(prompt)) {
-            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
+            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage, session.identityFingerprint)
         }
         session.finalPrompt = ProductLock.finalizeClean(
             prompt,
@@ -374,6 +386,32 @@ class PipelineEngine(private val ai: PipelineAi) {
             )
         }
         session.repairApplied = true
+        val plan = CreativeStrategyEngine.plan(session.analysis, fingerprint)
+        val creativeFails = CreativeStrategyEngine.gateFailures(
+            session.finalPrompt.orEmpty(),
+            session.hook,
+            plan,
+            session.speechLanguage,
+            session.analysis,
+        )
+        if (creativeFails.isNotEmpty()) {
+            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(
+                session.analysis,
+                session.speechLanguage,
+                fingerprint,
+                plan,
+            )
+            session.finalPrompt = ProductLock.finalizeClean(
+                session.finalPrompt.orEmpty(),
+                fingerprint,
+                session.targetGenerator,
+                session.speechLanguage,
+                session.hook,
+                session.strictProductLock,
+                session.analysis,
+                session.evidence,
+            )
+        }
         ProductLock.regressionFailures(session.finalPrompt.orEmpty(), fingerprint, session.targetGenerator, session.speechLanguage).forEach {
             session.warnings.add("Prompt quality: $it")
         }
@@ -445,11 +483,10 @@ class PipelineEngine(private val ai: PipelineAi) {
     private fun hashtags(session: PipelineSession) {
         val tags = session.hashtags.map { it.trim() }.filter { it.isNotBlank() }.distinct().toMutableList()
         if (tags.size < 4) {
-            val extras = if (session.speechLanguage.equals("РУССКИЙ", true)) {
-                listOf("#tiktokshop", "#обзор", "#кухня", "#ugc")
-            } else {
-                listOf("#tiktokshop", "#alltag", "#küche", "#ugc")
-            }
+            val extras = CreativeStrategyEngine.hashtagExtras(
+                CreativeStrategyEngine.plan(session.analysis, session.identityFingerprint),
+                session.speechLanguage.equals("РУССКИЙ", true),
+            )
             extras.forEach { if (tags.size < 6 && it !in tags) tags.add(it) }
         }
         session.hashtags = tags.take(6).toMutableList()
@@ -483,7 +520,7 @@ class PipelineEngine(private val ai: PipelineAi) {
             .put("no_forbidden_headings", composer.FORBIDDEN_HEADINGS.none { (composer.rawHeadingCounts(prompt)[it] ?: 0) > 0 })
             .put("exact_8s", ProductLock.veoHasExactDuration(prompt) || session.targetGenerator != "VEO")
             .put("speech_end", session.speechLanguage.equals("OFF", true) || ProductLock.hasSpeechEndTiming(prompt))
-            .put("hook", session.hook.isNotBlank() && !de.spardirekt.ugcagent.v3.prompt.HookEngine.isWeak(session.hook, session.speechLanguage))
+            .put("hook", session.hook.isNotBlank() && !de.spardirekt.ugcagent.v3.prompt.HookEngine.isWeak(session.hook, session.speechLanguage, session.analysis))
             .put("caption", session.caption.orEmpty().isNotBlank())
             .put("hashtags", de.spardirekt.ugcagent.v3.prompt.EvidenceModel.hashtagCountOk(session.hashtags))
             .put("no_hard_error", session.pausedReason == null)
@@ -514,7 +551,7 @@ class PipelineEngine(private val ai: PipelineAi) {
             session.repairApplied = true
         }
         if (!checks.optBoolean("hook")) {
-            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
+            session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage, session.identityFingerprint)
         }
         if (!checks.optBoolean("hashtags")) hashtags(session)
     }

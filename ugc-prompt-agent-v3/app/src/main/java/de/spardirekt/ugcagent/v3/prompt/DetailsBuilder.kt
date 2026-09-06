@@ -20,11 +20,14 @@ object DetailsBuilder {
         }
         val action = scene.optString("main_action").ifBlank { ActionIdentity.recommendedSafeAction(fingerprint) }
         val firstFrame = session.firstFrameId?.take(8) ?: "—"
+        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+        val idea = CreativeStrategyEngine.ideaLabel(plan, russian)
         val warnings = session.warnings.filter { it.isNotBlank() && !isInternal(it) }.distinct().take(6)
         val body = if (russian) {
             buildString {
                 appendLine("Категория товара: $category")
                 appendLine("Основное применение: $use")
+                appendLine("Идея ролика: $idea")
                 appendLine("Подтверждённые видимые функции: ${visual.ifBlank { "—" }}")
                 appendLine("Подтверждённые текстовые признаки: ${text.ifBlank { "—" }}")
                 appendLine("Ключевые детали идентичности: ${identity.ifBlank { "—" }}")
@@ -39,6 +42,7 @@ object DetailsBuilder {
             buildString {
                 appendLine("Produktkategorie: $category")
                 appendLine("Hauptnutzung: $use")
+                appendLine("Videoidée: $idea")
                 appendLine("Bestätigte sichtbare Funktionen: ${visual.ifBlank { "—" }}")
                 appendLine("Bestätigte Textmerkmale: ${text.ifBlank { "—" }}")
                 appendLine("Wichtige Identitätsdetails: ${identity.ifBlank { "—" }}")

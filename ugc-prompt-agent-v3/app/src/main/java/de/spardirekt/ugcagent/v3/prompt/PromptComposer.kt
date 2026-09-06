@@ -30,7 +30,7 @@ object PromptComposer {
     )
 
     const val TIMING_BLOCK =
-        "0.0–1.5 s: hook and establish product\n" +
+        "0.0–1.5 s: hook and immediate use context so the selling idea is already clear\n" +
             "1.5–6.5 s: one LOW-RISK natural interaction\n" +
             "6.5–8.0 s: natural settle\n" +
             "End exactly at 8.0 seconds.\n" +
@@ -55,7 +55,8 @@ object PromptComposer {
         val first = render(raw, fingerprint, generator, speechLanguage, hook, analysis, evidence)
         if (isCanonical(first, speechLanguage, analysis, evidence, fingerprint)) return first
         val action = extractAction(first).ifBlank { extractAction(raw) }
-        val retryRaw = "ACTION:\n$action\n\nSETTING:\nOrdinary cozy home kitchen."
+        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+        val retryRaw = "ACTION:\n$action\n\nSETTING:\n${plan.setting}"
         return render(retryRaw, fingerprint, generator, speechLanguage, hook, analysis, evidence)
     }
 
@@ -143,34 +144,30 @@ object PromptComposer {
     ): String {
         val cleaned = stripNoise(raw)
         val sections = parseSections(cleaned)
-        val action = firstNonBlank(
-            sections["ACTION"],
-            extractLooseAction(cleaned),
-            "One hand uses the referenced product with a LOW-RISK home movement. Do not fold, open, rotate, pull, detach or reconstruct hidden geometry.",
-        )
-        val setting = firstNonBlank(
-            sections["SETTING"],
-            "Ordinary cozy home kitchen. Warm, lived-in, slightly imperfect. Not a studio, showroom or commercial set.",
-        )
-        val resolvedHook = resolveHook(cleaned, hook, speechLanguage, analysis)
+        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+        val parsedAction = firstNonBlank(sections["ACTION"], extractLooseAction(cleaned), plan.action)
+        val action = if (CreativeStrategyEngine.actionConflicts(parsedAction, plan)) plan.action else parsedAction
+        val parsedSetting = firstNonBlank(sections["SETTING"], plan.setting)
+        val setting = if (CreativeStrategyEngine.settingConflicts(parsedSetting, plan)) plan.setting else parsedSetting
+        val resolvedHook = resolveHook(cleaned, hook, speechLanguage, analysis, fingerprint, plan)
         val identity = identityBlock(fingerprint, analysis, evidence, sections["PRODUCT IDENTITY LOCK"])
         val moving = movingBlock(fingerprint, sections["MOVING COMPONENT LOCK"])
         val settingBody = stripDimensions(setting, analysis, evidence)
         val actionBody = stripDimensions(action, analysis, evidence)
-        val extraAllowed = "$identity\n$moving\n$settingBody\n$actionBody"
+        val extraAllowed = "$identity\n$moving\n$settingBody\n$actionBody\n${plan.human}"
         val body = buildString {
-            appendSection("FORMAT", formatBlock(generator))
+            appendSection("FORMAT", formatBlock(generator, plan))
             appendSection("REFERENCE", referenceBlock(fingerprint))
             appendSection("PRODUCT IDENTITY LOCK", identity)
             appendSection("MOVING COMPONENT LOCK", moving)
             appendSection("SETTING", settingBody)
-            appendSection("CAMERA", ProductLock.CAMERA_LOCK + " Warm homely handheld UGC, not a polished commercial move.")
+            appendSection("CAMERA", plan.camera)
             appendSection("ACTION", actionBody)
-            appendSection("HUMAN BEHAVIOUR", ProductLock.HUMAN_LOCK)
-            appendSection("LIGHTING", ProductLock.LIGHTING_LOCK)
-            appendSection("SPEECH", speechBlock(speechLanguage, resolvedHook))
+            appendSection("HUMAN BEHAVIOUR", plan.human)
+            appendSection("LIGHTING", plan.lighting)
+            appendSection("SPEECH", speechBlock(speechLanguage, resolvedHook, plan))
             appendSection("ANTI-MORPH", ProductLock.antiMorphFor(fingerprint, analysis))
-            appendSection("TIMING", TIMING_BLOCK)
+            appendSection("TIMING", timingBlock(plan))
         }.trim()
         return ProductLexicon.stripForeign(body, fingerprint, analysis, extraAllowed)
     }
@@ -180,14 +177,21 @@ object PromptComposer {
         append(heading).append(":\n").append(body.trim())
     }
 
-    private fun formatBlock(generator: String): String {
+    private fun formatBlock(generator: String, plan: CreativeStrategyEngine.Plan): String {
         val gen = when (generator.uppercase()) {
             "KLING" -> "Target generator: Kling."
             "VEO" -> "Target generator: Veo."
             else -> "Target generator: generic short-form video model."
         }
-        return "$gen Vertical 9:16. One continuous natural smartphone UGC clip. Warm, homely, lived-in kitchen feeling. Not a showroom."
+        return "$gen Vertical 9:16. One continuous natural smartphone UGC clip. ${plan.formatTone}"
     }
+
+    private fun timingBlock(plan: CreativeStrategyEngine.Plan): String =
+        "0.0–1.5 s: ${plan.opening}\n" +
+            "1.5–6.5 s: one LOW-RISK natural interaction that supports that single idea\n" +
+            "6.5–8.0 s: natural settle\n" +
+            "End exactly at 8.0 seconds.\n" +
+            "No intro, outro, CTA, additional scene, freeze-frame or transition tail."
 
     private fun referenceBlock(fingerprint: JSONObject?): String {
         val finish = if (ProductIdentity.hasFinishConflict(fingerprint)) "\n${ProductLock.FIRST_FRAME_WINS}" else ""
@@ -231,28 +235,30 @@ object PromptComposer {
         return semanticDedup(withMicrowave)
     }
 
-    private fun speechBlock(language: String, hook: String?): String {
+    private fun speechBlock(language: String, hook: String?, plan: CreativeStrategyEngine.Plan): String {
         if (language.equals("OFF", true)) return "No spoken dialogue."
-        val line = hook?.trim().orEmpty().ifBlank { HookEngine.generate(null, language) }
-        val langLine = if (language.equals("РУССКИЙ", true)) {
-            "The person speaks naturally in casual home Russian, like chatting in their own kitchen, not presenting a product."
-        } else {
-            "The person speaks naturally in casual home German, like chatting in their own kitchen, not presenting a product."
-        }
-        return "$langLine\n\"$line\"\nThe spoken line must finish before the 8.0-second endpoint."
+        val line = hook?.trim().orEmpty().ifBlank { HookEngine.generate(null, language, plan = plan) }
+        return "${HookEngine.speechIntro(language, plan)}\n\"$line\"\nThe spoken line must finish before the 8.0-second endpoint."
     }
 
-    private fun resolveHook(raw: String, preferred: String?, language: String, analysis: JSONObject?): String? {
+    private fun resolveHook(
+        raw: String,
+        preferred: String?,
+        language: String,
+        analysis: JSONObject?,
+        fingerprint: JSONObject?,
+        plan: CreativeStrategyEngine.Plan,
+    ): String? {
         if (language.equals("OFF", true)) return null
         val found = ProductLock.extractSpokenHooks(raw)
         if (found.size > 1) {
-            return if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language, analysis)) preferred.trim()
-            else HookEngine.generate(analysis, language)
+            return if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language, analysis, plan)) preferred.trim()
+            else HookEngine.generate(analysis, language, fingerprint, plan)
         }
-        if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language, analysis)) return preferred.trim()
+        if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language, analysis, plan)) return preferred.trim()
         val only = found.firstOrNull()
-        if (!only.isNullOrBlank() && !HookEngine.isWeak(only, language, analysis)) return only
-        return HookEngine.generate(analysis, language)
+        if (!only.isNullOrBlank() && !HookEngine.isWeak(only, language, analysis, plan)) return only
+        return HookEngine.generate(analysis, language, fingerprint, plan)
     }
 
     private fun parseSections(text: String): Map<String, String> {
