@@ -1,0 +1,26 @@
+{
+  "name": "TikTok Shop Creator",
+  "install": "cd backend && npm install && cd ../proxy && npm install",
+  "terminals": [
+    {
+      "name": "proxy",
+      "command": "cd proxy && PORT=3001 node server.js",
+      "description": "Zero-dependency CORS proxy for the browser-key model (root site, gh-pages, Android apps). Forwards /api/generate to api.anthropic.com using the per-request x-api-key-fwd header. Listens on http://localhost:3001."
+    },
+    {
+      "name": "backend",
+      "command": "cd backend && PORT=3002 ALLOWED_ORIGIN=http://localhost:8000 node server.js",
+      "description": "Express backend for the server-key model (frontend/). Reads ANTHROPIC_API_KEY from the environment and exposes POST /api/generate plus GET /health. Listens on http://localhost:3002. Set the ANTHROPIC_API_KEY secret to enable live generation."
+    },
+    {
+      "name": "static-site",
+      "command": "python3 -m http.server 8000",
+      "description": "Serves the static web clients from the repo root: root app http://localhost:8000/index.html (uses the proxy), frontend http://localhost:8000/frontend/index.html (set Backend URL to http://localhost:3002), and gh-pages http://localhost:8000/gh-pages/index.html."
+    }
+  ],
+  "ports": [
+    { "name": "proxy", "port": 3001 },
+    { "name": "backend", "port": 3002 },
+    { "name": "static-site", "port": 8000 }
+  ]
+}
