@@ -46,6 +46,12 @@ class CreativeStrategyEngineTest {
         assertFalse(prompt.contains("Ordinary cozy home kitchen"))
         assertTrue(prompt.contains("already seated"))
         assertTrue(prompt.contains("Do not fold"))
+        assertFalse(prompt.contains("microwave", ignoreCase = true))
+        assertFalse(prompt.contains("Mikrowelle"))
+        assertFalse(prompt.contains("микроволн"))
+        assertFalse(prompt.contains("hanging ring", ignoreCase = true))
+        assertFalse(prompt.contains("referenced pan", ignoreCase = true))
+        assertFalse(prompt.contains("circular upper vent", ignoreCase = true))
         assertFalse(prompt.substringAfter("ACTION:").substringBefore("HUMAN").contains("fold the chair and rotate"))
         PromptComposer.CANONICAL_HEADINGS.forEach { heading ->
             assertEquals(heading, 1, PromptComposer.headingCounts(prompt)[heading] ?: 0)
@@ -74,6 +80,10 @@ class CreativeStrategyEngineTest {
         assertTrue(ProductLock.preservesMicrowaveCover(prompt))
         assertTrue(prompt.contains("Warm, homely"))
         assertTrue(prompt.contains("kitchen", ignoreCase = true))
+        assertFalse(prompt.contains("lakeside", ignoreCase = true))
+        assertFalse(prompt.contains("bait tray", ignoreCase = true))
+        assertFalse(prompt.contains("рыбал"))
+        assertFalse(prompt.contains("hanging ring", ignoreCase = true))
     }
 
     @Test
@@ -86,6 +96,22 @@ class CreativeStrategyEngineTest {
         val hook = HookEngine.generate(analysis, "DEUTSCH", ProductIdentity.cookwarePanFingerprint(), plan)
         assertTrue(hook.contains("Küche") || hook.contains("Hause") || hook.contains("Pfanne") || hook.contains("mag"))
         assertTrue(plan.action.contains("wooden handle") || plan.action.contains("lid"))
+        val prompt = ProductLock.finalizeClean(
+            "ACTION:\none hand touches the wooden handle.",
+            ProductIdentity.cookwarePanFingerprint(),
+            "VEO",
+            "DEUTSCH",
+            hook,
+            true,
+            analysis,
+        )
+        assertTrue(prompt.contains("hanging ring", ignoreCase = true) || prompt.contains("wooden handle", ignoreCase = true))
+        assertFalse(prompt.contains("circular upper vent", ignoreCase = true))
+        assertFalse(prompt.contains("rectangular modules", ignoreCase = true))
+        assertFalse(prompt.contains("lakeside", ignoreCase = true))
+        assertFalse(prompt.contains("bait tray", ignoreCase = true))
+        assertFalse(prompt.contains("cylindrical reservoir", ignoreCase = true))
+        assertFalse(prompt.contains("steam vent", ignoreCase = true))
     }
 
     @Test
@@ -112,6 +138,11 @@ class CreativeStrategyEngineTest {
         )
         assertTrue(prompt.contains("desk", ignoreCase = true) || prompt.contains("office", ignoreCase = true))
         assertFalse(prompt.contains("Ordinary cozy home kitchen"))
+        assertFalse(prompt.contains("circular upper vent", ignoreCase = true))
+        assertFalse(prompt.contains("bait tray", ignoreCase = true))
+        assertFalse(prompt.contains("hanging ring", ignoreCase = true))
+        assertFalse(prompt.contains("lakeside", ignoreCase = true))
+        assertFalse(prompt.contains("Mikrowelle"))
         assertFalse(prompt.substringAfter("LIGHTING:").contains("outdoor daylight"))
         assertTrue(prompt.contains("speaks naturally in casual German"))
         assertTrue(
@@ -156,6 +187,10 @@ class CreativeStrategyEngineTest {
         )
         assertFalse(prompt.contains("Ordinary cozy home kitchen"))
         assertFalse(prompt.contains("lakeside"))
+        assertFalse(prompt.contains("circular upper vent", ignoreCase = true))
+        assertFalse(prompt.contains("bait tray", ignoreCase = true))
+        assertFalse(prompt.contains("hanging ring", ignoreCase = true))
+        assertFalse(prompt.contains("Mikrowelle"))
         assertTrue(prompt.contains("Neutral realistic indoor") || prompt.contains("matching the First Frame"))
     }
 
@@ -188,6 +223,10 @@ class CreativeStrategyEngineTest {
         assertTrue(prompt.contains("living room", ignoreCase = true))
         assertFalse(prompt.contains("Ordinary cozy home kitchen"))
         assertFalse(prompt.contains("lakeside"))
+        assertFalse(prompt.contains("bait tray", ignoreCase = true))
+        assertFalse(prompt.contains("circular upper vent", ignoreCase = true))
+        assertFalse(prompt.contains("hanging ring", ignoreCase = true))
+        assertFalse(prompt.contains("рыбал"))
         assertTrue(prompt.substringAfter("LIGHTING:").contains("home daylight") || prompt.substringAfter("LIGHTING:").contains("indoor"))
     }
 

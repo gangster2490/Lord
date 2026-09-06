@@ -38,11 +38,15 @@ object ProductLexicon {
         analysis?.optString("product_category")?.let { parts += it }
         analysis?.optString("observed_use_case")?.let { parts += it }
         if (extra.isNotBlank()) parts += extra
-        if (ProductIdentity.looksLikeMicrowaveCover(fingerprint) || extra.lowercase().contains("circular upper vent")) {
+        if (ProductIdentity.looksLikeMicrowaveCover(fingerprint) ||
+            CrossProductGuard.family(fingerprint, analysis, extra) == CrossProductGuard.Family.MICROWAVE_COVER
+        ) {
             parts += ProductIdentity.MICROWAVE_COVER_LOCK
             parts += "reservoir vent clips modules dome cap tank"
         }
-        if (ProductIdentity.looksLikeCookwarePan(fingerprint, analysis) || extra.lowercase().contains("hanging ring")) {
+        if (ProductIdentity.looksLikeCookwarePan(fingerprint, analysis) ||
+            CrossProductGuard.family(fingerprint, analysis, extra) == CrossProductGuard.Family.COOKWARE_PAN
+        ) {
             parts += ProductIdentity.COOKWARE_PAN_LOCK
         }
         return parts.joinToString(" ").lowercase()

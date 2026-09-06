@@ -1,5 +1,6 @@
 package de.spardirekt.ugcagent.v3.prompt
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -24,5 +25,8 @@ class SystemPromptsTest {
         assertTrue(SystemPrompts.CONSISTENCY.contains("identity-critical visible geometry"))
         assertTrue(SystemPrompts.CONSISTENCY.contains("packaging"))
         assertTrue(SystemPrompts.PRODUCT_IDENTITY_FINGERPRINT.contains("identity_critical_components"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("Write one native spoken line for THIS product"))
+        assertFalse(SystemPrompts.VIDEO_PROMPT.contains("Kitchen example"))
+        assertFalse(SystemPrompts.VIDEO_PROMPT.contains("Fishing example"))
     }
 }

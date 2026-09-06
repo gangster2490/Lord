@@ -449,8 +449,7 @@ The person speaks naturally in German, like a real person in this product's actu
 Include one short spoken line that matches the selling idea. Casual, human. No robotic or overly technical voiceover. No polished commercial showroom tone. No unsupported claims. Do not overuse: krass, Leute, ehrlich gesagt, mega, Game Changer.
 Do not use purely descriptive hooks such as where a handle is placed.
 Do not force a cozy-home hook on outdoor or technical products. Do not force a problem hook if the product has no natural pain point.
-Kitchen example: "Ich mag's, wenn in der Küche alles einfach bleibt."
-Fishing example: "So sitzt sich's beim Angeln schon ganz anders."
+Write one native spoken line for THIS product and THIS setting only. Never copy a kitchen, fishing, pan, or any other-product template line. Never mix leftover names from another product into identity, setting, action or speech.
 The spoken hook begins around 0.3–0.8 seconds and must finish before the 8.0-second endpoint. No speech continuing after the main action ends.
 Include exactly one SPEECH section and exactly one spoken line.
 
@@ -459,8 +458,7 @@ The person speaks naturally in Russian, like a real person in this product's act
 Include one short spoken line that matches the selling idea. Casual, human. Not a literal translation of a German line. No ad-robot tone. No unknown characteristics. One short sentence.
 Do not use weak descriptive lines such as "Ручка удобно расположена сбоку."
 Do not force a cozy-home hook on outdoor products.
-Kitchen example: "Вот за такие вещи я и люблю домашнюю кухню."
-Fishing example: "Вот так на рыбалке сидеть уже совсем другое дело."
+Write one native spoken line for THIS product and THIS setting only. Never copy a kitchen, fishing, pan, or any other-product template line. Never mix leftover names from another product into identity, setting, action or speech.
 The spoken hook must finish before the 8.0-second endpoint.
 Include exactly one SPEECH section and exactly one spoken line.
 

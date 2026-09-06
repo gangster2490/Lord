@@ -86,7 +86,7 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         "DURATION:\n$VEO_DURATION_LOCK\n$SCENE_TIMING_BUDGET"
 
     const val UGC_STYLE =
-        "STYLE:\nWarm, homely, natural kitchen UGC. Ordinary cozy home, not a showroom. Casual human voice, not a product presenter. Slightly imperfect handheld smartphone. No robotic or overly technical narration. No polished commercial tone."
+        "STYLE:\nWarm, homely, natural UGC. Ordinary real setting, not a showroom. Casual human voice, not a product presenter. Slightly imperfect handheld smartphone. No robotic or overly technical narration. No polished commercial tone."
 
     private const val SECTION_LOOKAHEAD =
         "FORMAT|REFERENCE|PRODUCT IDENTITY LOCK|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|SPEECH|ANTI-MORPH|DURATION|TIMING|STYLE|PRODUCT LOCK|Target generator"

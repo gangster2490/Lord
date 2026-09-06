@@ -83,10 +83,10 @@ object HookEngine {
     ): String {
         val resolved = plan ?: CreativeStrategyEngine.plan(analysis, fingerprint)
         val ranked = candidates(analysis, language, fingerprint, resolved)
-            .map { it to score(it, language, analysis, resolved) }
+            .map { it to score(it, language, analysis, resolved, fingerprint) }
             .sortedByDescending { it.second.total }
-        val best = ranked.firstOrNull { !isWeak(it.first, language, analysis, resolved) }?.first
-        return best ?: generateFallback(analysis, language, resolved)
+        val best = ranked.firstOrNull { !isWeak(it.first, language, analysis, resolved, fingerprint) }?.first
+        return best ?: generateFallback(analysis, language, resolved, fingerprint)
     }
 
     fun candidates(
@@ -97,7 +97,7 @@ object HookEngine {
     ): List<String> {
         val resolved = plan ?: CreativeStrategyEngine.plan(analysis, fingerprint)
         val russian = language.equals("РУССКИЙ", true)
-        return hooksFor(resolved, russian, analysis, fingerprint)
+        return safeHooks(resolved, russian, analysis, fingerprint)
     }
 
     fun isWeak(
@@ -105,6 +105,7 @@ object HookEngine {
         language: String,
         analysis: JSONObject? = null,
         plan: CreativeStrategyEngine.Plan? = null,
+        fingerprint: JSONObject? = null,
     ): Boolean {
         val text = hook.trim()
         if (text.isBlank()) return true
@@ -114,7 +115,8 @@ object HookEngine {
         if (EvidenceModel.containsUnverifiedClaim(text)) return true
         val weak = weakEn + if (language.equals("РУССКИЙ", true)) weakRu else weakDe
         if (weak.any { it.containsMatchIn(text) }) return true
-        val resolved = plan ?: CreativeStrategyEngine.plan(analysis, null)
+        val resolved = plan ?: CreativeStrategyEngine.plan(analysis, fingerprint)
+        if (CrossProductGuard.containsLeak(text, fingerprint, analysis, resolved)) return true
         if (isGenericAnyProduct(text) && resolved.primary != CreativeStrategyEngine.Motivation.HOME_COZY) return true
         if (isUnrelated(text, analysis, resolved)) return true
         if (isFeatureOnly(text)) return true
@@ -139,7 +141,11 @@ object HookEngine {
         plan: CreativeStrategyEngine.Plan? = null,
     ): String {
         val resolved = plan ?: CreativeStrategyEngine.plan(analysis, fingerprint)
-        return if (isWeak(hook, language, analysis, resolved)) generate(analysis, language, fingerprint, resolved) else hook.trim()
+        return if (isWeak(hook, language, analysis, resolved, fingerprint)) {
+            generate(analysis, language, fingerprint, resolved)
+        } else {
+            hook.trim()
+        }
     }
 
     fun score(
@@ -147,9 +153,10 @@ object HookEngine {
         language: String,
         analysis: JSONObject? = null,
         plan: CreativeStrategyEngine.Plan? = null,
+        fingerprint: JSONObject? = null,
     ): HookScore {
-        val resolved = plan ?: CreativeStrategyEngine.plan(analysis, null)
-        if (isWeak(hook, language, analysis, resolved)) {
+        val resolved = plan ?: CreativeStrategyEngine.plan(analysis, fingerprint)
+        if (isWeak(hook, language, analysis, resolved, fingerprint)) {
             return HookScore(0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2)
         }
         val lower = hook.lowercase()
@@ -331,13 +338,39 @@ $SPEECH_END
         }
     }
 
+    private fun safeHooks(
+        plan: CreativeStrategyEngine.Plan,
+        russian: Boolean,
+        analysis: JSONObject?,
+        fingerprint: JSONObject?,
+    ): List<String> {
+        val raw = hooksFor(plan, russian, analysis, fingerprint)
+        val clean = raw.filter { !CrossProductGuard.containsLeak(it, fingerprint, analysis, plan) }
+        if (clean.isNotEmpty()) return clean
+        val generic = if (russian) {
+            listOf(
+                "Вот эта мелочь в обычном дне реально выручает.",
+                "Когда так под рукой — сразу спокойнее.",
+                "Вот ради такой простоты это и оставляют рядом.",
+            )
+        } else {
+            listOf(
+                "Solche Kleinigkeiten machen den Alltag einfach ruhiger.",
+                "Ich mag's, wenn so was einfach in Reichweite bleibt.",
+                "Genau so eine Sache lässt den Moment entspannter.",
+            )
+        }
+        return generic.filter { !CrossProductGuard.containsLeak(it, fingerprint, analysis, plan) }.ifEmpty { generic }
+    }
+
     private fun generateFallback(
         analysis: JSONObject?,
         language: String,
         plan: CreativeStrategyEngine.Plan,
+        fingerprint: JSONObject?,
     ): String {
         val russian = language.equals("РУССКИЙ", true)
-        return hooksFor(plan, russian, analysis, null).first()
+        return safeHooks(plan, russian, analysis, fingerprint).first()
     }
 
     fun isKitchen(analysis: JSONObject?): Boolean {

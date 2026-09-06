@@ -145,7 +145,11 @@ object ProductIdentity {
     fun finalIdentityConstraints(fingerprint: JSONObject?): List<String> =
         compactIdentityFeatures(fingerprint)
 
-    fun compactIdentityFeatures(fingerprint: JSONObject?, extra: List<String> = emptyList()): List<String> {
+    fun compactIdentityFeatures(
+        fingerprint: JSONObject?,
+        extra: List<String> = emptyList(),
+        analysis: JSONObject? = null,
+    ): List<String> {
         val features = mutableListOf<String>()
         fun add(raw: String) {
             if (features.size >= 10) return
@@ -153,14 +157,19 @@ object ProductIdentity {
             if (features.any { similarFeature(it, item) }) return
             features += item
         }
+        fun addSafeExtra() {
+            extra.forEach { line ->
+                if (!CrossProductGuard.isForeignIdentityLine(line, fingerprint, analysis, extra.joinToString("\n"))) add(line)
+            }
+        }
         if (looksLikeMicrowaveCover(fingerprint)) {
             MICROWAVE_COVER_FEATURES.forEach(::add)
-            extra.forEach(::add)
+            addSafeExtra()
             return padIdentityFeatures(features)
         }
         if (looksLikeCookwarePan(fingerprint)) {
             COOKWARE_PAN_FEATURES.forEach(::add)
-            extra.forEach(::add)
+            addSafeExtra()
             return padIdentityFeatures(features)
         }
         addVisibleItems(fingerprint, "identity_critical_components", features)
@@ -169,7 +178,7 @@ object ProductIdentity {
         val geometry = fingerprint?.optString("overall_geometry").orEmpty().trim()
         if (geometry.length in 12..140) add(geometry)
         addVisibleItems(fingerprint, "component_layout", features)
-        extra.forEach(::add)
+        addSafeExtra()
         return padIdentityFeatures(features)
     }
 

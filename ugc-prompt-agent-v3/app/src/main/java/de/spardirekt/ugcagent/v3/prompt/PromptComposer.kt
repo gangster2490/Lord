@@ -111,6 +111,9 @@ object PromptComposer {
         if (ProductLexicon.containsForeign(prompt, fingerprint, analysis, identityAllowedExtra(prompt))) {
             failures.add("foreign_component_leak")
         }
+        if (CrossProductGuard.containsLeak(prompt, fingerprint, analysis, CreativeStrategyEngine.plan(analysis, fingerprint))) {
+            failures.add("cross_product_leak")
+        }
         if (!endsWithTiming(prompt)) failures.add("prompt_does_not_end_with_timing")
         if (Regex("REFERENCE IMAGE OVERRIDES", RegexOption.IGNORE_CASE).findAll(prompt).count() > 1) {
             failures.add("repeated_first_frame_rule")
@@ -122,7 +125,7 @@ object PromptComposer {
             failures.add("two_speech_lines")
         }
         val hooks = ProductLock.extractSpokenHooks(prompt)
-        if (!speechLanguage.equals("OFF", true) && hooks.any { HookEngine.isWeak(it, speechLanguage, analysis) }) {
+        if (!speechLanguage.equals("OFF", true) && hooks.any { HookEngine.isWeak(it, speechLanguage, analysis, fingerprint = fingerprint) }) {
             failures.add("weak_hook")
         }
         return failures
@@ -144,20 +147,23 @@ object PromptComposer {
     ): String {
         val cleaned = stripNoise(raw)
         val sections = parseSections(cleaned)
-        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+        val effectiveFingerprint = fingerprint ?: fingerprintFromIdentity(sections["PRODUCT IDENTITY LOCK"])
+        val plan = CreativeStrategyEngine.plan(analysis, effectiveFingerprint)
         val parsedAction = firstNonBlank(sections["ACTION"], extractLooseAction(cleaned), plan.action)
-        val action = if (CreativeStrategyEngine.actionConflicts(parsedAction, plan)) plan.action else parsedAction
-        val parsedSetting = firstNonBlank(sections["SETTING"], plan.setting)
-        val setting = if (CreativeStrategyEngine.settingConflicts(parsedSetting, plan)) plan.setting else parsedSetting
-        val resolvedHook = resolveHook(cleaned, hook, speechLanguage, analysis, fingerprint, plan)
-        val identity = identityBlock(fingerprint, analysis, evidence, sections["PRODUCT IDENTITY LOCK"])
-        val moving = movingBlock(fingerprint, sections["MOVING COMPONENT LOCK"])
+        val action = if (
+            CreativeStrategyEngine.actionConflicts(parsedAction, plan) ||
+            CrossProductGuard.containsLeak(parsedAction, effectiveFingerprint, analysis, plan)
+        ) plan.action else parsedAction
+        val setting = plan.setting
+        val resolvedHook = resolveHook(cleaned, hook, speechLanguage, analysis, effectiveFingerprint, plan)
+        val identity = identityBlock(effectiveFingerprint, analysis, evidence, sections["PRODUCT IDENTITY LOCK"])
+        val moving = movingBlock(effectiveFingerprint, analysis, sections["MOVING COMPONENT LOCK"])
         val settingBody = stripDimensions(setting, analysis, evidence)
         val actionBody = stripDimensions(action, analysis, evidence)
-        val extraAllowed = "$identity\n$moving\n$settingBody\n$actionBody\n${plan.human}"
+        val extraAllowed = "$identity\n$moving"
         val body = buildString {
             appendSection("FORMAT", formatBlock(generator, plan))
-            appendSection("REFERENCE", referenceBlock(fingerprint))
+            appendSection("REFERENCE", referenceBlock(effectiveFingerprint))
             appendSection("PRODUCT IDENTITY LOCK", identity)
             appendSection("MOVING COMPONENT LOCK", moving)
             appendSection("SETTING", settingBody)
@@ -165,11 +171,19 @@ object PromptComposer {
             appendSection("ACTION", actionBody)
             appendSection("HUMAN BEHAVIOUR", plan.human)
             appendSection("LIGHTING", plan.lighting)
-            appendSection("SPEECH", speechBlock(speechLanguage, resolvedHook, plan))
-            appendSection("ANTI-MORPH", ProductLock.antiMorphFor(fingerprint, analysis))
+            appendSection("SPEECH", speechBlock(speechLanguage, resolvedHook, plan, effectiveFingerprint, analysis))
+            appendSection("ANTI-MORPH", ProductLock.antiMorphFor(effectiveFingerprint, analysis))
             appendSection("TIMING", timingBlock(plan))
         }.trim()
-        return ProductLexicon.stripForeign(body, fingerprint, analysis, extraAllowed)
+        val guarded = CrossProductGuard.strip(body, effectiveFingerprint, analysis, plan)
+        return ProductLexicon.stripForeign(guarded, effectiveFingerprint, analysis, extraAllowed)
+    }
+
+    private fun fingerprintFromIdentity(identity: String?): JSONObject? = when (CrossProductGuard.family(null, null, identity.orEmpty())) {
+        CrossProductGuard.Family.MICROWAVE_COVER -> ProductIdentity.microwaveCoverFingerprint()
+        CrossProductGuard.Family.COOKWARE_PAN -> ProductIdentity.cookwarePanFingerprint()
+        CrossProductGuard.Family.FISHING_GEAR -> CreativeStrategyEngine.fishingChairFingerprint()
+        CrossProductGuard.Family.GENERIC -> null
     }
 
     private fun StringBuilder.appendSection(heading: String, body: String) {
@@ -205,7 +219,12 @@ object PromptComposer {
         reused: String?,
     ): String {
         val extras = extractShortFeatures(reused)
-        val features = ProductIdentity.compactIdentityFeatures(fingerprint, extras)
+        val extraBlob = extras.joinToString("\n") + "\n" + reused.orEmpty()
+        val features = ProductIdentity.compactIdentityFeatures(
+            fingerprint,
+            extras.filter { !CrossProductGuard.isForeignIdentityLine(it, fingerprint, analysis, extraBlob) },
+            analysis,
+        )
             .map { stripDimensions(it, analysis, evidence) }
             .filter { it.isNotBlank() && !looksLikeDimension(it) }
             .distinctBy { normalizePhrase(it) }
@@ -222,23 +241,52 @@ object PromptComposer {
         }.toList()
     }
 
-    private fun movingBlock(fingerprint: JSONObject?, reused: String?): String {
+    private fun movingBlock(fingerprint: JSONObject?, analysis: JSONObject?, reused: String?): String {
         val base = ProductLock.MOVING_COMPONENT_LOCK + "\n" + ProductLock.STATIC_WHEN_UNCERTAIN
         val withMicrowave = if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) {
             base + "\n" + ProductIdentity.MICROWAVE_VENT_STATIC
         } else {
             base
         }
-        if (fingerprint == null && !reused.isNullOrBlank() && reused.contains("identity-critical moving", true)) {
+        if (
+            fingerprint == null &&
+            !reused.isNullOrBlank() &&
+            reused.contains("identity-critical moving", true) &&
+            !CrossProductGuard.containsLeak(reused, fingerprint, analysis)
+        ) {
             return semanticDedup(reused)
         }
         return semanticDedup(withMicrowave)
     }
 
-    private fun speechBlock(language: String, hook: String?, plan: CreativeStrategyEngine.Plan): String {
+    private fun speechBlock(
+        language: String,
+        hook: String?,
+        plan: CreativeStrategyEngine.Plan,
+        fingerprint: JSONObject?,
+        analysis: JSONObject?,
+    ): String {
         if (language.equals("OFF", true)) return "No spoken dialogue."
-        val line = hook?.trim().orEmpty().ifBlank { HookEngine.generate(null, language, plan = plan) }
+        val line = cleanSpokenLine(hook, language, analysis, fingerprint, plan)
         return "${HookEngine.speechIntro(language, plan)}\n\"$line\"\nThe spoken line must finish before the 8.0-second endpoint."
+    }
+
+    private fun cleanSpokenLine(
+        hook: String?,
+        language: String,
+        analysis: JSONObject?,
+        fingerprint: JSONObject?,
+        plan: CreativeStrategyEngine.Plan,
+    ): String {
+        val candidate = hook?.trim().orEmpty()
+        if (
+            candidate.isNotBlank() &&
+            !HookEngine.isWeak(candidate, language, analysis, plan, fingerprint) &&
+            !CrossProductGuard.containsLeak(candidate, fingerprint, analysis, plan)
+        ) {
+            return candidate
+        }
+        return HookEngine.generate(analysis, language, fingerprint, plan)
     }
 
     private fun resolveHook(
@@ -250,14 +298,20 @@ object PromptComposer {
         plan: CreativeStrategyEngine.Plan,
     ): String? {
         if (language.equals("OFF", true)) return null
+        fun usable(value: String?): Boolean {
+            val text = value?.trim().orEmpty()
+            return text.isNotBlank() &&
+                !HookEngine.isWeak(text, language, analysis, plan, fingerprint) &&
+                !CrossProductGuard.containsLeak(text, fingerprint, analysis, plan)
+        }
         val found = ProductLock.extractSpokenHooks(raw)
         if (found.size > 1) {
-            return if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language, analysis, plan)) preferred.trim()
+            return if (usable(preferred)) preferred!!.trim()
             else HookEngine.generate(analysis, language, fingerprint, plan)
         }
-        if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language, analysis, plan)) return preferred.trim()
+        if (usable(preferred)) return preferred!!.trim()
         val only = found.firstOrNull()
-        if (!only.isNullOrBlank() && !HookEngine.isWeak(only, language, analysis, plan)) return only
+        if (usable(only)) return only
         return HookEngine.generate(analysis, language, fingerprint, plan)
     }
 
