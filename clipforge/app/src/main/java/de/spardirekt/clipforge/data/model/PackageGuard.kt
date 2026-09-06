@@ -27,16 +27,21 @@ object PackageGuard {
             .distinct()
             .take(brief.platform.hashtagCount)
         val caption = stripSpam(ad.caption).take(brief.platform.captionMax)
-        val overlays = ad.onScreenTexts
-            .map { stripSpam(it).take(brief.platform.overlayMax) }
-            .filter { it.isNotEmpty() }
+        val overlays = ensureCtaOverlay(
+            ad.onScreenTexts.map { stripSpam(it).take(brief.platform.overlayMax) }.filter { it.isNotEmpty() },
+            cta,
+            brief.platform,
+        )
+        val storyboard = coverStoryboard(ad.storyboard, brief.length).let { shots ->
+            if (shots.isEmpty()) shots else shots.dropLast(1) + shots.last().copy(overlay = cta.take(brief.platform.overlayMax))
+        }
         return ad.copy(
-            hooks = hooks,
+            hooks = padHooks(hooks, brief.language),
             caption = caption,
-            hashtags = hashtags,
+            hashtags = padHashtags(hashtags, brief.platform),
             onScreenTexts = overlays,
             cta = cta,
-            storyboard = coverStoryboard(ad.storyboard, brief.length),
+            storyboard = storyboard,
             veoPrompt = completeVeo(ad.veoPrompt, brief.length, brief.platform),
         )
     }
@@ -103,6 +108,41 @@ object PackageGuard {
     }
 
     fun isRetryableHttp(code: Int): Boolean = code == 429 || code in 500..599
+
+    fun padHooks(hooks: List<String>, language: AdLanguage): List<String> {
+        val fallbacks = when (language) {
+            AdLanguage.RU -> listOf("Стой, не скролль", "Смотри, как работает", "Вот это в деле", "Одно касание", "Сейчас увидишь")
+            AdLanguage.DE -> listOf("Stopp, nicht scrollen", "Sieh es in Aktion", "Echt im Einsatz", "Eine Berührung", "Jetzt ansehen")
+            AdLanguage.EN -> listOf("Stop, don't scroll", "Watch it work", "Real use, right now", "One touch", "See it now")
+        }
+        val out = hooks.toMutableList()
+        for (hook in fallbacks) {
+            if (out.size >= 5) break
+            val clipped = clipHook(hook)
+            if (clipped.isNotEmpty() && clipped !in out) out += clipped
+        }
+        return out.take(5)
+    }
+
+    fun padHashtags(tags: List<String>, platform: Platform): List<String> {
+        val extras = when (platform) {
+            Platform.TIKTOK_SHOP -> listOf("#TikTokShop", "#fyp", "#viral", "#review", "#musthave", "#shop", "#foryou", "#product")
+            Platform.REELS -> listOf("#Reels", "#instagram", "#viral", "#review", "#musthave", "#shop", "#foryou", "#product")
+            Platform.SHORTS -> listOf("#Shorts", "#youtube", "#viral", "#review", "#musthave")
+        }
+        val out = tags.toMutableList()
+        for (tag in extras) {
+            if (out.size >= platform.hashtagCount) break
+            if (tag !in out) out += tag
+        }
+        return out.take(platform.hashtagCount)
+    }
+
+    fun ensureCtaOverlay(overlays: List<String>, cta: String, platform: Platform): List<String> {
+        val clipped = cta.take(platform.overlayMax)
+        val without = overlays.filterNot { it.equals(clipped, ignoreCase = true) }
+        return (without + clipped).distinct().take(5)
+    }
 }
 
 fun AdPackage.guarded(brief: GenerateBrief): AdPackage = PackageGuard.harden(this, brief)

@@ -75,6 +75,7 @@ data class StudioUiState(
     val history: List<HistoryEntry> = emptyList(),
     val copiedLabel: String? = null,
     val pendingConfirm: PendingConfirm? = null,
+    val savedKeyMasked: String = "",
 ) {
     val canGenerate: Boolean
         get() = !isGenerating && apiKey.isNotBlank() && photos.isNotEmpty()
@@ -129,6 +130,7 @@ sealed interface StudioEvent {
     data object CopyAll : StudioEvent
     data object ShareVeo : StudioEvent
     data object ShareAll : StudioEvent
+    data object Regenerate : StudioEvent
     data class OpenHistory(val id: String) : StudioEvent
     data class RequestDeleteHistory(val id: String) : StudioEvent
     data object RequestClearArchive : StudioEvent
@@ -144,7 +146,9 @@ class StudioViewModel(
     private val liveGenerator: AdGenerator = OpenAiAdGenerator(),
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(StudioUiState(apiKey = keys.getKey()))
+    private val _state = MutableStateFlow(
+        StudioUiState(apiKey = keys.getKey(), savedKeyMasked = keys.maskedPreview()),
+    )
     val state: StateFlow<StudioUiState> = _state.asStateFlow()
     private var generateJob: Job? = null
 
@@ -175,6 +179,9 @@ class StudioViewModel(
             }
         }
         viewModelScope.launch {
+            settings.wish.collect { text -> _state.update { it.copy(wish = text) } }
+        }
+        viewModelScope.launch {
             history.entries.collect { list -> _state.update { it.copy(history = list) } }
         }
     }
@@ -190,6 +197,7 @@ class StudioViewModel(
             StudioEvent.ToggleApiKeyVisibility -> _state.update { it.copy(showApiKey = !it.showApiKey) }
             StudioEvent.SaveApiKey -> {
                 keys.saveKey(_state.value.apiKey)
+                _state.update { it.copy(savedKeyMasked = keys.maskedPreview()) }
                 flashSettings("Ключ сохранён в защищённом хранилище.")
             }
             StudioEvent.RequestClearApiKey -> _state.update { it.copy(pendingConfirm = PendingConfirm.ClearKey) }
@@ -217,8 +225,12 @@ class StudioViewModel(
                 _state.update { it.copy(language = event.value) }
                 viewModelScope.launch { settings.setLanguage(event.value) }
             }
-            is StudioEvent.WishChanged -> _state.update { it.copy(wish = event.value.take(280)) }
-            StudioEvent.Generate -> generate()
+            is StudioEvent.WishChanged -> {
+                val text = event.value.take(280)
+                _state.update { it.copy(wish = text) }
+                viewModelScope.launch { settings.setWish(text) }
+            }
+            StudioEvent.Generate, StudioEvent.Regenerate -> generate()
             StudioEvent.CancelGenerate -> cancelGenerate()
             StudioEvent.DismissError -> _state.update { it.copy(error = null) }
             is StudioEvent.Copy -> copy(event.text, event.label)
@@ -261,11 +273,12 @@ class StudioViewModel(
             PendingConfirm.NewProject -> resetProject()
             PendingConfirm.ClearKey -> {
                 keys.removeKey()
-                _state.update { it.copy(apiKey = "", settingsMessage = "Ключ удалён.") }
+                _state.update { it.copy(apiKey = "", savedKeyMasked = "", settingsMessage = "Ключ удалён.") }
             }
             PendingConfirm.ClearArchive -> viewModelScope.launch {
                 history.clear()
                 PhotoStore.clearThumbs(app)
+                PhotoStore.clearPhotos(app)
             }
             is PendingConfirm.DeleteHistory -> viewModelScope.launch {
                 history.remove(pending.id)
@@ -287,6 +300,7 @@ class StudioViewModel(
                 generateStage = null,
             )
         }
+        viewModelScope.launch { settings.setWish("") }
     }
 
     private fun onPhotosPicked(uris: List<Uri>, names: List<String?>) {
@@ -308,14 +322,12 @@ class StudioViewModel(
     }
 
     private fun removePhoto(uri: String) {
-        PhotoStore.deleteLocal(app, uri)
         _state.update { current ->
             current.copy(photos = current.photos.filterNot { it.uri == uri })
         }
     }
 
     private fun clearStudioPhotos() {
-        _state.value.photos.forEach { PhotoStore.deleteLocal(app, it.uri) }
         _state.update { it.copy(photos = emptyList()) }
     }
 
@@ -359,8 +371,11 @@ class StudioViewModel(
                     lengthSeconds = current.length.seconds,
                     formulaId = current.formula.id,
                     languageId = current.language.id,
+                    styleId = current.style.id,
                     productName = result.product.name,
                     thumbnailUri = thumb,
+                    wish = current.wish,
+                    photoUris = current.photos.map { it.uri },
                     ad = result,
                 )
                 history.upsert(entry)
@@ -371,7 +386,6 @@ class StudioViewModel(
                         result = result,
                         resultId = entry.id,
                         showResult = true,
-                        tab = Tab.STUDIO,
                     )
                 }
             } catch (e: CancellationException) {
@@ -381,7 +395,7 @@ class StudioViewModel(
                 throw e
             } catch (e: GenerateException) {
                 _state.update {
-                    it.copy(isGenerating = false, generateStage = null, error = e.message, showResult = false)
+                    it.copy(isGenerating = false, generateStage = null, error = e.message)
                 }
             } catch (e: Exception) {
                 _state.update {
@@ -389,7 +403,6 @@ class StudioViewModel(
                         isGenerating = false,
                         generateStage = null,
                         error = e.message ?: "Неизвестная ошибка.",
-                        showResult = false,
                     )
                 }
             }
@@ -415,7 +428,9 @@ class StudioViewModel(
                     }
                 }
                 keys.saveKey(key)
-                _state.update { it.copy(apiKey = key, isTestingKey = false, settingsMessage = message) }
+                _state.update {
+                    it.copy(apiKey = key, savedKeyMasked = keys.maskedPreview(), isTestingKey = false, settingsMessage = message)
+                }
             } catch (e: Exception) {
                 _state.update {
                     it.copy(isTestingKey = false, error = e.message ?: "Ключ не принят.")
@@ -426,18 +441,33 @@ class StudioViewModel(
 
     private fun openHistory(id: String) {
         val entry = _state.value.history.firstOrNull { it.id == id } ?: return
+        val platform = Platform.fromId(entry.platformId)
+        val length = AdLength.fromSeconds(entry.lengthSeconds)
+        val formula = AdFormula.fromId(entry.formulaId)
+        val language = AdLanguage.fromId(entry.languageId)
+        val style = VisualStyle.fromId(entry.styleId)
         _state.update {
             it.copy(
                 result = entry.ad,
                 resultId = entry.id,
-                platform = Platform.fromId(entry.platformId),
-                length = AdLength.fromSeconds(entry.lengthSeconds),
-                formula = AdFormula.fromId(entry.formulaId),
-                language = AdLanguage.fromId(entry.languageId),
+                platform = platform,
+                length = length,
+                formula = formula,
+                language = language,
+                style = style,
+                wish = entry.wish,
+                photos = entry.photoUris.map { uri -> ProductPhoto(uri) },
                 showResult = true,
-                tab = Tab.STUDIO,
                 error = null,
             )
+        }
+        viewModelScope.launch {
+            settings.setPlatform(platform)
+            settings.setLength(length)
+            settings.setFormula(formula)
+            settings.setLanguage(language)
+            settings.setStyle(style)
+            settings.setWish(entry.wish)
         }
     }
 

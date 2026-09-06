@@ -9,7 +9,7 @@ ClipForge **не рендерит видеофайл**. Он собирает п
 | Field | Value |
 |---|---|
 | applicationId | `de.spardirekt.clipforge` |
-| versionName | `1.1.0` |
+| versionName | `1.1.1` |
 | minSdk | 26 |
 | targetSdk | 35 |
 
@@ -26,6 +26,8 @@ ClipForge **не рендерит видеофайл**. Он собирает п
 - Демо без сети: ключ `sk-demo`
 - Ключ OpenAI в EncryptedSharedPreferences
 - Подтверждение опасных действий, Share, отмена генерации
+- Архив восстанавливает стиль, пожелание и фото; «Ещё раз» пересобирает пакет
+- PackageGuard дополняет хуки, хештеги и CTA на последнем кадре
 
 Правила пакета:
 

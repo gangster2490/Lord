@@ -33,7 +33,35 @@ class PackageGuardTest {
             hooks = listOf("one two three four five six seven eight"),
         )
         val hardened = ad.guarded(brief())
-        assertThat(hardened.hooks.single().split(" ")).hasSize(6)
+        assertThat(hardened.hooks.first().split(" ")).hasSize(6)
+        assertThat(hardened.hooks).hasSize(5)
+    }
+
+    @Test
+    fun padsHooksAndHashtags() {
+        val hardened = AdPackage(
+            hooks = listOf("Стой"),
+            hashtags = listOf("#one"),
+        ).guarded(brief(platform = Platform.SHORTS))
+        assertThat(hardened.hooks).hasSize(5)
+        assertThat(hardened.hooks.first()).isEqualTo("Стой")
+        assertThat(hardened.hashtags).hasSize(Platform.SHORTS.hashtagCount)
+        assertThat(hardened.hashtags.first()).isEqualTo("#one")
+    }
+
+    @Test
+    fun lastStoryboardOverlayIsCta() {
+        val hardened = AdPackage(
+            cta = "Сейчас в корзине",
+            onScreenTexts = listOf("Не скролл"),
+            storyboard = listOf(
+                StoryboardShot(0.0, 2.0, "medium", "hook", "Не скролл"),
+                StoryboardShot(2.0, 8.0, "medium", "end", "Wrong"),
+            ),
+        ).guarded(brief())
+        assertThat(hardened.storyboard.last().overlay).isEqualTo("Сейчас в корзине")
+        assertThat(hardened.onScreenTexts.last()).isEqualTo("Сейчас в корзине")
+        assertThat(hardened.onScreenTexts).contains("Не скролл")
     }
 
     @Test

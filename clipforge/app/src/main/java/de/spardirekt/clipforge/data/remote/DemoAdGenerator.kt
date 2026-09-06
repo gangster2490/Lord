@@ -40,7 +40,7 @@ object DemoAdGenerator : AdGenerator {
                 name = copy.productName,
                 category = copy.category,
                 visualLock = copy.visualLock,
-                sellingAngle = copy.angle(brief.formula),
+                sellingAngle = foldWish(copy.angle(brief.formula), brief.wish, brief.language),
                 audience = copy.audience,
                 keyFeatures = copy.features,
             ),
@@ -57,6 +57,17 @@ object DemoAdGenerator : AdGenerator {
             thumbnailPrompt = copy.thumbnail,
             whyItConverts = copy.why(brief.platform, brief.formula),
         ).guarded(brief.copy(photoCount = images.size.coerceAtLeast(brief.photoCount)))
+    }
+
+    internal fun foldWish(angle: String, wish: String, language: AdLanguage): String {
+        val extra = wish.trim()
+        if (extra.isBlank()) return angle
+        val label = when (language) {
+            AdLanguage.RU -> "Пожелание"
+            AdLanguage.DE -> "Wunsch"
+            AdLanguage.EN -> "Wish"
+        }
+        return "$angle. $label: $extra"
     }
 
     private fun storyboard(

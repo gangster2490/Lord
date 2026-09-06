@@ -29,6 +29,7 @@ class SettingsStore(private val context: Context) {
     val formulaId: Flow<String> = context.settingsStore.data.map { it[FORMULA] ?: AdFormula.HOOK_DEMO_CTA.id }
     val styleId: Flow<String> = context.settingsStore.data.map { it[STYLE] ?: VisualStyle.CINEMATIC.id }
     val languageId: Flow<String> = context.settingsStore.data.map { it[LANGUAGE] ?: AdLanguage.RU.id }
+    val wish: Flow<String> = context.settingsStore.data.map { it[WISH].orEmpty() }
 
     suspend fun setPlatform(value: Platform) {
         context.settingsStore.edit { it[PLATFORM] = value.id }
@@ -50,12 +51,17 @@ class SettingsStore(private val context: Context) {
         context.settingsStore.edit { it[LANGUAGE] = value.id }
     }
 
+    suspend fun setWish(value: String) {
+        context.settingsStore.edit { it[WISH] = value.take(280) }
+    }
+
     companion object {
         private val PLATFORM = stringPreferencesKey("platform")
         private val LENGTH = stringPreferencesKey("length_seconds")
         private val FORMULA = stringPreferencesKey("formula")
         private val STYLE = stringPreferencesKey("style")
         private val LANGUAGE = stringPreferencesKey("language")
+        private val WISH = stringPreferencesKey("wish")
     }
 }
 

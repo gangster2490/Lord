@@ -130,13 +130,20 @@ fun SettingsScreen(
             state.settingsMessage?.let {
                 Text(it, color = Cyan, fontSize = 13.sp)
             }
+            if (state.savedKeyMasked.isNotBlank()) {
+                Text(
+                    "Сохранён: ${state.savedKeyMasked}",
+                    color = TextMid,
+                    fontSize = 12.sp,
+                )
+            }
             state.error?.let { ErrorBanner(it) { onEvent(StudioEvent.DismissError) } }
         }
 
         ForgeCard {
             SectionLabel("Архив")
             Text(
-                text = "Пакеты хранятся на этом устройстве. Очистка удаляет все записи и превью.",
+                text = "Пакеты хранятся на этом устройстве. Очистка удаляет записи, превью и сохранённые фото.",
                 color = TextMid,
                 fontSize = 13.sp,
                 lineHeight = 19.sp,
@@ -161,6 +168,23 @@ fun SettingsScreen(
                 color = TextPrimary,
                 fontSize = 14.sp,
                 lineHeight = 21.sp,
+            )
+        }
+
+        ForgeCard {
+            SectionLabel("О приложении")
+            Text(
+                text = "ClipForge ${de.spardirekt.clipforge.BuildConfig.VERSION_NAME}",
+                color = TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Пакет ролика, не рендер видео. Модель: gpt-4o vision.",
+                color = TextMid,
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+                modifier = Modifier.padding(top = 6.dp),
             )
         }
     }

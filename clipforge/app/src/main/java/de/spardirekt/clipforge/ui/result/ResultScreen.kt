@@ -24,6 +24,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -71,7 +75,7 @@ fun ResultScreen(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                contentDescription = "Назад в студию",
+                contentDescription = "Назад",
                 tint = TextPrimary,
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
@@ -225,9 +229,24 @@ fun ResultScreen(
                 .padding(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (state.isGenerating) {
+                Text(
+                    state.generateStage ?: "Собираю ролик…",
+                    color = Cyan,
+                    fontSize = 13.sp,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                ActionButton("Подпись", Modifier.weight(1f)) { onEvent(StudioEvent.CopyCaption) }
                 ActionButton("Veo пакет", Modifier.weight(1f), Magenta) { onEvent(StudioEvent.CopyVeo) }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 ActionButton("Поделиться", Modifier.weight(1f)) { onEvent(StudioEvent.ShareVeo) }
+                if (state.isGenerating) {
+                    ActionButton("Отмена", Modifier.weight(1f), Gold) { onEvent(StudioEvent.CancelGenerate) }
+                } else {
+                    ActionButton("Ещё раз", Modifier.weight(1f), Gold) { onEvent(StudioEvent.Regenerate) }
+                }
             }
             ActionButton("Скопировать всё", Modifier.fillMaxWidth()) {
                 onEvent(StudioEvent.CopyAll)
@@ -257,15 +276,16 @@ private fun MonoBlock(text: String) {
 private fun ActionButton(
     label: String,
     modifier: Modifier = Modifier,
-    color: androidx.compose.ui.graphics.Color = Cyan,
+    color: Color = Cyan,
     onClick: () -> Unit,
 ) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(color.copy(alpha = 0.14f))
-            .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.22f))
+            .border(1.dp, color.copy(alpha = 0.65f), RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) { role = Role.Button }
             .padding(vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {

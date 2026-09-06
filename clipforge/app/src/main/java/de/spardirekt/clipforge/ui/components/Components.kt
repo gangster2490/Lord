@@ -78,22 +78,24 @@ fun ChoiceChip(
     label: String,
     selected: Boolean,
     accent: Color = Magenta,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val isSelected = selected
     val bg = if (isSelected) accent.copy(alpha = 0.18f) else Surface2
     val border = if (isSelected) accent.copy(alpha = 0.7f) else Hairline
-    val fg = if (isSelected) TextPrimary else TextMid
+    val fg = if (!enabled) TextDim else if (isSelected) TextPrimary else TextMid
     Text(
         text = label,
         modifier = Modifier
             .clip(ChipShape)
             .background(bg)
             .border(1.dp, border, ChipShape)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .semantics(mergeDescendants = true) {
                 role = Role.RadioButton
                 this.selected = isSelected
+                if (!enabled) disabled()
             }
             .padding(horizontal = 12.dp, vertical = 8.dp),
         color = fg,

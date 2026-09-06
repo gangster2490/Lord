@@ -146,8 +146,11 @@ data class HistoryEntry(
     val lengthSeconds: Int,
     val formulaId: String,
     val languageId: String,
+    val styleId: String = VisualStyle.CINEMATIC.id,
     val productName: String,
     val thumbnailUri: String? = null,
+    val wish: String = "",
+    val photoUris: List<String> = emptyList(),
     val ad: AdPackage,
 )
 

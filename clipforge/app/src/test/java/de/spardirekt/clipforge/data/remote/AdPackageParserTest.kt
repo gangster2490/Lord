@@ -201,6 +201,18 @@ class DemoAdGeneratorTest {
         assertThat(isDemoKey("sk-proj-real")).isFalse()
         assertThat(adGeneratorFor("sk-demo")).isSameInstanceAs(DemoAdGenerator)
     }
+
+    @Test
+    fun foldsWishIntoSellingAngle() = runBlocking {
+        val ad = DemoAdGenerator.generate(
+            "sk-demo",
+            emptyList(),
+            brief(Platform.TIKTOK_SHOP).let { it.copy(wish = "на рыбалке, без студии") },
+        )
+        assertThat(ad.product.sellingAngle).contains("на рыбалке")
+        assertThat(ad.product.sellingAngle).contains("Пожелание")
+        assertThat(ad.storyboard.last().overlay).isEqualTo("Сейчас в корзине")
+    }
 }
 
 class JsonExtractorTest {

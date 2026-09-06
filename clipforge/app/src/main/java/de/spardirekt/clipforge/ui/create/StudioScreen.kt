@@ -121,6 +121,7 @@ fun StudioScreen(
                 Spacer(Modifier.height(10.dp))
                 PhotoStrip(
                     photos = state.photos,
+                    enabled = !state.isGenerating,
                     onAdd = {
                         picker.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
@@ -132,7 +133,7 @@ fun StudioScreen(
 
             ForgeCard {
                 SectionLabel("Площадка")
-                PlatformRow(state.platform) { onEvent(StudioEvent.PlatformChanged(it)) }
+                PlatformRow(state.platform, enabled = !state.isGenerating) { onEvent(StudioEvent.PlatformChanged(it)) }
                 Spacer(Modifier.height(12.dp))
                 SectionLabel("Хронометраж")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -141,6 +142,7 @@ fun StudioScreen(
                             label = length.label,
                             selected = state.length == length,
                             accent = Cyan,
+                            enabled = !state.isGenerating,
                             onClick = { onEvent(StudioEvent.LengthChanged(length)) },
                         )
                     }
@@ -157,6 +159,7 @@ fun StudioScreen(
                         ChoiceChip(
                             label = formula.labelRu,
                             selected = state.formula == formula,
+                            enabled = !state.isGenerating,
                             onClick = { onEvent(StudioEvent.FormulaChanged(formula)) },
                         )
                     }
@@ -172,6 +175,7 @@ fun StudioScreen(
                             label = style.labelRu,
                             selected = state.style == style,
                             accent = Cyan,
+                            enabled = !state.isGenerating,
                             onClick = { onEvent(StudioEvent.StyleChanged(style)) },
                         )
                     }
@@ -183,6 +187,7 @@ fun StudioScreen(
                         ChoiceChip(
                             label = language.label,
                             selected = state.language == language,
+                            enabled = !state.isGenerating,
                             onClick = { onEvent(StudioEvent.LanguageChanged(language)) },
                         )
                     }
@@ -195,6 +200,7 @@ fun StudioScreen(
                     value = state.wish,
                     onValueChange = { onEvent(StudioEvent.WishChanged(it)) },
                     modifier = Modifier.fillMaxWidth().testTag("wish"),
+                    enabled = !state.isGenerating,
                     placeholder = { Text("Например: показать на рыбалке, без студии") },
                     minLines = 2,
                     maxLines = 4,
@@ -263,6 +269,7 @@ fun StudioScreen(
 @Composable
 private fun PhotoStrip(
     photos: List<ProductPhoto>,
+    enabled: Boolean,
     onAdd: () -> Unit,
     onRemove: (String) -> Unit,
 ) {
@@ -291,7 +298,7 @@ private fun PhotoStrip(
                         .size(20.dp)
                         .clip(CircleShape)
                         .background(Background.copy(alpha = 0.75f))
-                        .clickable { onRemove(photo.uri) },
+                        .clickable(enabled = enabled) { onRemove(photo.uri) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -309,7 +316,7 @@ private fun PhotoStrip(
                 .clip(RoundedCornerShape(12.dp))
                 .background(Surface2)
                 .border(1.dp, Hairline, RoundedCornerShape(12.dp))
-                .clickable(onClick = onAdd)
+                .clickable(enabled = enabled, onClick = onAdd)
                 .testTag("add_photos"),
             contentAlignment = Alignment.Center,
         ) {
@@ -324,6 +331,7 @@ private fun PhotoStrip(
 @Composable
 private fun PlatformRow(
     selected: Platform,
+    enabled: Boolean,
     onSelect: (Platform) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -350,7 +358,7 @@ private fun PlatformRow(
                         if (isChosen) accent.copy(alpha = 0.7f) else Hairline,
                         RoundedCornerShape(12.dp),
                     )
-                    .clickable { onSelect(platform) }
+                    .clickable(enabled = enabled) { onSelect(platform) }
                     .semantics(mergeDescendants = true) {
                         role = Role.RadioButton
                         this.selected = isChosen

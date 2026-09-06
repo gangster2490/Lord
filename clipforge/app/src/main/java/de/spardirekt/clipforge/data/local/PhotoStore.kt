@@ -32,6 +32,10 @@ object PhotoStore {
         thumbsDir(context).deleteRecursively()
     }
 
+    fun clearPhotos(context: Context) {
+        photosDir(context).deleteRecursively()
+    }
+
     private fun copyOrKeep(context: Context, source: Uri, dest: File): String {
         dest.parentFile?.mkdirs()
         val copied = runCatching {
