@@ -75,7 +75,7 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         "STYLE:\nWarm, homely, natural kitchen UGC. Ordinary cozy home, not a showroom. Casual human voice, not a product presenter. Slightly imperfect handheld smartphone. No robotic or overly technical narration. No polished commercial tone."
 
     private const val SECTION_LOOKAHEAD =
-        "FORMAT|REFERENCE|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|SPEECH|ANTI-MORPH|DURATION|STYLE|PRODUCT LOCK|Target generator"
+        "FORMAT|REFERENCE|PRODUCT IDENTITY LOCK|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|SPEECH|ANTI-MORPH|DURATION|TIMING|STYLE|PRODUCT LOCK|Target generator"
 
     const val CAMERA_LOCK =
         "Natural handheld smartphone. Slight tremor and tiny human drift are allowed. No orbit, dramatic push-in, aggressive zoom, cinematic crane, or major angle change that hides identity-critical geometry."
@@ -95,32 +95,13 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
     )
 
     fun ensure(prompt: String, lockOn: Boolean, fingerprint: JSONObject? = null): String {
-        var body = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(prompt.trim())
-        body = stripInternalLeaks(body)
-        if (lockOn) {
-            body = ensureProductLockOnce(body)
-        }
-        body = upsertHeaderSection(body, "FINAL IDENTITY LOCK:", ProductIdentity.finalIdentityLockBlock(fingerprint))
-        body = ensureContains(body, COMPONENT_COUNT_LOCK)
-        body = ensureContains(body, GENERIC_SUBSTITUTION_BAN)
-        body = upsertHeaderSection(
-            body,
-            "MOVING COMPONENT LOCK:",
-            "MOVING COMPONENT LOCK:\n$MOVING_COMPONENT_LOCK\n$STATIC_WHEN_UNCERTAIN",
+        val repaired = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(prompt.trim())
+        return PromptComposer.compose(
+            raw = repaired,
+            fingerprint = fingerprint,
+            generator = "VEO",
+            speechLanguage = "OFF",
         )
-        body = upsertHeaderSection(body, "ANTI-MORPH:", "ANTI-MORPH:\n$ANTI_MORPH")
-        if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) {
-            body = ensureContains(body, ProductIdentity.MICROWAVE_COVER_LOCK)
-            body = ensureContains(body, ProductIdentity.MICROWAVE_VENT_STATIC, "keep it completely static")
-        }
-        if (ProductIdentity.hasFinishConflict(fingerprint) || looksLikeFinishConflict(body)) {
-            body = ensureContains(body, FIRST_FRAME_WINS, "SELECTED FIRST FRAME WINS")
-        }
-        body = ensureContains(body, CAMERA_LOCK, "Natural handheld smartphone")
-        body = ensureContains(body, HUMAN_LOCK, "five fingers")
-        body = ensureContains(body, LIGHTING_LOCK, "Ordinary home daylight")
-        body = collapseDuplicateLockBlocks(body)
-        return body.trim()
     }
 
     fun finalizeClean(
@@ -131,22 +112,28 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         hook: String? = null,
         lockOn: Boolean = true,
         analysis: JSONObject? = null,
+        evidence: JSONObject? = null,
     ): String {
-        var body = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(prompt)
-        body = stripInternalLeaks(body)
-        body = stripJsonDumps(body)
-        body = EvidenceModel.sanitizePromptBody(body)
-        body = de.spardirekt.ugcagent.v3.compliance.MarketplaceFilter.stripFromText(body)
-        body = stripUncertainDimensions(body)
-        val resolvedHook = resolveSpokenHook(body, hook, speechLanguage, analysis)
-        body = collapseDuplicateLockBlocks(body)
-        body = ensure(body, lockOn, fingerprint)
-        body = applyGenerator(body, generator)
-        body = upsertHeaderSection(body, "STYLE:", UGC_STYLE)
-        body = normalizeSpeech(body, speechLanguage, resolvedHook)
-        body = collapseDuplicateLockBlocks(body)
-        body = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(body)
-        return body.trim()
+        val repaired = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(prompt)
+        val composed = PromptComposer.compose(
+            raw = repaired,
+            fingerprint = fingerprint,
+            generator = generator,
+            speechLanguage = speechLanguage,
+            hook = hook,
+            analysis = analysis,
+            evidence = evidence,
+        )
+        if (PromptComposer.isCanonical(composed, speechLanguage, analysis, evidence)) return composed
+        return PromptComposer.compose(
+            raw = PromptComposer.extractAction(composed).ifBlank { composed },
+            fingerprint = fingerprint,
+            generator = generator,
+            speechLanguage = speechLanguage,
+            hook = hook,
+            analysis = analysis,
+            evidence = evidence,
+        )
     }
 
     fun repairOnce(
@@ -171,22 +158,13 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
     }
 
     fun normalizeSpeech(prompt: String, speechLanguage: String, hook: String?): String {
-        if (speechLanguage.equals("OFF", true)) {
-            var next = stripSpeechSections(prompt)
-            return ensureNoSpeech(next)
-        }
-        val block = if (!hook.isNullOrBlank()) {
-            HookEngine.speechBlock(hook, speechLanguage)
-        } else {
-            existingSpokenLine(prompt)?.let { HookEngine.speechBlock(it, speechLanguage) }
-                ?: """
-SPEECH:
-${if (speechLanguage.equals("РУССКИЙ", true)) "The person speaks naturally in Russian." else "The person speaks naturally in German."}
-Spoken hook begins around 0.3–0.8 seconds.
-$SPEECH_END_TIMING
-""".trimIndent()
-        }
-        return (stripSpeechSections(prompt).trimEnd() + "\n\n" + block).replace(Regex("\n{3,}"), "\n\n").trim()
+        return PromptComposer.compose(
+            raw = de.spardirekt.ugcagent.v3.text.Utf8Guard.repair(prompt),
+            fingerprint = null,
+            generator = "VEO",
+            speechLanguage = speechLanguage,
+            hook = hook,
+        )
     }
 
     fun speechHeadingCount(prompt: String): Int =
@@ -196,13 +174,22 @@ $SPEECH_END_TIMING
         Regex("spoken line must finish before the 8\\.0-second endpoint", RegexOption.IGNORE_CASE).findAll(prompt).count()
 
     fun identityLockCount(prompt: String): Int =
-        Regex("(?im)^FINAL IDENTITY LOCK:").findAll(prompt).count()
+        Regex("(?im)^PRODUCT IDENTITY LOCK:").findAll(prompt).count()
+
+    fun leftoverIdentityHeadingCount(prompt: String): Int =
+        Regex("(?im)^(FINAL IDENTITY LOCK|STRUCTURAL IDENTITY LOCK):").findAll(prompt).count()
 
     fun movingLockCount(prompt: String): Int =
         Regex("(?im)^MOVING COMPONENT LOCK:").findAll(prompt).count()
 
     fun durationHeadingCount(prompt: String): Int =
+        Regex("(?im)^TIMING:").findAll(prompt).count()
+
+    fun leftoverDurationCount(prompt: String): Int =
         Regex("(?im)^DURATION:").findAll(prompt).count()
+
+    fun antiMorphHeadingCount(prompt: String): Int =
+        Regex("(?im)^ANTI-MORPH:").findAll(prompt).count()
 
     fun extractSpokenHooks(prompt: String): List<String> {
         val found = mutableListOf<String>()
@@ -231,25 +218,16 @@ $SPEECH_END_TIMING
     fun hasConflictingSpokenHooks(prompt: String): Boolean = extractSpokenHooks(prompt).size > 1
 
     fun applyGenerator(prompt: String, generator: String): String {
-        var cleaned = prompt.replace(Regex("maximum 8(\\.0)? seconds", RegexOption.IGNORE_CASE), "exactly 8.0 seconds")
-        val gen = generator.uppercase()
-        if (gen == "VEO") {
-            cleaned = upsertHeaderSection(cleaned, "DURATION:", DURATION_BLOCK)
-            if (!cleaned.contains("Target generator:", ignoreCase = true)) {
-                cleaned = "Target generator: Veo. Vertical 9:16. One continuous clip.\n\n$cleaned"
-            }
-            return collapseDuplicateLockBlocks(cleaned)
-        }
-        val closest = "Use the closest supported duration to 8.0 seconds without creating multiple scenes.\n$VEO_DURATION_LOCK"
-        cleaned = ensureContains(cleaned, closest, "closest supported duration to 8.0 seconds")
-        cleaned = ensureContains(cleaned, VEO_DURATION_LOCK, "freeze-frame tail")
-        if (cleaned.contains("Target generator:", ignoreCase = true)) return cleaned
-        val note = if (gen == "KLING") {
-            "Target generator: Kling. Vertical 9:16. One continuous clip."
-        } else {
-            "Target generator: generic short-form video model. Vertical 9:16. One continuous clip."
-        }
-        return "$note\n\n$cleaned"
+        val cleaned = prompt.replace(Regex("maximum 8(\\.0)? seconds", RegexOption.IGNORE_CASE), "exactly 8.0 seconds")
+        val speech = inferredSpeechLanguage(cleaned)
+        val hook = extractSpokenHooks(cleaned).firstOrNull()
+        return PromptComposer.compose(
+            raw = cleaned,
+            fingerprint = null,
+            generator = generator,
+            speechLanguage = speech,
+            hook = hook,
+        )
     }
 
     fun looksLikeProductRebuild(prompt: String): Boolean = appearanceLeak.containsMatchIn(prompt)
@@ -314,7 +292,9 @@ $SPEECH_END_TIMING
     fun veoHasExactDuration(prompt: String): Boolean {
         val lower = prompt.lowercase()
         val exact = lower.contains("exactly 8.0 seconds")
-        val end = lower.contains("end at exactly 8.0 seconds") || lower.contains("must end at exactly 8.0 seconds")
+        val end = lower.contains("end at exactly 8.0 seconds") ||
+            lower.contains("end exactly at 8.0 seconds") ||
+            lower.contains("must end at exactly 8.0 seconds")
         val noTail = lower.contains("freeze-frame tail") && (lower.contains("intro") && lower.contains("outro"))
         val onlyMaximum = lower.contains("maximum 8") && !exact
         return exact && end && noTail && !onlyMaximum
@@ -348,11 +328,15 @@ $SPEECH_END_TIMING
         if (hasDuplicateProductLock(prompt)) failures.add("duplicate_product_lock")
         if (!speechLanguage.equals("OFF", true) && speechHeadingCount(prompt) > 1) failures.add("duplicate_speech_heading")
         if (!speechLanguage.equals("OFF", true) && speechEndTimingCount(prompt) > 1) failures.add("duplicate_speech_timing")
-        if (identityLockCount(prompt) > 1) failures.add("duplicate_identity_lock")
-        if (movingLockCount(prompt) > 1) failures.add("duplicate_moving_lock")
-        if (durationHeadingCount(prompt) > 1) failures.add("duplicate_duration")
+        if (identityLockCount(prompt) != 1) failures.add("duplicate_identity_lock")
+        if (leftoverIdentityHeadingCount(prompt) > 0) failures.add("leftover_identity_heading")
+        if (movingLockCount(prompt) != 1) failures.add("duplicate_moving_lock")
+        if (antiMorphHeadingCount(prompt) != 1) failures.add("duplicate_anti_morph")
+        if (durationHeadingCount(prompt) != 1) failures.add("duplicate_duration")
+        if (leftoverDurationCount(prompt) > 0) failures.add("leftover_duration")
         if (hasConflictingSpokenHooks(prompt)) failures.add("conflicting_spoken_hooks")
-        return failures
+        failures += PromptComposer.canonicalFailures(prompt, speechLanguage)
+        return failures.distinct()
     }
 
     fun leaksInternalAnalysis(prompt: String): Boolean {
@@ -367,7 +351,8 @@ $SPEECH_END_TIMING
 
     fun hasDuplicateProductLock(prompt: String): Boolean =
         Regex("REFERENCE IMAGE OVERRIDES", RegexOption.IGNORE_CASE).findAll(prompt).count() > 1 ||
-            Regex("FINAL IDENTITY LOCK:", RegexOption.IGNORE_CASE).findAll(prompt).count() > 1
+            identityLockCount(prompt) > 1 ||
+            leftoverIdentityHeadingCount(prompt) > 0
 
     fun looksLikeFinishConflict(prompt: String): Boolean {
         val lower = prompt.lowercase()
@@ -393,8 +378,18 @@ $SPEECH_END_TIMING
         return if (body.contains("REFERENCE IMAGE OVERRIDES", ignoreCase = true)) body else "$LOCK_TEXT\n\n$body"
     }
 
+    private fun inferredSpeechLanguage(prompt: String): String {
+        val lower = prompt.lowercase()
+        return when {
+            lower.contains("no spoken dialogue") -> "OFF"
+            lower.contains("casual home russian") || lower.contains("speaks naturally in russian") -> "РУССКИЙ"
+            lower.contains("casual home german") || lower.contains("speaks naturally in german") -> "DEUTSCH"
+            else -> "OFF"
+        }
+    }
+
     private fun insertFinalIdentityLock(body: String, fingerprint: JSONObject?): String {
-        return upsertHeaderSection(body, "FINAL IDENTITY LOCK:", ProductIdentity.finalIdentityLockBlock(fingerprint))
+        return upsertHeaderSection(body, "PRODUCT IDENTITY LOCK:", ProductIdentity.finalIdentityLockBlock(fingerprint))
     }
 
     private fun ensureAntiMorphOnce(body: String): String {
@@ -445,10 +440,12 @@ $SPEECH_END_TIMING
 
     private fun collapseDuplicateLockBlocks(body: String): String {
         var next = keepFirstBlock(body, Regex("(?is)The reference images define one exact physical product\\.[\\s\\S]*?REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION\\."))
+        next = keepFirstHeaderSection(next, "PRODUCT IDENTITY LOCK:")
         next = keepFirstHeaderSection(next, "FINAL IDENTITY LOCK:")
         next = keepFirstHeaderSection(next, "MOVING COMPONENT LOCK:")
         next = keepFirstHeaderSection(next, "ANTI-MORPH:")
         next = keepFirstHeaderSection(next, "SPEECH:")
+        next = keepFirstHeaderSection(next, "TIMING:")
         next = keepFirstHeaderSection(next, "DURATION:")
         next = keepFirstHeaderSection(next, "STYLE:")
         next = keepFirstOccurrence(next, GENERIC_SUBSTITUTION_BAN)

@@ -25,7 +25,8 @@ class PipelineEngineTest {
         assertTrue(result.completed.contains(PipelineStage.CAPTION_GENERATION))
         assertTrue(result.completed.contains(PipelineStage.HOOK_GENERATION))
         assertTrue(result.repairApplied)
-        assertTrue(result.finalPrompt.orEmpty().contains("FINAL IDENTITY LOCK"))
+        assertTrue(result.finalPrompt.orEmpty().contains("PRODUCT IDENTITY LOCK"))
+        assertFalse(result.finalPrompt.orEmpty().contains("FINAL IDENTITY LOCK"))
         assertEquals("b", result.firstFrameId)
         assertTrue(result.firstFrameAutoApplied)
         assertEquals(1, fake.calls.count { it == PipelineStage.CONSISTENCY_CHECK })
@@ -43,7 +44,11 @@ class PipelineEngineTest {
         assertEquals(1, de.spardirekt.ugcagent.v3.prompt.ProductLock.durationHeadingCount(result.finalPrompt.orEmpty()))
         assertFalse(de.spardirekt.ugcagent.v3.prompt.ProductLock.hasConflictingSpokenHooks(result.finalPrompt.orEmpty()))
         assertTrue(result.hook.contains("mag") || result.hook.contains("Hause") || result.hook.contains("gemütlich") || result.hook.contains("Küche"))
-        assertTrue(result.finalPrompt.orEmpty().contains("Warm, homely") || result.finalPrompt.orEmpty().contains("STYLE:"))
+        assertTrue(result.finalPrompt.orEmpty().contains("Warm, homely"))
+        assertFalse(result.finalPrompt.orEmpty().contains("STYLE:"))
+        de.spardirekt.ugcagent.v3.prompt.PromptComposer.CANONICAL_HEADINGS.forEach { heading ->
+            assertEquals(heading, 1, de.spardirekt.ugcagent.v3.prompt.PromptComposer.headingCounts(result.finalPrompt.orEmpty())[heading] ?: 0)
+        }
     }
 
     @Test
@@ -200,6 +205,7 @@ class PipelineEngineTest {
         session.captionLanguage = "РУССКИЙ"
         val result = PipelineEngine(FakePipelineAi()).start(session)
         assertTrue(result.details.orEmpty().contains("Категория товара"))
+        assertTrue(result.hook.contains("приятно иметь дома") || result.finalPrompt.orEmpty().contains("Вот такую вещь приятно иметь дома."))
         val pack = de.spardirekt.ugcagent.v3.prompt.DetailsBuilder.videoPackage(
             result.finalPrompt.orEmpty(),
             result.caption.orEmpty(),

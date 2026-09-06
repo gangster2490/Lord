@@ -101,7 +101,46 @@ The spoken line must finish before the 8.0-second endpoint.
         assertFalse(ProductLock.hasConflictingSpokenHooks(out))
         assertTrue(out.contains("Ich mag's") || out.contains("gemütlich") || out.contains("Hause"))
         assertFalse(out.contains("beste Produkt"))
-        assertTrue(out.contains("STYLE:"))
+        assertTrue(out.contains("STYLE:").not())
         assertTrue(out.contains("Warm, homely"))
+        assertTrue(out.contains("PRODUCT IDENTITY LOCK"))
+        assertFalse(out.contains("FINAL IDENTITY LOCK"))
+        assertEquals(0, ProductLock.leftoverDurationCount(out))
+        assertTrue(out.contains("TIMING:"))
+        org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(out, ProductIdentity.microwaveCoverFingerprint(), "VEO", "DEUTSCH"))
+    }
+
+    @Test
+    fun finalizeCleanOmitsSellerAndConflictingDimensions() {
+        val raw = """
+FORMAT:
+Vertical 9:16.
+ACTION:
+Place the 28 cm cover on a plate.
+Exact dimensions: 28 cm diameter from listing graphic.
+""".trimIndent()
+        val analysis = org.json.JSONObject()
+            .put("product_category", "kitchen")
+            .put("dimensions", org.json.JSONArray().put("28 cm").put("30 cm listing"))
+            .put("text_claims", org.json.JSONArray().put("28 cm microwave cover"))
+        val out = ProductLock.finalizeClean(
+            raw,
+            ProductIdentity.microwaveCoverFingerprint(),
+            "VEO",
+            "РУССКИЙ",
+            "Вот такую вещь приятно иметь дома.",
+            true,
+            analysis,
+        )
+        assertFalse(out.contains("28 cm"))
+        assertFalse(out.contains("30 cm"))
+        assertFalse(Regex("(?im)^DURATION:").containsMatchIn(out))
+        assertFalse(Regex("(?im)^STYLE:").containsMatchIn(out))
+        assertFalse(Regex("(?im)^FINAL IDENTITY LOCK:").containsMatchIn(out))
+        PromptComposer.CANONICAL_HEADINGS.forEach { heading ->
+            assertEquals(heading, 1, PromptComposer.headingCounts(out)[heading] ?: 0)
+        }
+        assertTrue(out.contains("Вот такую вещь приятно иметь дома."))
+        assertEquals(1, ProductLock.extractSpokenHooks(out).size)
     }
 }

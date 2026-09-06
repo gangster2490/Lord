@@ -37,7 +37,7 @@ object HookEngine {
         val russian = language.equals("РУССКИЙ", true)
         val kitchen = isKitchen(analysis)
         val hook = when {
-            kitchen && russian -> "Люблю, когда на кухне всё просто и удобно."
+            kitchen && russian -> "Вот такую вещь приятно иметь дома."
             kitchen && !russian -> "Ich mag's, wenn in der Küche alles einfach und gemütlich bleibt."
             russian -> "Вот такую вещь приятно иметь дома."
             else -> "So was hat man gern zu Hause."
@@ -99,7 +99,7 @@ $SPEECH_END
     private fun generateFallback(analysis: JSONObject?, language: String): String {
         val russian = language.equals("РУССКИЙ", true)
         return when {
-            isKitchen(analysis) && russian -> "Для кухни — очень уютная и удобная вещь."
+            isKitchen(analysis) && russian -> "Вот такую вещь приятно иметь дома."
             isKitchen(analysis) && !russian -> "Für die Küche — gemütlich und einfach praktisch."
             russian -> "Вот такую вещь приятно иметь дома."
             else -> "So was hat man gern zu Hause."

@@ -337,6 +337,7 @@ class NativeBridge(
             project.hook,
             project.strictProductLock,
             project.analysis,
+            project.evidence,
         )
         project.repairApplied = true
         persist()
@@ -402,6 +403,7 @@ class NativeBridge(
             project.hook,
             project.strictProductLock,
             project.analysis,
+            project.evidence,
         )
         project.caption = fixed.caption
         project.hashtags = fixed.hashtags.toMutableList()

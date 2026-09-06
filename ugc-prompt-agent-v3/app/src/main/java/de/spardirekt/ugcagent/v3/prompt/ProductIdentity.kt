@@ -78,12 +78,12 @@ object ProductIdentity {
         }
         val geometry = fingerprint?.optString("overall_geometry").orEmpty().trim()
         if (geometry.isNotBlank()) out.add(geometry)
-        addVisibleItems(fingerprint, "identity_critical_components", out)
         addVisibleItems(fingerprint, "component_count_constraints", out)
+        addVisibleItems(fingerprint, "identity_critical_components", out)
         addVisibleItems(fingerprint, "component_layout", out)
         addVisibleItems(fingerprint, "attachment_points", out, skipUnconfirmed = true)
         addVisibleItems(fingerprint, "must_not_change", out)
-        return out.map { it.trim() }.filter { it.isNotBlank() && !isInternalLeak(it) }.distinctBy { it.lowercase() }.take(10)
+        return out.map { it.trim() }.filter { it.isNotBlank() && !isInternalLeak(it) && !looksLikeDimension(it) }.distinctBy { it.lowercase() }.take(12)
     }
 
     fun finalIdentityLockBlock(fingerprint: JSONObject?): String {
@@ -97,7 +97,7 @@ object ProductIdentity {
             )).distinctBy { it.lowercase() }.take(10)
         }
         return buildString {
-            appendLine("FINAL IDENTITY LOCK:")
+            appendLine("PRODUCT IDENTITY LOCK:")
             constraints.forEachIndexed { index, line -> appendLine("${index + 1}. $line") }
         }.trim()
     }
@@ -138,6 +138,8 @@ object ProductIdentity {
             lower.contains("unconfirmed attachment") ||
             lower.contains("exact dimension")
     }
+
+    private fun looksLikeDimension(text: String): Boolean = PromptComposer.looksLikeDimension(text)
 
     fun localReadiness(fingerprint: JSONObject?): JSONObject {
         val uncertain = fingerprint?.optJSONArray("uncertain_hidden_geometry") ?: JSONArray()

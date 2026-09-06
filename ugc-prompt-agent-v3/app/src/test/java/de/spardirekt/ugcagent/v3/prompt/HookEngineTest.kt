@@ -1,6 +1,7 @@
 package de.spardirekt.ugcagent.v3.prompt
 
 import org.json.JSONObject
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -15,6 +16,7 @@ class HookEngineTest {
     fun kitchenRussianHookIsWarmAndHomely() {
         val analysis = JSONObject().put("observed_use_case", "microwave cover").put("product_category", "kitchen")
         val hook = HookEngine.generate(analysis, "РУССКИЙ")
+        assertEquals("Вот такую вещь приятно иметь дома.", hook)
         assertFalse(HookEngine.isWeak(hook, "РУССКИЙ"))
         assertTrue(HookEngine.isWarm(hook, "РУССКИЙ"))
         assertTrue(

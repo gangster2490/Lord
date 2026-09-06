@@ -64,6 +64,9 @@ object EvidenceModel {
         val warning = source.optString("ambiguity_warning")
         if (warning.isNotBlank()) uncertain += warning
         val dimensions = JsonExtractor.stringList(source, "dimensions")
+        dimensions.filter { it.isNotBlank() }.forEach { dim ->
+            uncertain += dim
+        }
         if (dimensions.map { it.trim().lowercase() }.distinct().size > 1) {
             uncertain += "conflicting dimensions omitted"
         }
@@ -150,7 +153,7 @@ object EvidenceModel {
 
     fun sanitizePromptBody(prompt: String): String {
         val speech = Regex(
-            "(?is)(?:^|\\n)SPEECH:\\s*.*?(?=\\n(?:FORMAT|REFERENCE|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|ANTI-MORPH|DURATION|STYLE|Target generator)\\b|$)",
+            "(?is)(?:^|\\n)SPEECH:\\s*.*?(?=\\n(?:FORMAT|REFERENCE|PRODUCT IDENTITY LOCK|FINAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|LIGHTING|ANTI-MORPH|DURATION|TIMING|STYLE|Target generator)\\b|$)",
         )
         val speechBlocks = speech.findAll(prompt).map { it.value }.toList()
         var body = speech.replace(prompt, "\n")

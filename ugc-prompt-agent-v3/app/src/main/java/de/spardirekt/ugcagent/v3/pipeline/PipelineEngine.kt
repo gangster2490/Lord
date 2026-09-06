@@ -321,6 +321,7 @@ class PipelineEngine(private val ai: PipelineAi) {
             session.hook,
             session.strictProductLock,
             session.analysis,
+            session.evidence,
         )
     }
 
@@ -351,7 +352,26 @@ class PipelineEngine(private val ai: PipelineAi) {
             session.hook,
             session.strictProductLock,
             session.analysis,
+            session.evidence,
         )
+        if (!de.spardirekt.ugcagent.v3.prompt.PromptComposer.isCanonical(
+                session.finalPrompt.orEmpty(),
+                session.speechLanguage,
+                session.analysis,
+                session.evidence,
+            )
+        ) {
+            session.finalPrompt = ProductLock.finalizeClean(
+                de.spardirekt.ugcagent.v3.prompt.PromptComposer.extractAction(session.finalPrompt.orEmpty()),
+                fingerprint,
+                session.targetGenerator,
+                session.speechLanguage,
+                session.hook,
+                session.strictProductLock,
+                session.analysis,
+                session.evidence,
+            )
+        }
         session.repairApplied = true
         ProductLock.regressionFailures(session.finalPrompt.orEmpty(), fingerprint, session.targetGenerator, session.speechLanguage).forEach {
             session.warnings.add("Prompt quality: $it")
@@ -378,6 +398,7 @@ class PipelineEngine(private val ai: PipelineAi) {
             session.hook,
             session.strictProductLock,
             session.analysis,
+            session.evidence,
         )
         session.caption = fixed.caption
         session.hashtags = fixed.hashtags.toMutableList()
@@ -434,23 +455,58 @@ class PipelineEngine(private val ai: PipelineAi) {
     }
 
     private fun selfCheck(session: PipelineSession) {
-        val prompt = session.finalPrompt.orEmpty()
+        var prompt = session.finalPrompt.orEmpty()
+        val composer = de.spardirekt.ugcagent.v3.prompt.PromptComposer
+        if (!composer.isCanonical(prompt, session.speechLanguage, session.analysis, session.evidence) ||
+            composer.CANONICAL_HEADINGS.any { (composer.headingCounts(prompt)[it] ?: 0) != 1 }
+        ) {
+            prompt = ProductLock.finalizeClean(
+                prompt,
+                session.identityFingerprint,
+                session.targetGenerator,
+                session.speechLanguage,
+                session.hook,
+                session.strictProductLock,
+                session.analysis,
+                session.evidence,
+            )
+            session.finalPrompt = prompt
+            session.repairApplied = true
+        }
+        val counts = composer.headingCounts(prompt)
         val checks = JSONObject()
             .put("first_frame", session.firstFrameId != null)
-            .put("identity_lock", prompt.contains("FINAL IDENTITY LOCK", ignoreCase = true))
-            .put("one_lock_section", Regex("FINAL IDENTITY LOCK:", RegexOption.IGNORE_CASE).findAll(prompt).count() <= 1)
+            .put("identity_lock", prompt.contains("PRODUCT IDENTITY LOCK", ignoreCase = true))
+            .put("one_lock_section", (counts["PRODUCT IDENTITY LOCK"] ?: 0) == 1)
+            .put("canonical_headings", composer.CANONICAL_HEADINGS.all { (counts[it] ?: 0) == 1 })
+            .put("no_forbidden_headings", composer.FORBIDDEN_HEADINGS.none { (composer.rawHeadingCounts(prompt)[it] ?: 0) > 0 })
             .put("exact_8s", ProductLock.veoHasExactDuration(prompt) || session.targetGenerator != "VEO")
             .put("speech_end", session.speechLanguage.equals("OFF", true) || ProductLock.hasSpeechEndTiming(prompt))
             .put("hook", session.hook.isNotBlank() && !de.spardirekt.ugcagent.v3.prompt.HookEngine.isWeak(session.hook, session.speechLanguage))
             .put("caption", session.caption.orEmpty().isNotBlank())
             .put("hashtags", de.spardirekt.ugcagent.v3.prompt.EvidenceModel.hashtagCountOk(session.hashtags))
             .put("no_hard_error", session.pausedReason == null)
-            .put("speech_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.speechHeadingCount(prompt) <= 1)
-            .put("moving_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.movingLockCount(prompt) <= 1)
-            .put("duration_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.durationHeadingCount(prompt) <= 1)
+            .put("speech_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.speechHeadingCount(prompt) == 1)
+            .put("moving_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.movingLockCount(prompt) == 1)
+            .put("anti_morph_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.antiMorphHeadingCount(prompt) == 1)
+            .put("timing_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.durationHeadingCount(prompt) == 1)
+            .put("no_duration_heading", de.spardirekt.ugcagent.v3.prompt.ProductLock.leftoverDurationCount(prompt) == 0)
             .put("one_spoken_hook", !de.spardirekt.ugcagent.v3.prompt.ProductLock.hasConflictingSpokenHooks(prompt))
             .put("compliance_pass", session.compliance?.optString("status") != "BLOCK")
         session.selfCheck = checks
+        if (!checks.optBoolean("canonical_headings") || !checks.optBoolean("one_lock_section") || !checks.optBoolean("speech_once")) {
+            session.finalPrompt = ProductLock.finalizeClean(
+                prompt,
+                session.identityFingerprint,
+                session.targetGenerator,
+                session.speechLanguage,
+                session.hook,
+                session.strictProductLock,
+                session.analysis,
+                session.evidence,
+            )
+            session.repairApplied = true
+        }
         if (!checks.optBoolean("hook")) {
             session.hook = de.spardirekt.ugcagent.v3.prompt.HookEngine.generate(session.analysis, session.speechLanguage)
         }
