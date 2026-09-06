@@ -28,6 +28,31 @@ class ProviderClientsTest {
         assertThat(AiProviderId.fromStored("gemini")).isEqualTo(AiProviderId.GEMINI)
         assertThat(AiProviderId.fromStored("nope")).isEqualTo(AiProviderId.OPENAI)
     }
+
+    @Test
+    fun attemptOrder_addsOtherProviderOnceWhenItsKeyExists() {
+        val keys = mapOf(
+            AiProviderId.OPENAI to "sk-live",
+            AiProviderId.GEMINI to "AIza-live",
+        )
+        val order = ProviderClients.attemptOrder(AiProviderId.OPENAI) { keys.getValue(it) }
+        assertThat(order.map { it.provider }).containsExactly(AiProviderId.OPENAI, AiProviderId.GEMINI).inOrder()
+        assertThat(order[1].apiKey).isEqualTo("AIza-live")
+    }
+
+    @Test
+    fun attemptOrder_skipsFallbackForDemoAndMissingAltKey() {
+        val demo = ProviderClients.attemptOrder(AiProviderId.GEMINI) {
+            if (it == AiProviderId.GEMINI) "sk-demo" else "AIza-live"
+        }
+        assertThat(demo).hasSize(1)
+        assertThat(demo[0].provider).isEqualTo(AiProviderId.GEMINI)
+        val noAlt = ProviderClients.attemptOrder(AiProviderId.OPENAI) {
+            if (it == AiProviderId.OPENAI) "sk-live" else ""
+        }
+        assertThat(noAlt).hasSize(1)
+        assertThat(noAlt[0].provider).isEqualTo(AiProviderId.OPENAI)
+    }
 }
 
 class AiModelConfigTest {

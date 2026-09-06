@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.spardirekt.ugcclean.R
 import de.spardirekt.ugcclean.net.AiProviderId
+import de.spardirekt.ugcclean.ui.ProviderKeyUi
 import de.spardirekt.ugcclean.ui.theme.Accent
 import de.spardirekt.ugcclean.ui.theme.Background
 import de.spardirekt.ugcclean.ui.theme.Hairline
@@ -49,14 +51,14 @@ import de.spardirekt.ugcclean.ui.theme.TextPrimary
 @Composable
 fun SettingsScreen(
     provider: AiProviderId,
-    keyDraft: String,
-    masked: Boolean,
+    openai: ProviderKeyUi,
+    gemini: ProviderKeyUi,
     onProvider: (AiProviderId) -> Unit,
-    onKeyChange: (String) -> Unit,
-    onToggleMask: () -> Unit,
-    onSave: () -> Unit,
-    onTest: () -> Unit,
-    onRemove: () -> Unit,
+    onKeyChange: (AiProviderId, String) -> Unit,
+    onToggleMask: (AiProviderId) -> Unit,
+    onSave: (AiProviderId) -> Unit,
+    onTest: (AiProviderId) -> Unit,
+    onRemove: (AiProviderId) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -79,33 +81,71 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.provider_hint), color = TextMid, fontSize = 13.sp)
+        Spacer(Modifier.height(6.dp))
+        Text(stringResource(R.string.provider_fallback_hint), color = TextMid, fontSize = 12.sp)
         Spacer(Modifier.height(18.dp))
-        Text(
-            if (provider == AiProviderId.GEMINI) stringResource(R.string.api_key_gemini) else stringResource(R.string.api_key_openai),
-            color = TextMid,
-            fontSize = 13.sp,
+        ProviderKeyCard(
+            title = stringResource(R.string.provider_openai),
+            status = if (openai.saved) stringResource(R.string.provider_status_saved) else stringResource(R.string.provider_status_missing),
+            hint = stringResource(R.string.api_key_hint_openai),
+            ui = openai,
+            onKeyChange = { onKeyChange(AiProviderId.OPENAI, it) },
+            onToggleMask = { onToggleMask(AiProviderId.OPENAI) },
+            onSave = { onSave(AiProviderId.OPENAI) },
+            onTest = { onTest(AiProviderId.OPENAI) },
+            onRemove = { onRemove(AiProviderId.OPENAI) },
         )
-        Spacer(Modifier.height(8.dp))
+        ProviderKeyCard(
+            title = stringResource(R.string.provider_gemini),
+            status = if (gemini.saved) stringResource(R.string.provider_status_saved) else stringResource(R.string.provider_status_missing),
+            hint = stringResource(R.string.api_key_hint_gemini),
+            ui = gemini,
+            onKeyChange = { onKeyChange(AiProviderId.GEMINI, it) },
+            onToggleMask = { onToggleMask(AiProviderId.GEMINI) },
+            onSave = { onSave(AiProviderId.GEMINI) },
+            onTest = { onTest(AiProviderId.GEMINI) },
+            onRemove = { onRemove(AiProviderId.GEMINI) },
+        )
+        Text(stringResource(R.string.demo_hint), color = TextMid, fontSize = 13.sp)
+        Spacer(Modifier.height(80.dp))
+    }
+}
+
+@Composable
+private fun ProviderKeyCard(
+    title: String,
+    status: String,
+    hint: String,
+    ui: ProviderKeyUi,
+    onKeyChange: (String) -> Unit,
+    onToggleMask: () -> Unit,
+    onSave: () -> Unit,
+    onTest: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 14.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Surface)
+            .padding(14.dp),
+    ) {
+        Text(title, color = Accent, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(4.dp))
+        Text(status, color = TextMid, fontSize = 12.sp)
+        Spacer(Modifier.height(10.dp))
         OutlinedTextField(
-            value = keyDraft,
+            value = ui.draft,
             onValueChange = onKeyChange,
             modifier = Modifier.fillMaxWidth(),
-            placeholder = {
-                Text(
-                    if (provider == AiProviderId.GEMINI) {
-                        stringResource(R.string.api_key_hint_gemini)
-                    } else {
-                        stringResource(R.string.api_key_hint_openai)
-                    },
-                    color = TextMid,
-                )
-            },
-            visualTransformation = if (masked) PasswordVisualTransformation() else VisualTransformation.None,
+            placeholder = { Text(hint, color = TextMid) },
+            visualTransformation = if (ui.masked) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             trailingIcon = {
                 IconButton(onClick = onToggleMask) {
                     Icon(
-                        if (masked) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
+                        if (ui.masked) Icons.Outlined.Visibility else Icons.Outlined.VisibilityOff,
                         contentDescription = null,
                         tint = TextMid,
                     )
@@ -117,24 +157,25 @@ fun SettingsScreen(
                 focusedTextColor = TextPrimary,
                 unfocusedTextColor = TextPrimary,
                 cursorColor = Accent,
-                focusedContainerColor = Surface,
-                unfocusedContainerColor = Surface,
+                focusedContainerColor = Background,
+                unfocusedContainerColor = Background,
             ),
             shape = RoundedCornerShape(14.dp),
             singleLine = true,
         )
-        Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.demo_hint), color = TextMid, fontSize = 13.sp)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
         Button(
             onClick = onSave,
-            modifier = Modifier.fillMaxWidth().height(48.dp),
+            modifier = Modifier.fillMaxWidth().height(44.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background),
         ) { Text(stringResource(R.string.save_key), fontWeight = FontWeight.Bold) }
-        TextButton(onClick = onTest) { Text(stringResource(R.string.test_key), color = Accent) }
-        TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_key), color = TextMid) }
-        Spacer(Modifier.height(80.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onTest, shape = RoundedCornerShape(14.dp)) {
+                Text(stringResource(R.string.test_key), color = Accent)
+            }
+            TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_key), color = TextMid) }
+        }
     }
 }
 

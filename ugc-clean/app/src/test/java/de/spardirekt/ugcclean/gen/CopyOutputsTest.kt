@@ -22,6 +22,7 @@ class CopyOutputsTest {
             hashtags = listOf("#Büro", "#Alltag"),
             details = Compliance.details(Fixtures.organizer, SpeechLanguage.DE),
         ),
+        aiProvider = "GEMINI",
     )
 
     @Test
@@ -58,6 +59,7 @@ class CopyOutputsTest {
         val advanced = record.advancedDetails()
         assertThat(advanced).contains("desk organizer")
         assertThat(advanced).contains("First Frame")
+        assertThat(advanced).contains("KI: GEMINI")
         assertThat(record.videoPackage()).doesNotContain(advanced)
     }
 }

@@ -25,7 +25,10 @@
     <string name="provider">KI-Anbieter</string>
     <string name="provider_openai">OpenAI</string>
     <string name="provider_gemini">Gemini</string>
-    <string name="provider_hint">START nutzt den gespeicherten Anbieter. Anbieter nicht auf dem Create-Screen wählen.</string>
+    <string name="provider_hint">START nutzt den markierten Anbieter. Auf Create nicht nochmal wählen.</string>
+    <string name="provider_fallback_hint">Wenn er fehlschlägt und der andere Key gespeichert ist, wird einmal automatisch gewechselt.</string>
+    <string name="provider_status_saved">Key gespeichert</string>
+    <string name="provider_status_missing">Nicht konfiguriert</string>
     <string name="save_key">Key speichern</string>
     <string name="test_key">Verbindung testen</string>
     <string name="remove_key">Key löschen</string>

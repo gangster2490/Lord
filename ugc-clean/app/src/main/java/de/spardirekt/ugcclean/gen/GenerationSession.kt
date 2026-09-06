@@ -10,6 +10,7 @@ import de.spardirekt.ugcclean.model.PipelineStage
 import de.spardirekt.ugcclean.model.ProjectRecord
 import de.spardirekt.ugcclean.model.ProjectStatus
 import de.spardirekt.ugcclean.model.SpeechLanguage
+import de.spardirekt.ugcclean.net.Keys
 import de.spardirekt.ugcclean.net.ProviderClients
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,11 +59,28 @@ class GenerationSession(
                 if (images.size < StartGate.MIN_PHOTOS) {
                     throw PipelineException("Fotos konnten nicht gelesen werden.")
                 }
-                val live = clients.forKey(settings.provider(), key)
-                Pipeline(liveClient = live, demoClient = clients.demo).run(key, images, language) { stage, percent ->
-                    update { it.copy(stage = stage, progressPercent = percent, updatedAt = System.currentTimeMillis()) }
+                val attempts = ProviderClients.attemptOrder(settings.provider()) { settings.apiKey(it) }
+                var last: Throwable? = null
+                var used = if (Keys.isDemo(key)) "DEMO" else settings.provider().name
+                var result: PipelineResult? = null
+                for (attempt in attempts) {
+                    val outcome = runCatching {
+                        Pipeline(liveClient = clients.forKey(attempt.provider, attempt.key), demoClient = clients.demo)
+                            .run(attempt.key, images, language) { stage, percent ->
+                                update { it.copy(stage = stage, progressPercent = percent, updatedAt = System.currentTimeMillis()) }
+                            }
+                    }
+                    if (outcome.isSuccess) {
+                        result = outcome.getOrThrow()
+                        used = if (Keys.isDemo(attempt.key)) "DEMO" else attempt.provider.name
+                        last = null
+                        break
+                    }
+                    last = outcome.exceptionOrNull()
                 }
-            }.onSuccess { result ->
+                if (result == null) throw last ?: PipelineException("Anfrage fehlgeschlagen.")
+                result to used
+            }.onSuccess { (result, used) ->
                 update {
                     it.copy(
                         status = ProjectStatus.READY,
@@ -72,6 +90,7 @@ class GenerationSession(
                         veoPrompt = result.veoPrompt,
                         copyPack = result.copyPack,
                         errorMessage = null,
+                        aiProvider = used,
                         updatedAt = System.currentTimeMillis(),
                     )
                 }

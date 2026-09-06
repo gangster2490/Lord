@@ -4,7 +4,7 @@ New Android app (`de.spardirekt.ugcclean`) built from scratch. It does not reuse
 
 Native Kotlin + Jetpack Compose. One flow:
 
-1. Settings → pick OpenAI or Gemini, paste that key (or `sk-demo`)
+1. Settings → OpenAI and Gemini key cards, pick which one START uses (or `sk-demo`)
 2. Create → 3–15 product photos
 3. Deutsch or Русский
 4. **START** once
@@ -25,7 +25,7 @@ Providers (Settings only, not on START):
 - OpenAI: `gpt-5.6-sol` → `gpt-5.6-terra` → `gpt-4o`
 - Gemini: `gemini-2.5-flash` → `gemini-2.0-flash` → `gemini-1.5-flash`
 
-Keys stay in EncryptedSharedPreferences. `sk-demo` still runs locally with no network.
+Keys stay in EncryptedSharedPreferences, one per provider. If the selected provider fails and the other key is saved, START retries once. `sk-demo` still runs locally with no network.
 
 No leftover templates. Demo mode (`sk-demo`) is first-frame locked and category-unknown, so it cannot leak another product family.
 

@@ -92,7 +92,15 @@ private fun HistoryRow(project: ProjectRecord, onOpen: () -> Unit, onDelete: () 
                 fontWeight = FontWeight.Medium,
             )
             Text(
-                "${statusLabel(project.status)} · ${formatTime(project.updatedAt)}",
+                buildString {
+                    append(statusLabel(project.status))
+                    if (project.aiProvider.isNotBlank()) {
+                        append(" · ")
+                        append(project.aiProvider)
+                    }
+                    append(" · ")
+                    append(formatTime(project.updatedAt))
+                },
                 color = if (project.status == ProjectStatus.ERROR) Danger else TextMid,
                 fontSize = 12.sp,
             )

@@ -104,8 +104,8 @@ class MainActivity : ComponentActivity() {
                             )
                             state.tab == Tab.SETTINGS -> SettingsScreen(
                                 provider = state.provider,
-                                keyDraft = state.keyDraft,
-                                masked = state.keyMasked,
+                                openai = state.openai,
+                                gemini = state.gemini,
                                 onProvider = vm::setProvider,
                                 onKeyChange = vm::setKeyDraft,
                                 onToggleMask = vm::toggleKeyMask,

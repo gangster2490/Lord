@@ -65,6 +65,7 @@ data class ProjectRecord(
     val veoPrompt: String = "",
     val copyPack: CopyPack? = null,
     val errorMessage: String? = null,
+    val aiProvider: String = "",
 ) {
     fun videoPackage(): String {
         val tags = copyPack?.hashtags.orEmpty().joinToString(" ")
@@ -101,6 +102,7 @@ data class ProjectRecord(
             "First Frame: erstes Foto",
             "Support: ${supportUris().size} Bilder",
             "Sprache: ${language.name}",
+            "KI: ${aiProvider.ifBlank { "—" }}",
         ).joinToString("\n")
     }
 }

@@ -37,6 +37,11 @@ object AiModelConfig {
     }
 }
 
+data class ProviderAttempt(
+    val provider: AiProviderId,
+    val apiKey: String,
+)
+
 class ProviderClients(
     val openAi: OpenAiClient = OpenAiClient(),
     val gemini: GeminiClient = GeminiClient(),
@@ -55,6 +60,26 @@ class ProviderClients(
         return when (provider) {
             AiProviderId.OPENAI -> openAi.testConnection(apiKey)
             AiProviderId.GEMINI -> gemini.testConnection(apiKey)
+        }
+    }
+
+    companion object {
+        fun other(id: AiProviderId): AiProviderId =
+            if (id == AiProviderId.OPENAI) AiProviderId.GEMINI else AiProviderId.OPENAI
+
+        fun attemptOrder(
+            primary: AiProviderId,
+            keyFor: (AiProviderId) -> String,
+        ): List<ProviderAttempt> {
+            val firstKey = keyFor(primary)
+            val order = mutableListOf(ProviderAttempt(primary, firstKey))
+            if (Keys.isDemo(firstKey) || firstKey.isBlank()) return order
+            val alt = other(primary)
+            val altKey = keyFor(alt)
+            if (altKey.isNotBlank() && !Keys.isDemo(altKey)) {
+                order += ProviderAttempt(alt, altKey)
+            }
+            return order
         }
     }
 }

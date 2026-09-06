@@ -10,7 +10,6 @@ import de.spardirekt.ugcclean.model.ProjectRecord
 import de.spardirekt.ugcclean.model.ProjectStatus
 import de.spardirekt.ugcclean.model.SpeechLanguage
 import de.spardirekt.ugcclean.net.AiProviderId
-import de.spardirekt.ugcclean.net.Keys
 import de.spardirekt.ugcclean.net.ProviderClients
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,30 +20,30 @@ import kotlinx.coroutines.withContext
 
 enum class Tab { CREATE, HISTORY, SETTINGS }
 
+data class ProviderKeyUi(
+    val draft: String = "",
+    val masked: Boolean = true,
+    val saved: Boolean = false,
+)
+
 data class UiState(
     val tab: Tab = Tab.CREATE,
     val photos: List<String> = emptyList(),
     val language: SpeechLanguage = SpeechLanguage.DE,
     val hasKey: Boolean = false,
-    val keyDraft: String = "",
-    val keyMasked: Boolean = true,
     val toast: String? = null,
     val history: List<ProjectRecord> = emptyList(),
     val active: ProjectRecord? = null,
     val opened: ProjectRecord? = null,
     val showResult: Boolean = false,
     val provider: AiProviderId = AiProviderId.OPENAI,
+    val openai: ProviderKeyUi = ProviderKeyUi(),
+    val gemini: ProviderKeyUi = ProviderKeyUi(),
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as UgcCleanApp
-    private val _state = MutableStateFlow(
-        UiState(
-            hasKey = app.settings.hasKey(),
-            keyDraft = if (app.settings.hasKey()) "••••••••" else "",
-            provider = app.settings.provider(),
-        ),
-    )
+    private val _state = MutableStateFlow(loadUi())
     val state: StateFlow<UiState> = _state
     private val clients = ProviderClients()
 
@@ -140,41 +139,42 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setProvider(id: AiProviderId) {
         app.settings.setProvider(id)
-        val has = app.settings.hasKey(id)
-        _state.update {
-            it.copy(
-                provider = id,
-                hasKey = has,
-                keyDraft = if (has) "••••••••" else "",
-                keyMasked = true,
-            )
-        }
+        _state.update { it.copy(provider = id, hasKey = app.settings.hasKey(id)) }
     }
 
-    fun setKeyDraft(value: String) = _state.update { it.copy(keyDraft = value, keyMasked = false) }
+    fun setKeyDraft(id: AiProviderId, value: String) {
+        _state.update { ui -> ui.copyProvider(id) { it.copy(draft = value, masked = false) } }
+    }
 
-    fun toggleKeyMask() = _state.update { it.copy(keyMasked = !it.keyMasked) }
+    fun toggleKeyMask(id: AiProviderId) {
+        _state.update { ui -> ui.copyProvider(id) { it.copy(masked = !it.masked) } }
+    }
 
-    fun saveKey() {
-        val value = _state.value.keyDraft.trim()
-        if (value.isBlank() || value.startsWith("••")) {
+    fun saveKey(id: AiProviderId) {
+        val draft = _state.value.keyUi(id).draft.trim()
+        if (draft.isBlank() || draft.startsWith("••")) {
             _state.update { it.copy(toast = "Bitte einen Key einfügen.") }
             return
         }
-        app.settings.saveKey(value, _state.value.provider)
-        _state.update { it.copy(hasKey = true, keyDraft = "••••••••", keyMasked = true, toast = "Key gespeichert") }
+        app.settings.saveKey(draft, id)
+        _state.update { ui ->
+            ui.copyProvider(id) { ProviderKeyUi(draft = "••••••••", masked = true, saved = true) }
+                .copy(hasKey = app.settings.hasKey(), toast = "Key gespeichert")
+        }
     }
 
-    fun removeKey() {
-        app.settings.clearKey(_state.value.provider)
-        _state.update { it.copy(hasKey = false, keyDraft = "", toast = "Key gelöscht") }
+    fun removeKey(id: AiProviderId) {
+        app.settings.clearKey(id)
+        _state.update { ui ->
+            ui.copyProvider(id) { ProviderKeyUi() }
+                .copy(hasKey = app.settings.hasKey(), toast = "Key gelöscht")
+        }
     }
 
-    fun testKey() {
+    fun testKey(id: AiProviderId) {
         viewModelScope.launch {
-            val provider = _state.value.provider
-            val stored = app.settings.apiKey(provider)
-            val draft = _state.value.keyDraft.trim()
+            val stored = app.settings.apiKey(id)
+            val draft = _state.value.keyUi(id).draft.trim()
             val key = when {
                 stored.isNotBlank() -> stored
                 draft.isNotBlank() && !draft.startsWith("••") -> draft
@@ -185,9 +185,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
             val msg = withContext(Dispatchers.IO) {
-                runCatching { clients.test(provider, key) }.getOrElse { it.message ?: "Test fehlgeschlagen" }
+                runCatching { clients.test(id, key) }.getOrElse { it.message ?: "Test fehlgeschlagen" }
             }
-            _state.update { it.copy(toast = msg, hasKey = app.settings.hasKey(provider) || Keys.isDemo(key)) }
+            _state.update { it.copy(toast = msg, hasKey = app.settings.hasKey()) }
         }
     }
 
@@ -199,6 +199,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun refreshHistory() {
-        _state.update { it.copy(history = app.projects.list(), hasKey = app.settings.hasKey(), provider = app.settings.provider()) }
+        _state.update { loadUi().copy(tab = it.tab, photos = it.photos, language = it.language, showResult = it.showResult, opened = it.opened, active = it.active, toast = it.toast) }
+    }
+
+    private fun loadUi(): UiState {
+        val provider = app.settings.provider()
+        return UiState(
+            hasKey = app.settings.hasKey(),
+            history = app.projects.list(),
+            provider = provider,
+            openai = storedKeyUi(AiProviderId.OPENAI),
+            gemini = storedKeyUi(AiProviderId.GEMINI),
+        )
+    }
+
+    private fun storedKeyUi(id: AiProviderId): ProviderKeyUi {
+        val saved = app.settings.hasKey(id)
+        return ProviderKeyUi(draft = if (saved) "••••••••" else "", masked = true, saved = saved)
     }
 }
+
+private fun UiState.keyUi(id: AiProviderId): ProviderKeyUi =
+    if (id == AiProviderId.OPENAI) openai else gemini
+
+private fun UiState.copyProvider(id: AiProviderId, transform: (ProviderKeyUi) -> ProviderKeyUi): UiState =
+    if (id == AiProviderId.OPENAI) copy(openai = transform(openai)) else copy(gemini = transform(gemini))
