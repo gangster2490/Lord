@@ -43,11 +43,13 @@ class SettingsStore(context: Context) {
     private fun keyName(id: AiProviderId): String = when (id) {
         AiProviderId.OPENAI -> KEY_OPENAI
         AiProviderId.GEMINI -> KEY_GEMINI
+        AiProviderId.CLAUDE -> KEY_CLAUDE
     }
 
     companion object {
         private const val PROVIDER = "ai_provider"
         private const val KEY_OPENAI = "openai_api_key"
         private const val KEY_GEMINI = "gemini_api_key"
+        private const val KEY_CLAUDE = "claude_api_key"
     }
 }

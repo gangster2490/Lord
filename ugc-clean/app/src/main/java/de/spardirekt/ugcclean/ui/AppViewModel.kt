@@ -39,6 +39,7 @@ data class UiState(
     val provider: AiProviderId = AiProviderId.OPENAI,
     val openai: ProviderKeyUi = ProviderKeyUi(),
     val gemini: ProviderKeyUi = ProviderKeyUi(),
+    val claude: ProviderKeyUi = ProviderKeyUi(),
 )
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -210,6 +211,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             provider = provider,
             openai = storedKeyUi(AiProviderId.OPENAI),
             gemini = storedKeyUi(AiProviderId.GEMINI),
+            claude = storedKeyUi(AiProviderId.CLAUDE),
         )
     }
 
@@ -219,8 +221,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-private fun UiState.keyUi(id: AiProviderId): ProviderKeyUi =
-    if (id == AiProviderId.OPENAI) openai else gemini
+private fun UiState.keyUi(id: AiProviderId): ProviderKeyUi = when (id) {
+    AiProviderId.OPENAI -> openai
+    AiProviderId.GEMINI -> gemini
+    AiProviderId.CLAUDE -> claude
+}
 
 private fun UiState.copyProvider(id: AiProviderId, transform: (ProviderKeyUi) -> ProviderKeyUi): UiState =
-    if (id == AiProviderId.OPENAI) copy(openai = transform(openai)) else copy(gemini = transform(gemini))
+    when (id) {
+        AiProviderId.OPENAI -> copy(openai = transform(openai))
+        AiProviderId.GEMINI -> copy(gemini = transform(gemini))
+        AiProviderId.CLAUDE -> copy(claude = transform(claude))
+    }

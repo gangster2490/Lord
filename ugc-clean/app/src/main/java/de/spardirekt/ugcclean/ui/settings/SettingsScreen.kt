@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,11 +50,13 @@ import de.spardirekt.ugcclean.ui.theme.Surface
 import de.spardirekt.ugcclean.ui.theme.TextMid
 import de.spardirekt.ugcclean.ui.theme.TextPrimary
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     provider: AiProviderId,
     openai: ProviderKeyUi,
     gemini: ProviderKeyUi,
+    claude: ProviderKeyUi,
     onProvider: (AiProviderId) -> Unit,
     onKeyChange: (AiProviderId, String) -> Unit,
     onToggleMask: (AiProviderId) -> Unit,
@@ -71,12 +75,18 @@ fun SettingsScreen(
         Spacer(Modifier.height(20.dp))
         Text(stringResource(R.string.provider), color = TextMid, fontSize = 13.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             ProviderChip(stringResource(R.string.provider_openai), provider == AiProviderId.OPENAI) {
                 onProvider(AiProviderId.OPENAI)
             }
             ProviderChip(stringResource(R.string.provider_gemini), provider == AiProviderId.GEMINI) {
                 onProvider(AiProviderId.GEMINI)
+            }
+            ProviderChip(stringResource(R.string.provider_claude), provider == AiProviderId.CLAUDE) {
+                onProvider(AiProviderId.CLAUDE)
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -105,6 +115,17 @@ fun SettingsScreen(
             onSave = { onSave(AiProviderId.GEMINI) },
             onTest = { onTest(AiProviderId.GEMINI) },
             onRemove = { onRemove(AiProviderId.GEMINI) },
+        )
+        ProviderKeyCard(
+            title = stringResource(R.string.provider_claude),
+            status = if (claude.saved) stringResource(R.string.provider_status_saved) else stringResource(R.string.provider_status_missing),
+            hint = stringResource(R.string.api_key_hint_claude),
+            ui = claude,
+            onKeyChange = { onKeyChange(AiProviderId.CLAUDE, it) },
+            onToggleMask = { onToggleMask(AiProviderId.CLAUDE) },
+            onSave = { onSave(AiProviderId.CLAUDE) },
+            onTest = { onTest(AiProviderId.CLAUDE) },
+            onRemove = { onRemove(AiProviderId.CLAUDE) },
         )
         Text(stringResource(R.string.demo_hint), color = TextMid, fontSize = 13.sp)
         Spacer(Modifier.height(80.dp))

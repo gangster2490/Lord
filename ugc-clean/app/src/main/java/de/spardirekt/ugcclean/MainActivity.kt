@@ -106,6 +106,7 @@ class MainActivity : ComponentActivity() {
                                 provider = state.provider,
                                 openai = state.openai,
                                 gemini = state.gemini,
+                                claude = state.claude,
                                 onProvider = vm::setProvider,
                                 onKeyChange = vm::setKeyDraft,
                                 onToggleMask = vm::toggleKeyMask,
