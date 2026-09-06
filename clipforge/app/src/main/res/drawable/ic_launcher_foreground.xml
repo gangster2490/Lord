@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Play-mark forged from a vertical 9:16 frame -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M40,28 h28 a6,6 0 0 1 6,6 v40 a6,6 0 0 1 -6,6 h-28 a6,6 0 0 1 -6,-6 v-40 a6,6 0 0 1 6,-6 z"
+        android:strokeWidth="4"
+        android:strokeColor="#FF2D6A" />
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M50,42 L70,54 L50,66 Z" />
+</vector>
