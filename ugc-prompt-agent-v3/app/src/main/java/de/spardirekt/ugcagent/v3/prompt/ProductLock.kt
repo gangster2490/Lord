@@ -45,7 +45,18 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
             "A functionally similar but visually different product is a failed generation."
 
     const val ANTI_MORPH =
-        "No product redesign, substitution, morphing, duplication, component merging, component deletion, invented parts, invented reservoirs, geometry drift, moving-part deformation, proportion changes, texture drift, impossible physics, malformed hands or extra fingers."
+        "No product redesign, substitution, morphing, duplication, component merging, component deletion, invented parts, geometry drift, moving-part deformation, proportion changes, texture drift, impossible physics, malformed hands or extra fingers."
+
+    fun antiMorphFor(fingerprint: JSONObject?, analysis: JSONObject? = null): String {
+        val extra = mutableListOf<String>()
+        if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) {
+            extra += "Do not invent a cylindrical reservoir or merge the upper modules into one tank."
+        }
+        if (ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)) {
+            extra += "Do not invent extra handles, extra lids, extra rings, or replace the wooden grip, collar, tang or hanging ring."
+        }
+        return if (extra.isEmpty()) ANTI_MORPH else ANTI_MORPH + "\n" + extra.joinToString("\n")
+    }
 
     const val MOVING_COMPONENT_LOCK =
         "Identity-critical moving components must preserve their exact geometry, proportions, attachment points and mechanism during motion.\n" +
@@ -124,7 +135,7 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
             analysis = analysis,
             evidence = evidence,
         )
-        if (PromptComposer.isCanonical(composed, speechLanguage, analysis, evidence)) return composed
+        if (PromptComposer.isCanonical(composed, speechLanguage, analysis, evidence, fingerprint)) return composed
         return PromptComposer.compose(
             raw = PromptComposer.extractAction(composed).ifBlank { composed },
             fingerprint = fingerprint,
@@ -291,11 +302,13 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
 
     fun veoHasExactDuration(prompt: String): Boolean {
         val lower = prompt.lowercase()
-        val exact = lower.contains("exactly 8.0 seconds")
+        val exact = lower.contains("exactly 8.0 seconds") || lower.contains("exactly at 8.0 seconds")
         val end = lower.contains("end at exactly 8.0 seconds") ||
             lower.contains("end exactly at 8.0 seconds") ||
             lower.contains("must end at exactly 8.0 seconds")
-        val noTail = lower.contains("freeze-frame tail") && (lower.contains("intro") && lower.contains("outro"))
+        val noTail = (lower.contains("freeze-frame") || lower.contains("hold frame")) &&
+            lower.contains("intro") &&
+            lower.contains("outro")
         val onlyMaximum = lower.contains("maximum 8") && !exact
         return exact && end && noTail && !onlyMaximum
     }
@@ -305,11 +318,15 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
 
     fun allowsExtraTail(prompt: String): Boolean {
         val lower = prompt.lowercase()
-        val forbids = lower.contains("do not add") &&
-            lower.contains("intro") &&
+        val forbids = lower.contains("intro") &&
             lower.contains("outro") &&
             (lower.contains("freeze-frame") || lower.contains("hold frame")) &&
-            lower.contains("additional action")
+            (
+                lower.contains("do not add") ||
+                    lower.contains("no intro") ||
+                    lower.contains("additional scene") ||
+                    lower.contains("additional action")
+                )
         return !forbids
     }
 
@@ -335,7 +352,7 @@ REFERENCE IMAGE OVERRIDES TEXTUAL INTERPRETATION."""
         if (durationHeadingCount(prompt) != 1) failures.add("duplicate_duration")
         if (leftoverDurationCount(prompt) > 0) failures.add("leftover_duration")
         if (hasConflictingSpokenHooks(prompt)) failures.add("conflicting_spoken_hooks")
-        failures += PromptComposer.canonicalFailures(prompt, speechLanguage)
+        failures += PromptComposer.canonicalFailures(prompt, speechLanguage, fingerprint = fingerprint)
         return failures.distinct()
     }
 

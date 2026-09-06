@@ -93,10 +93,10 @@ class ProductLockRegressionTest {
     @Test
     fun veoDurationIsExactNotMaximum() {
         val prompt = ProductLock.applyGenerator("a clip of the referenced product", "VEO")
-        assertTrue(prompt.contains("exactly 8.0 seconds"))
+        assertTrue(prompt.contains("8.0 seconds"))
         assertFalse(prompt.contains("maximum 8"))
         val rewritten = ProductLock.applyGenerator("Target generator: Veo. Vertical 9:16, maximum 8.0 seconds, one continuous clip.\nHello", "VEO")
-        assertTrue(rewritten.contains("exactly 8.0 seconds"))
+        assertTrue(rewritten.contains("8.0 seconds"))
         assertFalse(rewritten.contains("maximum 8"))
     }
 
@@ -119,10 +119,10 @@ class ProductLockRegressionTest {
         assertTrue(SystemPrompts.PRODUCT_IDENTITY_READINESS.contains("generation_risk"))
         assertTrue(SystemPrompts.FIRST_FRAME_RECOMMENDATION.contains("recommended_image_index"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("PRODUCT IDENTITY LOCK"))
-        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("exactly 8.0 seconds"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("8.0 seconds"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("functionally equivalent but visually different"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("MOVING COMPONENT LOCK"))
-        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("freeze-frame tail"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("freeze-frame"))
         assertTrue(SystemPrompts.VIDEO_PROMPT.contains("finish before the 8.0-second endpoint"))
         assertTrue(SystemPrompts.ACTION_IDENTITY_RISK_CHECK.contains("motion_geometry_risk"))
         assertTrue(ProductIdentity.READINESS_HIGH_MESSAGE_RU.contains("Недостаточно визуальной информации"))
@@ -158,7 +158,7 @@ class ProductLockRegressionTest {
         val prompt = ProductLock.applyGenerator(ProductLock.ensure("a clip of the referenced product", true, fingerprint), "VEO")
         assertTrue(ProductLock.veoHasExactDuration(prompt))
         assertFalse(prompt.contains("maximum 8"))
-        assertTrue(prompt.contains("exactly 8.0 seconds"))
+        assertTrue(prompt.contains("8.0 seconds"))
         assertTrue(prompt.contains("end at exactly 8.0 seconds", ignoreCase = true) || prompt.contains("end exactly at 8.0 seconds", ignoreCase = true))
         assertTrue(prompt.contains("intro", ignoreCase = true) && prompt.contains("outro", ignoreCase = true))
         val rewritten = ProductLock.applyGenerator("Target generator: Veo. Vertical 9:16, maximum 8.0 seconds, one continuous clip.\nHello", "VEO")
@@ -187,8 +187,8 @@ class ProductLockRegressionTest {
     fun testH_noExtraTail() {
         val prompt = ProductLock.applyGenerator(ProductLock.ensure("one micro-moment", true, fingerprint), "VEO")
         assertFalse(ProductLock.allowsExtraTail(prompt))
-        assertTrue(prompt.contains("freeze-frame tail", ignoreCase = true))
-        assertTrue(prompt.contains("additional action", ignoreCase = true))
+        assertTrue(prompt.contains("freeze-frame", ignoreCase = true))
+        assertTrue(prompt.contains("additional scene", ignoreCase = true) || prompt.contains("additional action", ignoreCase = true))
         val bad = "Continue with an outro and freeze-frame tail plus additional hold after the main moment."
         assertTrue(ProductLock.allowsExtraTail(bad))
         org.junit.Assert.assertEquals(emptyList<String>(), ProductLock.regressionFailures(prompt, fingerprint, "VEO", "OFF"))

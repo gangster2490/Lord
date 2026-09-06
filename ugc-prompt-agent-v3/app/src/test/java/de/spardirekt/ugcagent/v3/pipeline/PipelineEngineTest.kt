@@ -205,7 +205,8 @@ class PipelineEngineTest {
         session.captionLanguage = "РУССКИЙ"
         val result = PipelineEngine(FakePipelineAi()).start(session)
         assertTrue(result.details.orEmpty().contains("Категория товара"))
-        assertTrue(result.hook.contains("приятно иметь дома") || result.finalPrompt.orEmpty().contains("Вот такую вещь приятно иметь дома."))
+        assertTrue(result.hook.contains("дом") || result.hook.contains("кух") || result.hook.contains("Любл") || result.hook.contains("приятн") || result.hook.contains("уют"))
+        assertTrue(de.spardirekt.ugcagent.v3.prompt.HookEngine.isWarm(result.hook, "РУССКИЙ"))
         val pack = de.spardirekt.ugcagent.v3.prompt.DetailsBuilder.videoPackage(
             result.finalPrompt.orEmpty(),
             result.caption.orEmpty(),

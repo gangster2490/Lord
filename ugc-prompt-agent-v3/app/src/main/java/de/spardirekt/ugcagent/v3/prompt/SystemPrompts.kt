@@ -339,10 +339,7 @@ VIDEO:
 
 Vertical 9:16.
 
-Generate exactly 8.0 seconds total.
-The clip must end at exactly 8.0 seconds.
-Do not continue beyond 8.0 seconds.
-Do not add an intro, outro, extra hold frame, freeze-frame tail, transition tail, or additional action after the main micro-moment.
+Put duration only in TIMING. One end instruction: End exactly at 8.0 seconds.
 
 One continuous micro-moment.
 
@@ -387,12 +384,12 @@ REFERENCE:
 Start from the selected original First Frame. Other references are supporting identity evidence. First Frame is the primary source of truth.
 
 PRODUCT IDENTITY LOCK:
-Insert only 5–10 concise high-confidence visible identity constraints. Do not dump the internal fingerprint.
+Include every identity-critical visible component needed to keep the exact product unchanged. Do not stop at 10 items. Keep each line concise and material.
 Keep exactly the same single physical product.
 Preserve exact component count, geometry and relative positions.
 Do not merge, split, remove, relocate, simplify or invent components.
 Do not generate a similar or generic category-equivalent product.
-Do not include listing, seller, marketplace or conflicting dimensions.
+Do not include listing, seller, marketplace or conflicting dimensions unless they are reliable, non-conflicting, and materially necessary.
 
 MOVING COMPONENT LOCK:
 Preserve exact geometry, proportions, attachment points and mechanism. If exact motion is uncertain, keep the component static.
@@ -401,14 +398,16 @@ ACTION:
 Use only the selected LOW-RISK evidence-supported action.
 
 ANTI-MORPH:
-No product redesign, substitution, morphing, duplication, component merging, component deletion, invented parts, invented reservoirs, geometry drift, moving-part deformation, proportion changes, texture drift, impossible physics, malformed hands or extra fingers.
+Universal only: no product redesign, substitution, morphing, duplication, component merging, component deletion, invented parts, geometry drift, moving-part deformation, proportion changes, texture drift, impossible physics, malformed hands or extra fingers.
+Then add only product-specific identity from THIS product. Never copy component names from another product or from a leftover template (no invented reservoirs, steam vents, clips, hinges, batteries or motors unless they belong to the current product).
 
 TIMING:
-0.0–1.5 s: warm spoken hook / establish product
-1.5–6.5 s: one LOW-RISK home interaction
+0.0–1.5 s: hook and establish product
+1.5–6.5 s: one LOW-RISK natural interaction
 6.5–8.0 s: natural settle
-Generate exactly 8.0 seconds total. End exactly at 8.0 seconds.
-Do not add an intro, outro, extra scene, CTA, extra hold frame, freeze-frame tail, transition tail, or additional action.
+End exactly at 8.0 seconds.
+No intro, outro, CTA, additional scene, freeze-frame or transition tail.
+Do not repeat duration wording. One end-at-8.0s instruction only.
 
 SPEECH:
 
@@ -427,12 +426,8 @@ If Russian:
 The person speaks naturally in Russian, like chatting in their own kitchen, not like a product presenter.
 Include one short warm homely spoken line. Casual, human, cozy. Not a literal translation of a German line. No ad-robot tone. No unknown characteristics. One short sentence.
 Do not use weak descriptive lines such as "Ручка удобно расположена сбоку."
-Prefer this kitchen home line:
-"Вот такую вещь приятно иметь дома."
-Other acceptable warm lines:
-"Люблю, когда на кухне всё просто и удобно."
-"Для кухни — очень уютная и удобная вещь."
-The spoken hook begins around 0.3–0.8 seconds and must finish before the 8.0-second endpoint.
+Generate one short warm homely spoken line that sounds like a real person at home. Casual, lightly persuasive, not a presenter and not a feature list.
+The spoken hook must finish before the 8.0-second endpoint.
 Include exactly one SPEECH section and exactly one spoken line.
 
 Speech may refer to action, situation, convenience, a homely feeling. Never certifications, performance, medical, material, durability, guarantees, unknown functions.

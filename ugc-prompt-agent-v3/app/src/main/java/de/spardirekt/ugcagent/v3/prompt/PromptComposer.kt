@@ -30,11 +30,11 @@ object PromptComposer {
     )
 
     const val TIMING_BLOCK =
-        "0.0–1.5 s: warm spoken hook / establish product\n" +
-            "1.5–6.5 s: one LOW-RISK home interaction\n" +
+        "0.0–1.5 s: hook and establish product\n" +
+            "1.5–6.5 s: one LOW-RISK natural interaction\n" +
             "6.5–8.0 s: natural settle\n" +
-            "Generate exactly 8.0 seconds total. End exactly at 8.0 seconds. The clip must end at exactly 8.0 seconds.\n" +
-            "Do not add an intro, outro, extra scene, CTA, extra hold frame, freeze-frame tail, transition tail, or additional action after the main micro-moment."
+            "End exactly at 8.0 seconds.\n" +
+            "No intro, outro, CTA, additional scene, freeze-frame or transition tail."
 
     private val headingLine = Regex(
         "(?im)^(FORMAT|REFERENCE|PRODUCT IDENTITY LOCK|FINAL IDENTITY LOCK|STRUCTURAL IDENTITY LOCK|MOVING COMPONENT LOCK|SETTING|CAMERA|SAFE ACTION|ACTION|HUMAN BEHAVIOUR|HUMAN BEHAVIOR|LIGHTING|SPEECH|ANTI-MORPH|ANTI MORPH|DURATION|TIMING|STYLE|PRODUCT LOCK|TARGET GENERATOR)\\s*:?\\s*$",
@@ -53,11 +53,10 @@ object PromptComposer {
         evidence: JSONObject? = null,
     ): String {
         val first = render(raw, fingerprint, generator, speechLanguage, hook, analysis, evidence)
-        if (isCanonical(first, speechLanguage, analysis, evidence)) return first
+        if (isCanonical(first, speechLanguage, analysis, evidence, fingerprint)) return first
         val action = extractAction(first).ifBlank { extractAction(raw) }
         val retryRaw = "ACTION:\n$action\n\nSETTING:\nOrdinary cozy home kitchen."
-        val repaired = render(retryRaw, fingerprint, generator, speechLanguage, hook, analysis, evidence)
-        return repaired
+        return render(retryRaw, fingerprint, generator, speechLanguage, hook, analysis, evidence)
     }
 
     fun isCanonical(
@@ -65,7 +64,8 @@ object PromptComposer {
         speechLanguage: String = "DEUTSCH",
         analysis: JSONObject? = null,
         evidence: JSONObject? = null,
-    ): Boolean = canonicalFailures(prompt, speechLanguage, analysis, evidence).isEmpty()
+        fingerprint: JSONObject? = null,
+    ): Boolean = canonicalFailures(prompt, speechLanguage, analysis, evidence, fingerprint).isEmpty()
 
     fun headingCounts(prompt: String): Map<String, Int> {
         val counts = mutableMapOf<String, Int>()
@@ -90,6 +90,7 @@ object PromptComposer {
         speechLanguage: String = "DEUTSCH",
         analysis: JSONObject? = null,
         evidence: JSONObject? = null,
+        fingerprint: JSONObject? = null,
     ): List<String> {
         val failures = mutableListOf<String>()
         val counts = headingCounts(prompt)
@@ -104,12 +105,24 @@ object PromptComposer {
         if (ProductLock.hasConflictingSpokenHooks(prompt)) failures.add("conflicting_spoken_hooks")
         if (antiMorphCount(prompt) > 1) failures.add("repeated_anti_morph")
         if (timingInstructionCount(prompt) > 1) failures.add("repeated_timing")
+        if (durationPhraseCount(prompt) > 1) failures.add("repeated_duration_wording")
         if (containsUncertainDimensions(prompt, analysis, evidence)) failures.add("uncertain_dimensions")
+        if (ProductLexicon.containsForeign(prompt, fingerprint, analysis, identityAllowedExtra(prompt))) {
+            failures.add("foreign_component_leak")
+        }
+        if (!endsWithTiming(prompt)) failures.add("prompt_does_not_end_with_timing")
+        if (Regex("REFERENCE IMAGE OVERRIDES", RegexOption.IGNORE_CASE).findAll(prompt).count() > 1) {
+            failures.add("repeated_first_frame_rule")
+        }
         if (!speechLanguage.equals("OFF", true) && ProductLock.extractSpokenHooks(prompt).isEmpty()) {
             failures.add("missing_spoken_line")
         }
         if (!speechLanguage.equals("OFF", true) && ProductLock.extractSpokenHooks(prompt).size > 1) {
             failures.add("two_speech_lines")
+        }
+        val hooks = ProductLock.extractSpokenHooks(prompt)
+        if (!speechLanguage.equals("OFF", true) && hooks.any { HookEngine.isWeak(it, speechLanguage, analysis) }) {
+            failures.add("weak_hook")
         }
         return failures
     }
@@ -140,20 +153,26 @@ object PromptComposer {
             "Ordinary cozy home kitchen. Warm, lived-in, slightly imperfect. Not a studio, showroom or commercial set.",
         )
         val resolvedHook = resolveHook(cleaned, hook, speechLanguage, analysis)
-        return buildString {
+        val identity = identityBlock(fingerprint, analysis, evidence, sections["PRODUCT IDENTITY LOCK"])
+        val moving = movingBlock(fingerprint, sections["MOVING COMPONENT LOCK"])
+        val settingBody = stripDimensions(setting, analysis, evidence)
+        val actionBody = stripDimensions(action, analysis, evidence)
+        val extraAllowed = "$identity\n$moving\n$settingBody\n$actionBody"
+        val body = buildString {
             appendSection("FORMAT", formatBlock(generator))
             appendSection("REFERENCE", referenceBlock(fingerprint))
-            appendSection("PRODUCT IDENTITY LOCK", identityBlock(fingerprint, analysis, evidence, sections["PRODUCT IDENTITY LOCK"]))
-            appendSection("MOVING COMPONENT LOCK", movingBlock(fingerprint, sections["MOVING COMPONENT LOCK"]))
-            appendSection("SETTING", stripDimensions(setting, analysis, evidence))
+            appendSection("PRODUCT IDENTITY LOCK", identity)
+            appendSection("MOVING COMPONENT LOCK", moving)
+            appendSection("SETTING", settingBody)
             appendSection("CAMERA", ProductLock.CAMERA_LOCK + " Warm homely handheld UGC, not a polished commercial move.")
-            appendSection("ACTION", stripDimensions(action, analysis, evidence))
+            appendSection("ACTION", actionBody)
             appendSection("HUMAN BEHAVIOUR", ProductLock.HUMAN_LOCK)
             appendSection("LIGHTING", ProductLock.LIGHTING_LOCK)
             appendSection("SPEECH", speechBlock(speechLanguage, resolvedHook))
-            appendSection("ANTI-MORPH", ProductLock.ANTI_MORPH)
+            appendSection("ANTI-MORPH", ProductLock.antiMorphFor(fingerprint, analysis))
             appendSection("TIMING", TIMING_BLOCK)
         }.trim()
+        return ProductLexicon.stripForeign(body, fingerprint, analysis, extraAllowed)
     }
 
     private fun StringBuilder.appendSection(heading: String, body: String) {
@@ -199,7 +218,7 @@ object PromptComposer {
         ).forEach { line ->
             if (constraints.none { similarPhrase(it, line) }) constraints.add(line)
         }
-        val numbered = constraints.distinctBy { normalizePhrase(it) }.take(10)
+        val numbered = constraints.distinctBy { normalizePhrase(it) }
             .mapIndexed { index, line -> "${index + 1}. ${stripDimensions(line, analysis, evidence)}" }
         val extras = mutableListOf<String>()
         extras += ProductLock.COMPONENT_COUNT_LOCK
@@ -207,6 +226,9 @@ object PromptComposer {
         if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) {
             extras += ProductIdentity.MICROWAVE_COVER_LOCK
             extras += "Keep two rectangular upper modules separate; never merge them into one cylindrical reservoir."
+        }
+        if (ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)) {
+            extras += ProductIdentity.COOKWARE_PAN_LOCK
         }
         val combined = (numbered + extras).joinToString("\n")
         return semanticDedup(stripDimensions(combined, analysis, evidence))
@@ -240,12 +262,12 @@ object PromptComposer {
         if (language.equals("OFF", true)) return null
         val found = ProductLock.extractSpokenHooks(raw)
         if (found.size > 1) {
-            return if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language)) preferred.trim()
+            return if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language, analysis)) preferred.trim()
             else HookEngine.generate(analysis, language)
         }
-        if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language)) return preferred.trim()
+        if (!preferred.isNullOrBlank() && !HookEngine.isWeak(preferred, language, analysis)) return preferred.trim()
         val only = found.firstOrNull()
-        if (!only.isNullOrBlank() && !HookEngine.isWeak(only, language)) return only
+        if (!only.isNullOrBlank() && !HookEngine.isWeak(only, language, analysis)) return only
         return HookEngine.generate(analysis, language)
     }
 
@@ -374,6 +396,32 @@ object PromptComposer {
         val headings = Regex("(?im)^(TIMING|DURATION):").findAll(prompt).count()
         val repeatedBudget = Regex("0\\.0–1\\.5 s", RegexOption.IGNORE_CASE).findAll(prompt).count()
         return maxOf(headings, repeatedBudget)
+    }
+
+    fun durationPhraseCount(prompt: String): Int {
+        val phrases = listOf(
+            "generate exactly 8.0 seconds total",
+            "end exactly at 8.0 seconds",
+            "the clip must end at exactly 8.0 seconds",
+            "end at exactly 8.0 seconds",
+        )
+        val lower = prompt.lowercase()
+        return phrases.count { lower.contains(it) }
+    }
+
+    fun endsWithTiming(prompt: String): Boolean {
+        val last = prompt.lineSequence().map { canonicalizeHeading(it) }.filterNotNull().lastOrNull()
+        return last == "TIMING"
+    }
+
+    private fun identityAllowedExtra(prompt: String): String {
+        val sections = parseSections(prompt)
+        return listOf(
+            sections["PRODUCT IDENTITY LOCK"],
+            sections["MOVING COMPONENT LOCK"],
+            sections["SETTING"],
+            sections["ACTION"],
+        ).joinToString("\n") { it.orEmpty() }
     }
 
     private fun firstNonBlank(vararg values: String?): String =

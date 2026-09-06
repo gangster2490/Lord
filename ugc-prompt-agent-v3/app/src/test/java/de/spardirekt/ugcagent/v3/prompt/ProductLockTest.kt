@@ -33,7 +33,9 @@ class ProductLockTest {
         assertTrue(ProductLock.applyGenerator("x", "VEO").contains("Veo"))
         assertTrue(ProductLock.applyGenerator("x", "KLING").contains("Kling"))
         assertTrue(ProductLock.applyGenerator("x", "GENERIC").contains("generic"))
-        assertTrue(ProductLock.applyGenerator("x", "VEO").contains("exactly 8.0 seconds"))
+        val veo = ProductLock.applyGenerator("x", "VEO")
+        assertTrue(veo.contains("8.0 seconds"))
+        assertTrue(ProductLock.veoHasExactDuration(veo))
     }
 
     @Test
@@ -142,5 +144,56 @@ Exact dimensions: 28 cm diameter from listing graphic.
         }
         assertTrue(out.contains("Вот такую вещь приятно иметь дома."))
         assertEquals(1, ProductLock.extractSpokenHooks(out).size)
+    }
+
+    @Test
+    fun panIdentityKeepsAllDistinctivePartsAndDropsForeignTemplateTerms() {
+        val dirty = """
+FORMAT:
+Vertical 9:16.
+ANTI-MORPH:
+No product redesign, invented reservoirs, steam vent, battery, motor, hinges or clips.
+ACTION:
+One hand slides the pan on the stove.
+""".trimIndent()
+        val analysis = org.json.JSONObject().put("product_category", "kitchen").put("observed_use_case", "frying pan")
+        val out = ProductLock.finalizeClean(
+            dirty,
+            ProductIdentity.cookwarePanFingerprint(),
+            "VEO",
+            "РУССКИЙ",
+            null,
+            true,
+            analysis,
+        )
+        listOf(
+            "pan body",
+            "rounded deep sidewall",
+            "side handle assembly",
+            "short metal tang",
+            "wooden handle grip",
+            "collar",
+            "hanging ring",
+            "wooden lid",
+            "raised lid handle",
+            "fastener",
+        ).forEach { part ->
+            assertTrue(part, out.contains(part, ignoreCase = true))
+        }
+        assertFalse(out.contains("reservoir", ignoreCase = true))
+        assertFalse(out.contains("steam vent", ignoreCase = true))
+        assertFalse(out.contains("battery", ignoreCase = true))
+        assertFalse(out.contains("motor", ignoreCase = true))
+        assertTrue(PromptComposer.endsWithTiming(out))
+        assertEquals(1, PromptComposer.durationPhraseCount(out))
+        assertEquals(1, ProductLock.antiMorphHeadingCount(out))
+        assertEquals(1, ProductLock.extractSpokenHooks(out).size)
+        PromptComposer.CANONICAL_HEADINGS.forEach { heading ->
+            assertEquals(heading, 1, PromptComposer.headingCounts(out)[heading] ?: 0)
+        }
+        org.junit.Assert.assertEquals(
+            emptyList<String>(),
+            ProductLock.regressionFailures(out, ProductIdentity.cookwarePanFingerprint(), "VEO", "РУССКИЙ"),
+        )
     }
 }

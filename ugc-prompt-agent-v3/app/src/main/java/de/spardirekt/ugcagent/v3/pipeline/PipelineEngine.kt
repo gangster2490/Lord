@@ -359,6 +359,7 @@ class PipelineEngine(private val ai: PipelineAi) {
                 session.speechLanguage,
                 session.analysis,
                 session.evidence,
+                fingerprint,
             )
         ) {
             session.finalPrompt = ProductLock.finalizeClean(
@@ -457,7 +458,7 @@ class PipelineEngine(private val ai: PipelineAi) {
     private fun selfCheck(session: PipelineSession) {
         var prompt = session.finalPrompt.orEmpty()
         val composer = de.spardirekt.ugcagent.v3.prompt.PromptComposer
-        if (!composer.isCanonical(prompt, session.speechLanguage, session.analysis, session.evidence) ||
+        if (!composer.isCanonical(prompt, session.speechLanguage, session.analysis, session.evidence, session.identityFingerprint) ||
             composer.CANONICAL_HEADINGS.any { (composer.headingCounts(prompt)[it] ?: 0) != 1 }
         ) {
             prompt = ProductLock.finalizeClean(
@@ -492,9 +493,14 @@ class PipelineEngine(private val ai: PipelineAi) {
             .put("timing_once", de.spardirekt.ugcagent.v3.prompt.ProductLock.durationHeadingCount(prompt) == 1)
             .put("no_duration_heading", de.spardirekt.ugcagent.v3.prompt.ProductLock.leftoverDurationCount(prompt) == 0)
             .put("one_spoken_hook", !de.spardirekt.ugcagent.v3.prompt.ProductLock.hasConflictingSpokenHooks(prompt))
+            .put("no_foreign_components", !de.spardirekt.ugcagent.v3.prompt.ProductLexicon.containsForeign(prompt, session.identityFingerprint, session.analysis))
+            .put("ends_with_timing", composer.endsWithTiming(prompt))
+            .put("one_duration_instruction", composer.durationPhraseCount(prompt) <= 1)
             .put("compliance_pass", session.compliance?.optString("status") != "BLOCK")
         session.selfCheck = checks
-        if (!checks.optBoolean("canonical_headings") || !checks.optBoolean("one_lock_section") || !checks.optBoolean("speech_once")) {
+        if (!checks.optBoolean("canonical_headings") || !checks.optBoolean("one_lock_section") || !checks.optBoolean("speech_once") ||
+            !checks.optBoolean("no_foreign_components") || !checks.optBoolean("ends_with_timing")
+        ) {
             session.finalPrompt = ProductLock.finalizeClean(
                 prompt,
                 session.identityFingerprint,

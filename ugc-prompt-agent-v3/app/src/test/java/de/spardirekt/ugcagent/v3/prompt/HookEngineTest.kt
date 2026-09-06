@@ -16,7 +16,9 @@ class HookEngineTest {
     fun kitchenRussianHookIsWarmAndHomely() {
         val analysis = JSONObject().put("observed_use_case", "microwave cover").put("product_category", "kitchen")
         val hook = HookEngine.generate(analysis, "РУССКИЙ")
-        assertEquals("Вот такую вещь приятно иметь дома.", hook)
+        val options = HookEngine.candidates(analysis, "РУССКИЙ")
+        assertEquals(3, options.size)
+        assertTrue(options.contains(hook))
         assertFalse(HookEngine.isWeak(hook, "РУССКИЙ"))
         assertTrue(HookEngine.isWarm(hook, "РУССКИЙ"))
         assertTrue(
@@ -36,5 +38,14 @@ class HookEngineTest {
         assertTrue(HookEngine.isWarm(hook, "DEUTSCH"))
         assertFalse(hook.contains("Produktpresenter", ignoreCase = true))
         assertTrue(hook.contains("Küche") || hook.contains("Hause") || hook.contains("gemütlich") || hook.contains("mag"))
+        val options = HookEngine.candidates(analysis, "DEUTSCH")
+        assertEquals(3, options.size)
+        assertTrue(options.contains(hook))
+    }
+
+    @Test
+    fun rejectsUnsupportedCommercialHook() {
+        assertTrue(HookEngine.isWeak("Buy now — this product is guaranteed 100% perfect.", "DEUTSCH"))
+        assertTrue(HookEngine.isWeak("Купите сейчас, данное изделие сохраняет влагу.", "РУССКИЙ"))
     }
 }

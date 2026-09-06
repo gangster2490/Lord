@@ -18,6 +18,45 @@ object ProductIdentity {
             "Never replace the two rectangular upper modules or the circular vent with one cylindrical reservoir.\n" +
             "Do not remove the circular vent, relocate the handle, merge the modules, or change their relative positions."
 
+    const val COOKWARE_PAN_LOCK =
+        "Keep the pan body, rounded deep sidewall, side handle assembly, short metal tang, wooden handle grip, metallic/gold-colored collar, hanging ring, wooden lid, raised lid handle and visible fastener heads exactly as referenced.\n" +
+            "Do not add extra handles, extra lids, extra rings or a second collar.\n" +
+            "Do not replace the wooden grip, lid or hanging ring with generic cookware parts."
+
+    fun cookwarePanFingerprint(): JSONObject = JSONObject()
+        .put("overall_geometry", "deep round pan body with a wooden side handle, metallic collar, hanging ring and a wooden lid")
+        .put(
+            "identity_critical_components",
+            JSONArray()
+                .put("pan body")
+                .put("rounded deep sidewall")
+                .put("side handle assembly")
+                .put("short metal tang")
+                .put("wooden handle grip")
+                .put("metallic/gold-colored collar")
+                .put("hanging ring")
+                .put("wooden lid")
+                .put("raised lid handle")
+                .put("visible fastener heads"),
+        )
+        .put("component_count_constraints", JSONArray().put("one pan body, one lid, one side handle assembly"))
+        .put("component_layout", JSONArray().put("handle assembly attached at the sidewall with collar, tang and hanging ring in their original relative positions"))
+        .put("attachment_points", JSONArray().put("visible fastener heads on the handle assembly"))
+        .put("moving_or_removable_parts", JSONArray().put("wooden lid").put("raised lid handle"))
+        .put(
+            "must_not_change",
+            JSONArray()
+                .put("pan body")
+                .put("rounded deep sidewall")
+                .put("wooden handle grip")
+                .put("metallic/gold-colored collar")
+                .put("hanging ring")
+                .put("wooden lid")
+                .put("raised lid handle")
+                .put("visible fastener heads"),
+        )
+        .put("confidence", 0.88)
+
     const val MICROWAVE_VENT_STATIC =
         "If the scene does not require the circular upper component to move, keep it completely static.\n" +
             "If that circular upper component moves, its shape, diameter, thickness and attachment point must remain identical; the axis of movement must stay consistent; it must not rise, stretch, expand, collapse or turn into another mechanism."
@@ -76,14 +115,24 @@ object ProductIdentity {
             out.add("never replace the two rectangular modules or the circular vent with one cylindrical reservoir")
             out.add("do not remove the circular vent, relocate the handle, merge modules, or change relative positions")
         }
+        if (looksLikeCookwarePan(fingerprint)) {
+            out.add("pan body with rounded deep sidewall")
+            out.add("side handle assembly with short metal tang")
+            out.add("wooden handle grip")
+            out.add("metallic/gold-colored collar")
+            out.add("hanging ring")
+            out.add("wooden lid with raised lid handle")
+            out.add("visible fastener heads")
+        }
         val geometry = fingerprint?.optString("overall_geometry").orEmpty().trim()
         if (geometry.isNotBlank()) out.add(geometry)
         addVisibleItems(fingerprint, "component_count_constraints", out)
         addVisibleItems(fingerprint, "identity_critical_components", out)
         addVisibleItems(fingerprint, "component_layout", out)
         addVisibleItems(fingerprint, "attachment_points", out, skipUnconfirmed = true)
+        addVisibleItems(fingerprint, "moving_or_removable_parts", out, skipUnconfirmed = true)
         addVisibleItems(fingerprint, "must_not_change", out)
-        return out.map { it.trim() }.filter { it.isNotBlank() && !isInternalLeak(it) && !looksLikeDimension(it) }.distinctBy { it.lowercase() }.take(12)
+        return out.map { it.trim() }.filter { it.isNotBlank() && !isInternalLeak(it) && !looksLikeDimension(it) }.distinctBy { it.lowercase() }
     }
 
     fun finalIdentityLockBlock(fingerprint: JSONObject?): String {
@@ -94,7 +143,7 @@ object ProductIdentity {
                 "Do not merge, split, remove, relocate, simplify or invent components",
                 "Do not generate a similar or generic category-equivalent product",
                 "Do not invent hidden structure",
-            )).distinctBy { it.lowercase() }.take(10)
+            )).distinctBy { it.lowercase() }
         }
         return buildString {
             appendLine("PRODUCT IDENTITY LOCK:")
@@ -116,6 +165,30 @@ object ProductIdentity {
             blob.contains("vent") &&
             blob.contains("handle") &&
             blob.contains("green")
+    }
+
+    fun looksLikeCookwarePan(fingerprint: JSONObject?, analysis: JSONObject? = null): Boolean {
+        if (looksLikeMicrowaveCover(fingerprint)) return false
+        val blob = listOf(
+            fingerprint?.toString().orEmpty(),
+            analysis?.toString().orEmpty(),
+            analysis?.optString("product_category").orEmpty(),
+            analysis?.optString("observed_use_case").orEmpty(),
+        ).joinToString(" ").lowercase()
+        if (blob.isBlank()) return false
+        return blob.contains("skillet") ||
+            blob.contains("saucepan") ||
+            blob.contains("frying pan") ||
+            blob.contains("cookware") ||
+            blob.contains("сковород") ||
+            blob.contains("кастрюл") ||
+            Regex("\\bpan\\b").containsMatchIn(blob) ||
+            (
+                blob.contains("wooden") &&
+                    blob.contains("lid") &&
+                    blob.contains("handle") &&
+                    (blob.contains("collar") || blob.contains("hanging ring") || blob.contains("tang"))
+                )
     }
 
     fun structuralLockBlock(fingerprint: JSONObject?): String = finalIdentityLockBlock(fingerprint)
