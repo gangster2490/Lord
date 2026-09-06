@@ -4,7 +4,7 @@ import org.json.JSONObject
 
 object CreativeStrategyEngine {
     enum class Motivation { PROBLEM_SOLVER, COMFORT, HOME_COZY, DEMONSTRABLE_FUNCTION, PORTABLE, VISUAL, OUTDOOR_HOBBY }
-    enum class HookType { PROBLEM, COMFORT, CONVENIENCE, HOME, CURIOSITY, VISUAL }
+    enum class HookType { PROBLEM, COMFORT, CONVENIENCE, HOME, CURIOSITY, VISUAL, OUTDOOR }
     enum class SellingIdea {
         COMFORT, CONVENIENCE, CLEANLINESS, PORTABILITY, SIMPLE_USE, VISUAL_APPEAL, ORGANIZATION, OUTDOOR_PRACTICALITY, HOME_FEELING
     }
@@ -51,6 +51,9 @@ object CreativeStrategyEngine {
         val confidence: Double,
         val conceptKind: String,
         val kitchenDefault: Boolean,
+        val boughtFor: String = "",
+        val viewerFeel: String = "",
+        val desire: String = "",
     ) {
         fun toPublicJson(): JSONObject = JSONObject()
             .put("primary_motivation", primary.name)
@@ -59,6 +62,9 @@ object CreativeStrategyEngine {
             .put("hook_type", hookType.name)
             .put("concept_kind", conceptKind)
             .put("confidence", confidence)
+            .put("bought_for", boughtFor)
+            .put("viewer_should_feel", viewerFeel)
+            .put("desire", desire)
     }
 
     fun plan(analysis: JSONObject?, fingerprint: JSONObject? = null): Plan {
@@ -79,11 +85,16 @@ object CreativeStrategyEngine {
         val kitchen = isKitchenBlob(blob) || isMicrowaveBlob(blob) ||
             ProductIdentity.looksLikeMicrowaveCover(fingerprint) ||
             ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)
-        return Plan(
+        val outdoorHook = if (primary == Motivation.OUTDOOR_HOBBY && chosen.hookType != HookType.CONVENIENCE) {
+            HookType.OUTDOOR
+        } else {
+            chosen.hookType
+        }
+        val draft = Plan(
             primary = primary,
             secondary = secondary,
             idea = chosen.idea,
-            hookType = chosen.hookType,
+            hookType = outdoorHook,
             setting = setting,
             human = human,
             action = action,
@@ -91,12 +102,16 @@ object CreativeStrategyEngine {
             camera = cameraFor(kitchen, primary),
             formatTone = formatTone(kitchen, primary),
             speechContext = speechContext(primary, blob),
-            opening = openingFor(chosen),
+            opening = openingFor(chosen.copy(hookType = outdoorHook)),
             pitch = chosen.pitch,
             confidence = chosen.total,
             conceptKind = winner.kind,
             kitchenDefault = kitchen,
+            boughtFor = PurchaseAppealEngine.boughtFor(primary),
+            viewerFeel = PurchaseAppealEngine.viewerFeel(primary),
+            desire = PurchaseAppealEngine.desireFor(chosen.idea),
         )
+        return PurchaseAppealEngine.apply(draft, analysis, fingerprint)
     }
 
     fun looksLikeFishingChair(fingerprint: JSONObject?, analysis: JSONObject? = null): Boolean {
@@ -117,15 +132,18 @@ object CreativeStrategyEngine {
     }
 
     fun actionConflicts(action: String, plan: Plan): Boolean {
-        if (ActionIdentity.isUnsafeAction(action)) return true
-        val lower = action.lowercase()
+        if (ActionIdentity.isUnsafeAction(instructedAction(action))) return true
+        val lower = instructedAction(action).lowercase()
         if (plan.primary == Motivation.OUTDOOR_HOBBY) {
-            if (listOf("fold", "unfold", "180", "recline", "leg height", "height adjustment", "backrest").any { lower.contains(it) }) {
+            if (listOf("fold", "unfold", "180", "recline", "leg height", "height adjustment").any { lower.contains(it) }) {
                 return true
             }
         }
         return false
     }
+
+    fun instructedAction(action: String): String =
+        action.replace(Regex("(?i)do not[^.\\n]*"), " ").replace(Regex("\\s+"), " ").trim()
 
     fun ideaLabel(plan: Plan, russian: Boolean): String = when (plan.idea) {
         SellingIdea.COMFORT -> if (russian) "комфорт в реальном использовании" else "Komfort in der echten Nutzung"
@@ -141,14 +159,28 @@ object CreativeStrategyEngine {
 
     fun gateFailures(prompt: String, hook: String, plan: Plan, language: String, analysis: JSONObject?): List<String> {
         val failures = mutableListOf<String>()
-        val lower = prompt.lowercase()
+        val timing = prompt.substringAfter("TIMING:", missingDelimiterValue = "").lowercase()
+        val actionBody = instructedAction(PromptComposer.extractAction(prompt)).lowercase()
         if (hook.isNotBlank() && HookEngine.isWeak(hook, language, analysis, plan)) failures.add("hook_mismatch")
         if (settingConflicts(prompt, plan)) failures.add("setting_mismatch")
-        if (plan.primary == Motivation.OUTDOOR_HOBBY && (lower.contains("fold the chair") || lower.contains("180-degree"))) {
+        if (actionConflicts(actionBody, plan) ||
+            (plan.primary == Motivation.OUTDOOR_HOBBY && (actionBody.contains("fold") || actionBody.contains("180")))
+        ) {
             failures.add("high_risk_motion")
         }
         if (listOf("best", "perfect", "always", "never", "guaranteed").any { Regex("\\b$it\\b", RegexOption.IGNORE_CASE).containsMatchIn(hook) }) {
             failures.add("unsafe_claim")
+        }
+        if (plan.hookType != HookType.VISUAL && timing.contains("neutral") && timing.contains("beauty")) {
+            failures.add("wasted_opening")
+        }
+        val cleaned = prompt.replace(Regex("(?i)(no|do not|never)[^.\\n]*"), " ").lowercase()
+        if (listOf("presenter pose", "pointing at features", "feature list", "montage", "showroom demonstration").any { cleaned.contains(it) }) {
+            failures.add("technical_demo")
+        }
+        if (plan.desire.isBlank() && plan.pitch.isBlank()) failures.add("no_desire")
+        if (hook.isNotBlank() && HookEngine.score(hook, language, analysis, plan).purchaseAppeal < 0.55) {
+            failures.add("weak_purchase_appeal")
         }
         return failures
     }
@@ -191,7 +223,7 @@ object CreativeStrategyEngine {
     ): List<Angle> {
         val candidates = when (primary) {
             Motivation.OUTDOOR_HOBBY -> listOf(
-                angle(SellingIdea.COMFORT, Motivation.COMFORT, HookType.COMFORT, "comfort during a long outdoor sit", 0.96, 0.9, 0.92, 0.95, 0.94, 0.96),
+                angle(SellingIdea.COMFORT, Motivation.COMFORT, HookType.OUTDOOR, "comfort during a long outdoor sit", 0.96, 0.9, 0.92, 0.95, 0.94, 0.96),
                 angle(SellingIdea.CONVENIENCE, Motivation.COMFORT, HookType.CONVENIENCE, "needed bits stay in reach", 0.88, 0.86, 0.9, 0.94, 0.9, 0.93),
                 angle(SellingIdea.OUTDOOR_PRACTICALITY, Motivation.OUTDOOR_HOBBY, HookType.CURIOSITY, "stable outdoor seating", 0.84, 0.7, 0.8, 0.9, 0.35, 0.7),
             )
@@ -300,9 +332,9 @@ object CreativeStrategyEngine {
     }
 
     private fun formatTone(kitchen: Boolean, primary: Motivation): String = when {
-        kitchen -> "Warm, homely, lived-in kitchen feeling. Not a showroom."
-        primary == Motivation.OUTDOOR_HOBBY -> "Natural outdoor hobby UGC. Real use, not a showroom."
-        else -> "Natural lived-in UGC. Not a showroom."
+        kitchen -> "Warm, homely, lived-in kitchen feeling. Not a showroom. Organic UGC, not a technical demo."
+        primary == Motivation.OUTDOOR_HOBBY -> "Natural outdoor hobby UGC. Real use, not a showroom. Organic UGC, not a technical demo."
+        else -> "Natural lived-in UGC. Not a showroom. Organic UGC, not a technical demo."
     }
 
     private fun speechContext(primary: Motivation, blob: String): String = when {
@@ -321,6 +353,7 @@ object CreativeStrategyEngine {
         HookType.VISUAL -> "hook and immediate visual presence so desirability is already clear"
         HookType.CURIOSITY -> "hook and immediate useful detail so the idea is already clear"
         HookType.HOME -> "hook and immediate home context so the viewer already grasps the everyday appeal"
+        HookType.OUTDOOR -> "hook and immediate outdoor context so the viewer already feels why this helps outside"
     }
 
     private fun blob(analysis: JSONObject?, fingerprint: JSONObject?): String {

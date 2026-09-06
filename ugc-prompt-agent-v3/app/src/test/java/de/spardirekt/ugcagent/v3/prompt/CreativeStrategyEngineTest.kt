@@ -15,6 +15,8 @@ class CreativeStrategyEngineTest {
             .put("observed_context", "lakeside")
         val plan = CreativeStrategyEngine.plan(analysis, CreativeStrategyEngine.fishingChairFingerprint())
         assertEquals(CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY, plan.primary)
+        assertTrue(plan.hookType == CreativeStrategyEngine.HookType.OUTDOOR || plan.hookType == CreativeStrategyEngine.HookType.CONVENIENCE)
+        assertTrue(plan.desire.isNotBlank())
         assertTrue(plan.setting.contains("lakeside") || plan.setting.contains("riverside"))
         assertFalse(plan.setting.contains("kitchen", ignoreCase = true))
         assertTrue(plan.action.contains("already seated"))

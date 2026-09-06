@@ -50,6 +50,7 @@ class PipelineSession {
     var dominantImageIndices: List<Int> = emptyList()
     var hook: String = ""
     var hookScore: Double = 0.0
+    var purchaseAppeal: JSONObject? = null
     var evidence: JSONObject? = null
     var selfCheck: JSONObject? = null
 

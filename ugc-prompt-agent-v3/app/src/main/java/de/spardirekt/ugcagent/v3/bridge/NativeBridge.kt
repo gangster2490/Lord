@@ -737,6 +737,7 @@ class NativeBridge(
         actionRisk = project.actionRisk?.toString() ?: "{}",
         readiness = project.identityReadiness?.toString() ?: "{}",
         finalIdentityLock = project.finalIdentityLock ?: ProductIdentity.finalIdentityLockBlock(project.identityFingerprint),
+        purchaseAppeal = de.spardirekt.ugcagent.v3.prompt.PurchaseAppealEngine.evaluate(project.analysis, project.identityFingerprint).toPublicJson().toString(),
     )
 
     private fun ensureFingerprint() {

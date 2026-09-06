@@ -50,4 +50,5 @@ data class PromptContext(
     val actionRisk: String = "{}",
     val readiness: String = "{}",
     val finalIdentityLock: String = "",
+    val purchaseAppeal: String = "{}",
 )

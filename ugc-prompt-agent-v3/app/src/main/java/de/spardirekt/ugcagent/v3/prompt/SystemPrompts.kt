@@ -119,6 +119,12 @@ Return STRICT JSON only:
     val SCENE = """
 Create one believable smartphone UGC micro-scene for the referenced product.
 
+Before choosing setting or action, decide ONE reason someone would want this product.
+The scene must make that desire feel true in 8 seconds.
+Match the real-use setting: kitchen in a kitchen, fishing lakeside, camping outdoors, cleaning in a real home, tools in a garage/workshop.
+Do not place every product in a generic kitchen.
+Do not create a technical demo, feature brochure, presenter pose or montage.
+
 Environment must follow evidence, not a random setting.
 One main action only, and only if confirmed by visual or text evidence.
 If a function is not confirmed, do not use it.
@@ -359,6 +365,8 @@ Avoid polished studio-commercial aesthetics.
 Match the UGC feeling to the product's real use: kitchen products feel homely; outdoor products feel like a real hobby moment; tools feel like a real home repair corner. Never default every product to a kitchen.
 
 Choose ONE selling idea before writing: problem relief, comfort, convenience, home feeling, a single useful function, portability, or visual appeal. Do not sell a feature list.
+
+Think like a UGC creative assistant: why would someone want this, what feeling or practical benefit should be obvious in the first 2 seconds, and what simple LOW-RISK moment makes it desirable. Not a prompt formatter and not a technical demo.
 
 The first 1.5 seconds must already make the selling idea clear. One continuous clip. One LOW-RISK action.
 

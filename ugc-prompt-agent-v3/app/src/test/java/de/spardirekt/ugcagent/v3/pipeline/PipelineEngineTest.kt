@@ -24,6 +24,8 @@ class PipelineEngineTest {
         assertTrue(result.completed.contains(PipelineStage.FINAL_QUALITY_CHECK))
         assertTrue(result.completed.contains(PipelineStage.CAPTION_GENERATION))
         assertTrue(result.completed.contains(PipelineStage.HOOK_GENERATION))
+        assertTrue(result.completed.contains(PipelineStage.PURCHASE_APPEAL))
+        assertTrue(result.details.orEmpty().contains("Kaufgrund"))
         assertTrue(result.repairApplied)
         assertTrue(result.finalPrompt.orEmpty().contains("PRODUCT IDENTITY LOCK"))
         assertFalse(result.finalPrompt.orEmpty().contains("FINAL IDENTITY LOCK"))
