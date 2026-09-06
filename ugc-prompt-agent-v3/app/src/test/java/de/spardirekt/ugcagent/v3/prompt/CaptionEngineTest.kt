@@ -66,4 +66,24 @@ class CaptionEngineTest {
         assertFalse(caption.contains("weicher"))
         assertFalse(caption.contains("anti-scratch"))
     }
+
+    @Test
+    fun kitchenPanDoesNotInheritMicrowaveCaption() {
+        val analysis = JSONObject()
+            .put("product_category", "kitchen")
+            .put("observed_use_case", "frying pan")
+            .put("possible_scene", "microwave cover leftover")
+        assertFalse(CaptionEngine.isMicrowaveCover(analysis, ProductIdentity.cookwarePanFingerprint()))
+        val caption = CaptionEngine.finalize(
+            raw = "seller pitch",
+            analysis = analysis,
+            evidence = EvidenceModel.classify(analysis),
+            fingerprint = ProductIdentity.cookwarePanFingerprint(),
+            language = "DEUTSCH",
+            appendDisclosure = false,
+        )
+        assertFalse(caption.contains("Mikrowelle"))
+        assertFalse(caption.contains("Tellerabdeckung"))
+        assertFalse(caption.contains("микроволн"))
+    }
 }

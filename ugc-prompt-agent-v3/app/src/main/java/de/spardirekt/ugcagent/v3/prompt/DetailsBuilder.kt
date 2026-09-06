@@ -10,17 +10,21 @@ object DetailsBuilder {
         val russian = isRussian(session.speechLanguage, session.captionLanguage)
         val analysis = session.analysis ?: JSONObject()
         val fingerprint = session.identityFingerprint ?: JSONObject()
+        val (cleanAnalysis, cleanFingerprint) = CrossProductGuard.clean(analysis, fingerprint)
         val scene = session.scene ?: JSONObject()
-        val category = analysis.optString("product_category").ifBlank { "—" }
-        val use = analysis.optString("observed_use_case").ifBlank { analysis.optString("inferred_use_case").ifBlank { "—" } }
-        val visual = join(de.spardirekt.ugcagent.v3.prompt.EvidenceModel.visuallyConfirmed(session.evidence, analysis))
-        val text = join(de.spardirekt.ugcagent.v3.prompt.EvidenceModel.verifiedReliable(session.evidence, analysis))
-        val identity = fingerprint.optString("overall_geometry").ifBlank {
-            join(JsonExtractor.stringList(fingerprint, "identity_critical_components"))
+        val category = (cleanAnalysis ?: analysis).optString("product_category").ifBlank { "—" }
+        val use = (cleanAnalysis ?: analysis).optString("observed_use_case").ifBlank {
+            (cleanAnalysis ?: analysis).optString("inferred_use_case").ifBlank { "—" }
         }
-        val action = scene.optString("main_action").ifBlank { ActionIdentity.recommendedSafeAction(fingerprint) }
+        val visual = join(de.spardirekt.ugcagent.v3.prompt.EvidenceModel.visuallyConfirmed(session.evidence, cleanAnalysis ?: analysis))
+        val text = join(de.spardirekt.ugcagent.v3.prompt.EvidenceModel.verifiedReliable(session.evidence, cleanAnalysis ?: analysis))
+        val identitySource = cleanFingerprint ?: fingerprint
+        val identity = identitySource.optString("overall_geometry").ifBlank {
+            join(JsonExtractor.stringList(identitySource, "identity_critical_components"))
+        }
+        val action = scene.optString("main_action").ifBlank { ActionIdentity.recommendedSafeAction(cleanFingerprint ?: fingerprint) }
         val firstFrame = session.firstFrameId?.take(8) ?: "—"
-        val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+        val plan = CreativeStrategyEngine.plan(cleanAnalysis, cleanFingerprint)
         val idea = CreativeStrategyEngine.ideaLabel(plan, russian)
         val warnings = session.warnings.filter { it.isNotBlank() && !isInternal(it) }.distinct().take(6)
         val body = if (russian) {

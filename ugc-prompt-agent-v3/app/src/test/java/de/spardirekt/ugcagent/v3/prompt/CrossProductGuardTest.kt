@@ -232,6 +232,51 @@ SPEECH:
         assertFalse(prompt.contains("Ordinary cozy home kitchen"))
     }
 
+    @Test
+    fun travelBathroomWorkshopAndUnknownKeepTheirOwnContextWhenLeftoversArePresent() {
+        data class Case(
+            val category: String,
+            val use: String,
+            val context: String,
+            val geometry: String,
+            val setting: CreativeStrategyEngine.SettingType,
+        )
+        val cases = listOf(
+            Case("travel", "portable folding suitcase", "airport", "soft travel bag with zipper and carry handle", CreativeStrategyEngine.SettingType.TRAVEL),
+            Case("personal care", "soap dispenser", "bathroom", "pump bottle with cylindrical body", CreativeStrategyEngine.SettingType.BATHROOM),
+            Case("tools", "bench clamp", "workshop", "metal clamp with screw handle", CreativeStrategyEngine.SettingType.WORKSHOP),
+            Case("unknown gadget", "small household widget", "white background packshot", "small unknown household widget", CreativeStrategyEngine.SettingType.INDOOR_NEUTRAL),
+        )
+        cases.forEach { item ->
+            val analysis = JSONObject()
+                .put("product_category", item.category)
+                .put("observed_use_case", item.use)
+                .put("observed_context", item.context)
+                .put("possible_scene", "Ordinary cozy home kitchen by the lakeside fishing spot with a microwave cover")
+                .put("notes", "circular upper vent, side bait tray, hanging ring, desk organizer")
+            val fingerprint = JSONObject().put("overall_geometry", item.geometry)
+            val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+            assertEquals(item.use, item.setting, plan.settingType)
+            assertFalse(item.use, plan.setting.contains("Ordinary cozy home kitchen"))
+            assertFalse(item.use, plan.setting.contains("lakeside"))
+            assertFalse(item.use, plan.formatTone.contains("lived-in kitchen feeling"))
+            val prompt = ProductLock.finalizeClean(
+                dirtyIdentity,
+                fingerprint,
+                "VEO",
+                "DEUTSCH",
+                "Вот так на рыбалке сидеть уже совсем другое дело.",
+                true,
+                analysis,
+            )
+            assertNoMicrowaveFamily(prompt)
+            assertNoFishingFamily(prompt)
+            assertNoPanFamily(prompt)
+            assertFalse(item.use, prompt.contains("Ordinary cozy home kitchen"))
+            assertFalse(item.use, prompt.contains("Warm, homely"))
+        }
+    }
+
     private fun assertNoMicrowaveFamily(text: String) {
         assertFalse(text.contains("circular upper vent", ignoreCase = true))
         assertFalse(text.contains("rectangular modules", ignoreCase = true))

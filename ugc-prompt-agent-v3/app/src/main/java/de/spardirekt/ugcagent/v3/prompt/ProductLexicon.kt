@@ -33,8 +33,7 @@ object ProductLexicon {
 
     fun allowedVocabulary(fingerprint: JSONObject?, analysis: JSONObject?, extra: String = ""): String {
         val parts = mutableListOf<String>()
-        fingerprint?.toString()?.let { parts += it }
-        analysis?.toString()?.let { parts += it }
+        parts += CrossProductGuard.planningText(analysis, fingerprint)
         analysis?.optString("product_category")?.let { parts += it }
         analysis?.optString("observed_use_case")?.let { parts += it }
         if (extra.isNotBlank()) parts += extra

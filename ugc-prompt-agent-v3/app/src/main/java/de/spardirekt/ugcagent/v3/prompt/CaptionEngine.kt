@@ -84,17 +84,7 @@ object CaptionEngine {
 
     fun isMicrowaveCover(analysis: JSONObject?, fingerprint: JSONObject?): Boolean {
         if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) return true
-        val use = analysis?.optString("observed_use_case").orEmpty().lowercase()
-        val category = analysis?.optString("product_category").orEmpty().lowercase()
-        return use.contains("microwave") ||
-            use.contains("микроволн") ||
-            use.contains("tellerabdeck") ||
-            (category.contains("kitchen") && (
-                use.contains("cover") ||
-                    use.contains("splash") ||
-                    use.contains("брызг") ||
-                    use.contains("крыш")
-                ))
+        return CrossProductGuard.family(fingerprint, analysis) == CrossProductGuard.Family.MICROWAVE_COVER
     }
 
     fun isCommercialLanguage(language: String): Boolean =

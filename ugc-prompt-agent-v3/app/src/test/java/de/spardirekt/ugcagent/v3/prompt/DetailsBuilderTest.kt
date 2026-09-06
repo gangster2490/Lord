@@ -51,6 +51,32 @@ class DetailsBuilderTest {
         )
     }
 
+    @Test
+    fun detailsDropForeignIdentityExtrasFromAnotherProduct() {
+        val session = PipelineSession()
+        session.speechLanguage = "DEUTSCH"
+        session.analysis = JSONObject()
+            .put("product_category", "office")
+            .put("observed_use_case", "desk organizer")
+            .put("possible_scene", "lakeside kitchen microwave leftover")
+        session.identityFingerprint = JSONObject()
+            .put("overall_geometry", "desktop organizer tray with rectangular compartments")
+            .put(
+                "identity_critical_components",
+                JSONArray()
+                    .put("desktop compartments")
+                    .put("circular upper vent")
+                    .put("side bait tray")
+                    .put("hanging ring"),
+            )
+        val text = DetailsBuilder.build(session)
+        assertTrue(text.contains("desk organizer") || text.contains("office"))
+        assertFalse(text.contains("circular upper vent"))
+        assertFalse(text.contains("bait tray"))
+        assertFalse(text.contains("hanging ring"))
+        assertFalse(text.contains("lakeside"))
+    }
+
     private fun sample(): PipelineSession {
         val session = PipelineSession()
         session.firstFrameId = "photo001"
