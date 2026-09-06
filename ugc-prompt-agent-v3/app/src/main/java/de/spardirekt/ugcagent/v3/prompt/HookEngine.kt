@@ -216,8 +216,8 @@ $SPEECH_END
             listOf("microwave", "микроволн", "cover food").any {
                 CrossProductGuard.productScopeText(fingerprint, analysis).contains(it)
             }
-        val cookware = ProductIdentity.looksLikeCookwarePan(fingerprint, analysis) &&
-            plan.settingType == CreativeStrategyEngine.SettingType.HOME_KITCHEN
+        val cookware = ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)
+        val kitchenCookware = cookware && plan.settingType == CreativeStrategyEngine.SettingType.HOME_KITCHEN
         if (russian) {
             return when {
                 fishingSpot -> listOf(
@@ -235,10 +235,15 @@ $SPEECH_END
                     "Вот ради такой мелочи потом меньше возни по дому.",
                     "Когда эта штука под рукой, обычный момент идёт спокойнее.",
                 )
-                cookware || (type == CreativeStrategyEngine.HookType.HOME && plan.kitchenDefault) -> listOf(
+                kitchenCookware || (type == CreativeStrategyEngine.HookType.HOME && plan.kitchenDefault) -> listOf(
                     "Вот за такие вещи я и люблю домашнюю кухню.",
                     "Люблю, когда на плите всё выглядит просто и по-домашнему.",
                     "С такой вещью дома сразу как-то спокойнее.",
+                )
+                type == CreativeStrategyEngine.HookType.HOME -> listOf(
+                    "С такой вещью дома сразу как-то спокойнее.",
+                    "Приятно, когда обычная вещь сразу вписывается в дом.",
+                    "Вот за такие вещи дом сразу становится роднее.",
                 )
                 type == CreativeStrategyEngine.HookType.OUTDOOR -> listOf(
                     "Вот так на улице уже совсем другой комфорт.",
@@ -294,10 +299,15 @@ $SPEECH_END
                 "Solche Kleinigkeiten nehmen einem später Arbeit ab.",
                 "Wenn das in Reichweite ist, bleibt der Ablauf ruhiger.",
             )
-            cookware || (type == CreativeStrategyEngine.HookType.HOME && plan.kitchenDefault) -> listOf(
+            kitchenCookware || (type == CreativeStrategyEngine.HookType.HOME && plan.kitchenDefault) -> listOf(
                 "Ich mag's, wenn so eine Pfanne die Küche nach Zuhause anfühlen lässt.",
                 "Solche Sachen haben wir gern einfach zu Hause am Herd.",
                 "Mit so was wird's in der Küche gleich gemütlicher.",
+            )
+            type == CreativeStrategyEngine.HookType.HOME -> listOf(
+                "Solche Sachen haben wir gern einfach zu Hause.",
+                "Ich mag's, wenn so was nach Zuhause anfühlt.",
+                "Mit so was wird's gleich gemütlicher.",
             )
             type == CreativeStrategyEngine.HookType.OUTDOOR -> listOf(
                 "Draußen sitzt sich's damit schon ganz anders.",

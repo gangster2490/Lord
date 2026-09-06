@@ -182,8 +182,9 @@ object CreativeStrategyEngine {
         chosen: Angle? = null,
     ): String {
         if (ProductIdentity.looksLikeMicrowaveCover(fingerprint)) return ActionIdentity.MICROWAVE_SAFE_ACTION
-        val blob = CreativeConsistencyEngine.blob(analysis, fingerprint)
-        val seated = listOf("chair", "stuhl", "кресл", "стул", "seat").any { blob.contains(it) }
+        val id = CrossProductGuard.productScopeText(fingerprint, analysis)
+        val seated = listOf("chair", "stuhl", "кресл", "стул", "seat", "armchair").any { id.contains(it) } &&
+            !id.contains("car seat")
         if (seated) {
             val trayBit = if (settingType == SettingType.FISHING_SPOT) " or uses a clearly visible tray" else ""
             return "The person is already seated in the referenced chair. Relaxed posture. One LOW-RISK moment: a hand rests on the arm$trayBit. Do not fold, unfold, rotate a backrest, change leg height or reconstruct hidden geometry. The chair stays exact and stable."

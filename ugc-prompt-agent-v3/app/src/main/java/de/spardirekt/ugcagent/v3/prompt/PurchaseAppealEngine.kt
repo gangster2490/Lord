@@ -86,12 +86,12 @@ object PurchaseAppealEngine {
         val refined = lock(plan, winner)
         return Brief(
             boughtFor = refined.boughtFor,
-            desireKind = desireFor(winner.idea),
+            desireKind = refined.desire.ifBlank { desireFor(refined.idea) },
             viewerFeel = refined.viewerFeel,
-            sellingIdea = winner.pitch,
-            setting = winner.setting,
-            action = winner.action,
-            hookType = winner.hookType,
+            sellingIdea = refined.pitch,
+            setting = refined.setting,
+            action = refined.action,
+            hookType = refined.hookType,
             plan = refined,
             concepts = concepts,
             winnerKind = winner.kind,
@@ -104,21 +104,15 @@ object PurchaseAppealEngine {
     }
 
     private fun lock(plan: CreativeStrategyEngine.Plan, winner: Concept): CreativeStrategyEngine.Plan {
+        val action = if (scoreAction(winner.action).highRisk) {
+            CreativeStrategyEngine.safeAction(null, null, plan.idea, plan.settingType)
+        } else {
+            winner.action
+        }
         return plan.copy(
-            primary = winner.motivation,
-            idea = winner.idea,
-            hookType = winner.hookType,
-            setting = winner.setting,
-            human = winner.human,
-            action = winner.action,
-            opening = openingFor(winner),
-            pitch = winner.pitch,
+            action = action,
             conceptKind = winner.kind,
-            boughtFor = boughtFor(winner.motivation),
-            viewerFeel = viewerFeel(winner.motivation),
-            desire = desireFor(winner.idea),
-            formatTone = formatTone(plan.copy(primary = winner.motivation, idea = winner.idea), winner),
-            secondary = plan.secondary.takeIf { it != winner.motivation },
+            actionRiskLabel = if (scoreAction(action).highRisk) "HIGH" else "LOW",
         )
     }
 
@@ -193,24 +187,17 @@ object PurchaseAppealEngine {
         val action = plan.action
         val glance = "The referenced product stays in place while the person shares one quiet natural glance. Do not fold, open, rotate, pull, detach or reconstruct hidden geometry."
         val safestAction = if (action.contains("already seated") || ProductIdentity.looksLikeMicrowaveCover(fingerprint)) action else glance
-        val settingEvidence = CreativeConsistencyEngine.resolveSetting(analysis, fingerprint, null)
-        val angle = SellingAngleSelector.winner(analysis, fingerprint, settingEvidence)
-        val scores = scoresFor(angle.motivation)
+        val scores = scoresFor(plan.primary)
         fun asConcept(kind: String, chosenAction: String, score: ConceptScore): Concept = Concept(
             kind = kind,
-            motivation = angle.motivation,
-            idea = angle.idea,
-            hookType = angle.hookType,
+            motivation = plan.primary,
+            idea = plan.idea,
+            hookType = plan.hookType,
             setting = setting,
             action = chosenAction,
             human = human,
-            pitch = CreativeConsistencyEngine.pitchFor(angle.motivation, angle.idea),
-            scores = score.copy(
-                purchaseAppeal = minOf(score.purchaseAppeal, angle.purchase),
-                relevance = minOf(score.relevance, angle.relevance),
-                settingCoherence = angle.settingCoherence,
-                speechNaturalness = angle.naturalness,
-            ),
+            pitch = plan.pitch.ifBlank { CreativeConsistencyEngine.pitchFor(plan.primary, plan.idea) },
+            scores = score.copy(settingCoherence = 1.0),
         )
         return listOf(
             asConcept("safest", safestAction, scores.safest),
@@ -261,13 +248,5 @@ object PurchaseAppealEngine {
         val safe = aligned.filter { it.scores.safe }.ifEmpty { concepts.filter { it.scores.safe } }
         val pool = if (safe.isNotEmpty()) safe else aligned.ifEmpty { concepts }
         return pool.maxByOrNull { it.score } ?: concepts.first()
-    }
-
-    private fun openingFor(concept: Concept): String = CreativeConsistencyEngine.openingFor(concept.hookType)
-
-    private fun formatTone(plan: CreativeStrategyEngine.Plan, winner: Concept): String {
-        val desire = desireFor(winner.idea)
-        val base = plan.formatTone.substringBefore(" One desire:")
-        return "$base One desire only: $desire. Not a technical demo or feature brochure."
     }
 }

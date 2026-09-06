@@ -98,4 +98,64 @@ class PurchaseAppealEngineTest {
         assertFalse(brief.plan.idea == CreativeStrategyEngine.SellingIdea.HOME_FEELING)
         assertFalse(brief.plan.idea == CreativeStrategyEngine.SellingIdea.CLEANLINESS)
     }
+
+    @Test
+    fun applyKeepsThePlansSellingIdeaAndOnlyVariesAction() {
+        val analysis = JSONObject()
+            .put("product_category", "office")
+            .put("observed_use_case", "desk organizer")
+            .put("observed_context", "desk")
+            .put("inferred_use_case", "cover food mess splash putzen")
+            .put("possible_scene", "Ordinary cozy home kitchen by the lakeside")
+        val fingerprint = JSONObject().put("overall_geometry", "desktop organizer tray")
+        val draft = CreativeConsistencyEngine.build(analysis, fingerprint)
+        val applied = PurchaseAppealEngine.apply(draft, analysis, fingerprint)
+        assertEquals(draft.primary, applied.primary)
+        assertEquals(draft.idea, applied.idea)
+        assertEquals(draft.hookType, applied.hookType)
+        assertEquals(draft.setting, applied.setting)
+        assertEquals(CreativeStrategyEngine.Motivation.ORGANIZATION, applied.primary)
+        val brief = PurchaseAppealEngine.evaluate(analysis, fingerprint)
+        assertEquals(1, brief.concepts.map { it.idea }.distinct().size)
+        assertEquals(applied.idea, brief.concepts.first().idea)
+        assertEquals(applied.hookType, brief.concepts.first().hookType)
+        assertEquals(applied.primary, brief.concepts.first().motivation)
+        assertFalse(brief.plan.idea == CreativeStrategyEngine.SellingIdea.CLEANLINESS)
+        assertFalse(brief.plan.primary == CreativeStrategyEngine.Motivation.PROBLEM_SOLVER)
+    }
+
+    @Test
+    fun bathroomDispenserSellsConvenienceNotKitchenCleanliness() {
+        val analysis = JSONObject()
+            .put("product_category", "personal care")
+            .put("observed_use_case", "soap dispenser")
+            .put("observed_context", "bathroom")
+            .put("possible_scene", "cover food mess splash in a cozy kitchen")
+        val fingerprint = JSONObject().put("overall_geometry", "pump bottle with cylindrical body")
+        val brief = PurchaseAppealEngine.evaluate(analysis, fingerprint)
+        assertEquals(CreativeStrategyEngine.SettingType.BATHROOM, brief.plan.settingType)
+        assertEquals(CreativeStrategyEngine.Motivation.CONVENIENCE, brief.plan.primary)
+        assertEquals(CreativeStrategyEngine.SellingIdea.CONVENIENCE, brief.plan.idea)
+        assertEquals(CreativeStrategyEngine.HookType.CONVENIENCE, brief.plan.hookType)
+        assertFalse(brief.plan.idea == CreativeStrategyEngine.SellingIdea.CLEANLINESS)
+        assertFalse(brief.plan.idea == CreativeStrategyEngine.SellingIdea.HOME_FEELING)
+        assertEquals(1, brief.concepts.map { it.idea }.distinct().size)
+        val prompt = ProductLock.finalizeClean(
+            "ACTION:\none hand rests near the dispenser.",
+            fingerprint,
+            "VEO",
+            "DEUTSCH",
+            null,
+            true,
+            analysis,
+        )
+        assertTrue(prompt.contains("bathroom", ignoreCase = true))
+        assertTrue(prompt.contains("One desire only: convenience"))
+        assertFalse(prompt.contains("One desire only: cleanliness"))
+        assertFalse(prompt.contains("Ordinary cozy home kitchen"))
+        val hook = ProductLock.extractSpokenHooks(prompt).first()
+        assertFalse(hook.contains("Mikrowelle"))
+        assertFalse(hook.contains("putzen"))
+        assertFalse(hook.contains("Küche"))
+    }
 }

@@ -34,7 +34,7 @@ object SellingAngleSelector {
         setting: CreativeConsistencyEngine.SettingEvidence,
         blob: String = CreativeConsistencyEngine.blob(analysis, fingerprint),
     ): List<ScoredAngle> {
-        val signals = signals(blob, fingerprint, analysis)
+        val signals = signals(fingerprint, analysis)
         return candidates(signals, setting)
             .sortedByDescending { it.total }
     }
@@ -87,50 +87,48 @@ object SellingAngleSelector {
         val cookware: Boolean,
     )
 
-    private fun signals(blob: String, fingerprint: JSONObject?, analysis: JSONObject?): Signals {
+    private fun signals(fingerprint: JSONObject?, analysis: JSONObject?): Signals {
         val scope = CrossProductGuard.productScopeText(fingerprint, analysis)
         val microwave = ProductIdentity.looksLikeMicrowaveCover(fingerprint) ||
             listOf("microwave cover", "cover food", "микроволн", "mikrowelle").any { scope.contains(it) }
         val cookware = ProductIdentity.looksLikeCookwarePan(fingerprint, analysis)
         val fishing = CreativeStrategyEngine.looksLikeFishingChair(fingerprint, analysis)
-        val seated = listOf("chair", "stuhl", "кресл", "стул", "seat", "armchair").any { scope.contains(it) }
+        val seated = listOf("chair", "stuhl", "кресл", "стул", "seat", "armchair").any { scope.contains(it) } &&
+            !scope.contains("car seat")
         val pain = strength(
-            blob,
-            listOf("mess", "splash", "брызг", "убор", "cover food", "leak", "clutter", "возн", "putzen", "spatter", "nacharbeit"),
+            scope,
+            listOf("mess", "splash", "брызг", "убор", "cover food", "leak", "возн", "putzen", "spatter", "nacharbeit"),
         ).let { base ->
             when {
                 microwave -> maxOf(base, 0.92)
-                blob.contains("clean") && (blob.contains("mess") || blob.contains("splash") || microwave) -> maxOf(base, 0.8)
+                scope.contains("clean") && (scope.contains("mess") || scope.contains("splash") || microwave) -> maxOf(base, 0.8)
                 else -> base
             }
         }
         val outdoorHobby = if (fishing) {
             maxOf(
                 0.9,
-                strength(blob, listOf("fish", "рыбал", "angeln", "camp", "кемпинг", "hiking", "bait", "lakeside", "riverside")),
+                strength(scope, listOf("fish", "рыбал", "angeln", "camp", "кемпинг", "hiking", "bait", "lakeside", "riverside")),
             )
         } else {
-            strength(blob, listOf("camp", "кемпинг", "hiking", "outdoor", "draußen"))
+            strength(scope, listOf("camp", "кемпинг", "hiking", "outdoor", "draußen"))
         }
-        val comfort = strength(blob, listOf("cushion", "подуш", "comfort", "комфорт", "armchair", "bequem", "удобн сид"))
-            .let { base ->
-                val chairHit = seated && !blob.contains("car seat")
-                if (chairHit) maxOf(base, 0.72) else base
-            }
-        val organize = strength(blob, listOf("organizer", "storage", "хранен", "drawer", "shelf", "порядок", "ordnung"))
-        val portable = strength(blob, listOf("portable", "travel", "компакт", "складн", "походн", "suitcase", "folding"))
+        val comfort = strength(scope, listOf("cushion", "подуш", "comfort", "комфорт", "armchair", "bequem", "удобн сид"))
+            .let { base -> if (seated) maxOf(base, 0.72) else base }
+        val organize = strength(scope, listOf("organizer", "storage", "хранен", "drawer", "shelf", "порядок", "ordnung"))
+        val portable = strength(scope, listOf("portable", "travel", "компакт", "складн", "походн", "suitcase", "folding"))
             .let { base ->
                 if (microwave || (seated && fishing)) 0.0 else base
             }
-        val visual = strength(blob, listOf("lamp", "ламп", "decor", "декор", "glassware", "бокал", "fashion", "светильн", "aesthetic"))
-        val function = strength(blob, listOf("waffle", "grill", "processor", "pump", "blender", "вафельн", "гриль"))
-        val homeCook = strength(blob, listOf("cookware", "frying pan", "сковород", "кастрюл", "serving", "посуд", "pfanne"))
+        val visual = strength(scope, listOf("lamp", "ламп", "decor", "декор", "glassware", "бокал", "fashion", "светильн", "aesthetic"))
+        val function = strength(scope, listOf("waffle", "grill", "processor", "pump", "blender", "вафельн", "гриль"))
+        val homeCook = strength(scope, listOf("cookware", "frying pan", "сковород", "кастрюл", "serving", "посуд", "pfanne"))
             .let { if (cookware) maxOf(it, 0.8) else it }
-        val time = strength(blob, listOf("faster", "quick", "time-sav", "экономит время"))
-        val space = strength(blob, listOf("space-sav", "compact storage", "flat pack"))
-        val gift = strength(blob, listOf("gift", "подарок"))
-        val premium = strength(blob, listOf("premium", "elegant", "luxury"))
-        val cleanliness = strength(blob, listOf("mess", "splash", "брызг", "убор", "cover food", "cleanliness"))
+        val time = strength(scope, listOf("faster", "quick", "time-sav", "экономит время"))
+        val space = strength(scope, listOf("space-sav", "compact storage", "flat pack"))
+        val gift = strength(scope, listOf("gift", "подарок"))
+        val premium = strength(scope, listOf("premium", "elegant", "luxury"))
+        val cleanliness = strength(scope, listOf("mess", "splash", "брызг", "убор", "cover food", "cleanliness"))
             .let { if (microwave) maxOf(it, 0.9) else it }
         return Signals(
             pain, outdoorHobby, comfort, organize, portable, visual, function, homeCook,
@@ -145,12 +143,21 @@ object SellingAngleSelector {
         val outdoor = setting.type.isOutdoor()
         val kitchen = setting.type == CreativeStrategyEngine.SettingType.HOME_KITCHEN
         val office = setting.type == CreativeStrategyEngine.SettingType.OFFICE
+        val bathroom = setting.type == CreativeStrategyEngine.SettingType.BATHROOM
         val list = mutableListOf<ScoredAngle>()
+        val problemFitsProduct = signals.microwave || (
+            signals.pain >= 0.45 &&
+                !signals.fishing &&
+                signals.organize < 0.45 &&
+                !(signals.comfort >= 0.45 && signals.seated) &&
+                !(signals.homeCook >= 0.45 && !signals.microwave) &&
+                signals.portable < 0.55
+            )
 
-        if (signals.pain >= 0.45 || signals.microwave) {
+        if (problemFitsProduct) {
             list += angle(
                 motivation = CreativeStrategyEngine.Motivation.PROBLEM_SOLVER,
-                idea = if (signals.cleanliness >= 0.5 || signals.microwave) {
+                idea = if (signals.microwave || (signals.cleanliness >= 0.5 && kitchen && !signals.cookware)) {
                     CreativeStrategyEngine.SellingIdea.CLEANLINESS
                 } else CreativeStrategyEngine.SellingIdea.SIMPLE_USE,
                 hook = CreativeStrategyEngine.HookType.PROBLEM,
@@ -161,7 +168,10 @@ object SellingAngleSelector {
                     signals.microwave && kitchen -> 1.0
                     kitchen -> 0.95
                     signals.microwave -> 0.8
-                    else -> 0.62
+                    bathroom && !signals.microwave -> 0.35
+                    office -> 0.3
+                    outdoor -> 0.28
+                    else -> 0.45
                 },
                 naturalness = 0.9,
                 motion = if (signals.microwave) 0.92 else 0.94,
@@ -221,6 +231,7 @@ object SellingAngleSelector {
             )
         }
         if (signals.homeCook >= 0.45 || (kitchen && (signals.cookware || signals.microwave))) {
+            val outdoorCook = signals.cookware && outdoor && !signals.microwave
             list += angle(
                 motivation = CreativeStrategyEngine.Motivation.HOME_COZY,
                 idea = CreativeStrategyEngine.SellingIdea.HOME_FEELING,
@@ -231,10 +242,16 @@ object SellingAngleSelector {
                 settingCoherence = when {
                     kitchen && !signals.microwave -> 1.0
                     kitchen && signals.microwave -> 0.62
+                    outdoorCook -> 0.78
                     outdoor -> 0.2
+                    office || bathroom -> 0.2
                     else -> 0.35
                 },
-                naturalness = if (kitchen && !signals.microwave) 0.96 else 0.55,
+                naturalness = when {
+                    kitchen && !signals.microwave -> 0.96
+                    outdoorCook -> 0.9
+                    else -> 0.55
+                },
             )
         }
         if (signals.portable >= 0.55 && !signals.microwave && !(signals.seated && signals.fishing)) {
@@ -293,6 +310,18 @@ object SellingAngleSelector {
                 visual = 0.82,
                 settingCoherence = 1.0,
                 naturalness = 0.9,
+            )
+        }
+        if (bathroom && !signals.microwave && !signals.cookware && !signals.fishing) {
+            list += angle(
+                motivation = CreativeStrategyEngine.Motivation.CONVENIENCE,
+                idea = CreativeStrategyEngine.SellingIdea.CONVENIENCE,
+                hook = CreativeStrategyEngine.HookType.CONVENIENCE,
+                relevance = 0.74,
+                purchase = 0.88,
+                visual = 0.84,
+                settingCoherence = 1.0,
+                naturalness = 0.93,
             )
         }
         if (signals.time >= 0.55) {

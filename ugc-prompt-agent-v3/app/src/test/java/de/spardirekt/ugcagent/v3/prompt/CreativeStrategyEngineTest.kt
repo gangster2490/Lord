@@ -239,9 +239,18 @@ class CreativeStrategyEngineTest {
             .put("first_frame_context", "home garden table")
         val plan = CreativeStrategyEngine.plan(analysis, ProductIdentity.cookwarePanFingerprint(), "home garden table")
         assertEquals(CreativeStrategyEngine.SettingType.GARDEN, plan.settingType)
+        assertEquals(CreativeStrategyEngine.Motivation.HOME_COZY, plan.primary)
+        assertEquals(CreativeStrategyEngine.SellingIdea.HOME_FEELING, plan.idea)
+        assertEquals(CreativeStrategyEngine.HookType.HOME, plan.hookType)
+        assertFalse(plan.idea == CreativeStrategyEngine.SellingIdea.CLEANLINESS)
+        assertFalse(plan.primary == CreativeStrategyEngine.Motivation.PROBLEM_SOLVER)
         assertFalse(plan.setting.contains("Ordinary cozy home kitchen"))
         assertTrue(plan.lighting.contains("outdoor daylight"))
         assertFalse(plan.speechContext.contains("kitchen"))
+        val gardenHook = HookEngine.generate(analysis, "DEUTSCH", ProductIdentity.cookwarePanFingerprint(), plan)
+        assertFalse(gardenHook.contains("Mikrowelle"))
+        assertFalse(gardenHook.contains("in der Küche"))
+        assertTrue(gardenHook.contains("Hause") || gardenHook.contains("Zuhause") || gardenHook.contains("gemütlich") || gardenHook.contains("mag"))
         val prompt = ProductLock.finalizeClean(
             "SETTING:\nOrdinary cozy home kitchen.\nACTION:\none hand touches the handle.",
             ProductIdentity.cookwarePanFingerprint(),
@@ -255,5 +264,91 @@ class CreativeStrategyEngineTest {
         assertFalse(prompt.contains("Ordinary cozy home kitchen"))
         assertTrue(prompt.substringAfter("LIGHTING:").contains("outdoor daylight"))
         assertFalse(prompt.substringAfter("SPEECH:").contains("in their own kitchen"))
+        assertTrue(prompt.contains("One desire only: coziness") || prompt.contains("coziness"))
+        assertFalse(prompt.contains("One desire only: cleanliness"))
+        assertFalse(prompt.contains("One desire only: convenience"))
+    }
+
+    @Test
+    fun leftoverPainDoesNotStealTheProductSellingAngle() {
+        data class Case(
+            val category: String,
+            val use: String,
+            val context: String,
+            val geometry: String,
+            val setting: CreativeStrategyEngine.SettingType,
+            val motivation: CreativeStrategyEngine.Motivation,
+            val idea: CreativeStrategyEngine.SellingIdea,
+            val forbiddenPrimary: List<CreativeStrategyEngine.Motivation>,
+        )
+        val leftovers = JSONObject()
+            .put("possible_scene", "Ordinary cozy home kitchen by the lakeside with a microwave cover food mess splash")
+            .put("inferred_use_case", "cover food putzen nacharbeit clutter leak")
+            .put("notes", "circular upper vent, side bait tray, hanging ring")
+        val cases = listOf(
+            Case(
+                "office", "desk organizer", "desk", "desktop organizer tray",
+                CreativeStrategyEngine.SettingType.OFFICE,
+                CreativeStrategyEngine.Motivation.ORGANIZATION,
+                CreativeStrategyEngine.SellingIdea.ORGANIZATION,
+                listOf(CreativeStrategyEngine.Motivation.PROBLEM_SOLVER, CreativeStrategyEngine.Motivation.HOME_COZY, CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY),
+            ),
+            Case(
+                "personal care", "soap dispenser", "bathroom", "pump bottle with cylindrical body",
+                CreativeStrategyEngine.SettingType.BATHROOM,
+                CreativeStrategyEngine.Motivation.CONVENIENCE,
+                CreativeStrategyEngine.SellingIdea.CONVENIENCE,
+                listOf(CreativeStrategyEngine.Motivation.PROBLEM_SOLVER, CreativeStrategyEngine.Motivation.HOME_COZY, CreativeStrategyEngine.Motivation.CLEANLINESS),
+            ),
+            Case(
+                "travel", "portable folding suitcase", "airport", "soft travel bag with zipper and carry handle",
+                CreativeStrategyEngine.SettingType.TRAVEL,
+                CreativeStrategyEngine.Motivation.PORTABLE,
+                CreativeStrategyEngine.SellingIdea.PORTABILITY,
+                listOf(CreativeStrategyEngine.Motivation.PROBLEM_SOLVER, CreativeStrategyEngine.Motivation.HOME_COZY, CreativeStrategyEngine.Motivation.CLEANLINESS),
+            ),
+            Case(
+                "furniture", "armchair", "living room", "upholstered armchair with armrests and stable legs",
+                CreativeStrategyEngine.SettingType.LIVING_ROOM,
+                CreativeStrategyEngine.Motivation.COMFORT,
+                CreativeStrategyEngine.SellingIdea.COMFORT,
+                listOf(CreativeStrategyEngine.Motivation.PROBLEM_SOLVER, CreativeStrategyEngine.Motivation.OUTDOOR_HOBBY, CreativeStrategyEngine.Motivation.HOME_COZY),
+            ),
+        )
+        cases.forEach { item ->
+            val analysis = JSONObject(leftovers.toString())
+                .put("product_category", item.category)
+                .put("observed_use_case", item.use)
+                .put("observed_context", item.context)
+            val fingerprint = JSONObject().put("overall_geometry", item.geometry)
+            val draft = CreativeConsistencyEngine.build(analysis, fingerprint)
+            val plan = CreativeStrategyEngine.plan(analysis, fingerprint)
+            assertEquals(item.use, item.setting, plan.settingType)
+            assertEquals(item.use, item.motivation, plan.primary)
+            assertEquals(item.use, item.idea, plan.idea)
+            assertEquals(item.use, draft.primary, plan.primary)
+            assertEquals(item.use, draft.idea, plan.idea)
+            assertEquals(item.use, draft.hookType, plan.hookType)
+            item.forbiddenPrimary.forEach { bad ->
+                assertFalse("${item.use} must not be $bad", plan.primary == bad)
+            }
+            assertFalse(item.use, plan.idea == CreativeStrategyEngine.SellingIdea.CLEANLINESS)
+            assertFalse(item.use, plan.formatTone.contains("One desire only: cleanliness"))
+            val prompt = ProductLock.finalizeClean(
+                "ACTION:\none hand rests near the product.",
+                fingerprint,
+                "VEO",
+                "DEUTSCH",
+                null,
+                true,
+                analysis,
+            )
+            assertFalse(item.use, prompt.contains("One desire only: cleanliness"))
+            assertFalse(item.use, prompt.contains("Ordinary cozy home kitchen"))
+            val hook = ProductLock.extractSpokenHooks(prompt).firstOrNull().orEmpty()
+            assertFalse(item.use, hook.contains("Mikrowelle"))
+            assertFalse(item.use, hook.contains("Angeln"))
+            assertFalse(item.use, hook.contains("рыбал"))
+        }
     }
 }
