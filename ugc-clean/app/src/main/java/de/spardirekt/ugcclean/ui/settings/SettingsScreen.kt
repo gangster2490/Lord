@@ -4,10 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +28,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
@@ -40,6 +38,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import de.spardirekt.ugcclean.BuildConfig
 import de.spardirekt.ugcclean.R
 import de.spardirekt.ugcclean.net.AiProviderId
 import de.spardirekt.ugcclean.ui.ProviderKeyUi
@@ -50,7 +49,6 @@ import de.spardirekt.ugcclean.ui.theme.Surface
 import de.spardirekt.ugcclean.ui.theme.TextMid
 import de.spardirekt.ugcclean.ui.theme.TextPrimary
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     provider: AiProviderId,
@@ -64,6 +62,11 @@ fun SettingsScreen(
     onTest: (AiProviderId) -> Unit,
     onRemove: (AiProviderId) -> Unit,
 ) {
+    val rows = listOf(
+        ProviderRowSpec(AiProviderId.OPENAI, R.string.provider_openai, R.string.api_key_hint_openai, openai),
+        ProviderRowSpec(AiProviderId.GEMINI, R.string.provider_gemini, R.string.api_key_hint_gemini, gemini),
+        ProviderRowSpec(AiProviderId.CLAUDE, R.string.provider_claude, R.string.api_key_hint_claude, claude),
+    )
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -75,18 +78,18 @@ fun SettingsScreen(
         Spacer(Modifier.height(20.dp))
         Text(stringResource(R.string.provider), color = TextMid, fontSize = 13.sp, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(8.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ProviderChip(stringResource(R.string.provider_openai), provider == AiProviderId.OPENAI) {
-                onProvider(AiProviderId.OPENAI)
-            }
-            ProviderChip(stringResource(R.string.provider_gemini), provider == AiProviderId.GEMINI) {
-                onProvider(AiProviderId.GEMINI)
-            }
-            ProviderChip(stringResource(R.string.provider_claude), provider == AiProviderId.CLAUDE) {
-                onProvider(AiProviderId.CLAUDE)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            rows.forEach { row ->
+                ProviderRow(
+                    label = stringResource(row.title),
+                    status = if (row.ui.saved) {
+                        stringResource(R.string.provider_status_saved)
+                    } else {
+                        stringResource(R.string.provider_status_missing)
+                    },
+                    selected = provider == row.id,
+                    onClick = { onProvider(row.id) },
+                )
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -94,43 +97,40 @@ fun SettingsScreen(
         Spacer(Modifier.height(6.dp))
         Text(stringResource(R.string.provider_fallback_hint), color = TextMid, fontSize = 12.sp)
         Spacer(Modifier.height(18.dp))
-        ProviderKeyCard(
-            title = stringResource(R.string.provider_openai),
-            status = if (openai.saved) stringResource(R.string.provider_status_saved) else stringResource(R.string.provider_status_missing),
-            hint = stringResource(R.string.api_key_hint_openai),
-            ui = openai,
-            onKeyChange = { onKeyChange(AiProviderId.OPENAI, it) },
-            onToggleMask = { onToggleMask(AiProviderId.OPENAI) },
-            onSave = { onSave(AiProviderId.OPENAI) },
-            onTest = { onTest(AiProviderId.OPENAI) },
-            onRemove = { onRemove(AiProviderId.OPENAI) },
-        )
-        ProviderKeyCard(
-            title = stringResource(R.string.provider_gemini),
-            status = if (gemini.saved) stringResource(R.string.provider_status_saved) else stringResource(R.string.provider_status_missing),
-            hint = stringResource(R.string.api_key_hint_gemini),
-            ui = gemini,
-            onKeyChange = { onKeyChange(AiProviderId.GEMINI, it) },
-            onToggleMask = { onToggleMask(AiProviderId.GEMINI) },
-            onSave = { onSave(AiProviderId.GEMINI) },
-            onTest = { onTest(AiProviderId.GEMINI) },
-            onRemove = { onRemove(AiProviderId.GEMINI) },
-        )
-        ProviderKeyCard(
-            title = stringResource(R.string.provider_claude),
-            status = if (claude.saved) stringResource(R.string.provider_status_saved) else stringResource(R.string.provider_status_missing),
-            hint = stringResource(R.string.api_key_hint_claude),
-            ui = claude,
-            onKeyChange = { onKeyChange(AiProviderId.CLAUDE, it) },
-            onToggleMask = { onToggleMask(AiProviderId.CLAUDE) },
-            onSave = { onSave(AiProviderId.CLAUDE) },
-            onTest = { onTest(AiProviderId.CLAUDE) },
-            onRemove = { onRemove(AiProviderId.CLAUDE) },
-        )
+        rows.sortedByDescending { it.id == provider }.forEach { row ->
+            ProviderKeyCard(
+                title = stringResource(row.title),
+                status = if (row.ui.saved) {
+                    stringResource(R.string.provider_status_saved)
+                } else {
+                    stringResource(R.string.provider_status_missing)
+                },
+                hint = stringResource(row.hint),
+                ui = row.ui,
+                onKeyChange = { onKeyChange(row.id, it) },
+                onToggleMask = { onToggleMask(row.id) },
+                onSave = { onSave(row.id) },
+                onTest = { onTest(row.id) },
+                onRemove = { onRemove(row.id) },
+            )
+        }
         Text(stringResource(R.string.demo_hint), color = TextMid, fontSize = 13.sp)
+        Spacer(Modifier.height(16.dp))
+        Text(
+            stringResource(R.string.settings_build, BuildConfig.VERSION_NAME, BuildConfig.APPLICATION_ID),
+            color = TextMid,
+            fontSize = 12.sp,
+        )
         Spacer(Modifier.height(80.dp))
     }
 }
+
+private data class ProviderRowSpec(
+    val id: AiProviderId,
+    val title: Int,
+    val hint: Int,
+    val ui: ProviderKeyUi,
+)
 
 @Composable
 private fun ProviderKeyCard(
@@ -201,18 +201,27 @@ private fun ProviderKeyCard(
 }
 
 @Composable
-private fun ProviderChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ProviderRow(
+    label: String,
+    status: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
     val bg = if (selected) Accent.copy(alpha = 0.16f) else Surface
     val border = if (selected) Accent else Hairline
-    val color = if (selected) Accent else TextMid
-    Box(
+    val color = if (selected) Accent else TextPrimary
+    Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(99.dp))
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
             .background(bg)
-            .border(1.dp, border, RoundedCornerShape(99.dp))
+            .border(1.dp, border, RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, color = color, fontWeight = FontWeight.Medium)
+        Text(label, color = color, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Text(status, color = TextMid, fontSize = 12.sp)
     }
 }

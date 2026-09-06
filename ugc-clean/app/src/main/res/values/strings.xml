@@ -27,7 +27,8 @@
     <string name="provider">KI-Anbieter</string>
     <string name="provider_openai">OpenAI</string>
     <string name="provider_gemini">Gemini</string>
-    <string name="provider_claude">Claude</string>
+    <string name="provider_claude">Claude (Anthropic)</string>
+    <string name="settings_build">%1$s · %2$s</string>
     <string name="provider_hint">START nutzt den markierten Anbieter. Auf Create nicht nochmal wählen.</string>
     <string name="provider_fallback_hint">Wenn er fehlschlägt und ein anderer Key gespeichert ist, wird automatisch gewechselt.</string>
     <string name="provider_status_saved">Key gespeichert</string>

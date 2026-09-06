@@ -27,7 +27,8 @@
     <string name="provider">Провайдер ИИ</string>
     <string name="provider_openai">OpenAI</string>
     <string name="provider_gemini">Gemini</string>
-    <string name="provider_claude">Claude</string>
+    <string name="provider_claude">Claude (Anthropic)</string>
+    <string name="settings_build">%1$s · %2$s</string>
     <string name="provider_hint">START использует отмеченного провайдера. На экране создания его выбирать не нужно.</string>
     <string name="provider_fallback_hint">Если он не ответит и другой ключ сохранён, приложение переключится автоматически.</string>
     <string name="provider_status_saved">Ключ сохранён</string>

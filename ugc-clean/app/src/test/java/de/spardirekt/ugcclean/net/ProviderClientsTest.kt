@@ -26,6 +26,11 @@ class ProviderClientsTest {
 
     @Test
     fun fromStored_defaultsToOpenAi() {
+        assertThat(AiProviderId.entries).containsExactly(
+            AiProviderId.OPENAI,
+            AiProviderId.GEMINI,
+            AiProviderId.CLAUDE,
+        ).inOrder()
         assertThat(AiProviderId.fromStored(null)).isEqualTo(AiProviderId.OPENAI)
         assertThat(AiProviderId.fromStored("gemini")).isEqualTo(AiProviderId.GEMINI)
         assertThat(AiProviderId.fromStored("claude")).isEqualTo(AiProviderId.CLAUDE)

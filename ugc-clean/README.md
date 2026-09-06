@@ -52,6 +52,6 @@ If release signing secrets are missing, CI uses the debug keystore so `assembleR
 | Field | Value |
 |---|---|
 | applicationId | `de.spardirekt.ugcclean` |
-| versionName | `1.0.0` |
+| versionName | `1.1.0` |
 | minSdk | 26 |
 | targetSdk | 35 |

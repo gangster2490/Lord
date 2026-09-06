@@ -73,7 +73,12 @@ jobs:
           "$SIGNER" verify --print-certs "$RELEASE_APK"
           aapt=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort | tail -n 1)
           "$aapt" dump badging "$DEBUG_APK" | grep -q "package: name='de.spardirekt.ugcclean.debug'"
+          "$aapt" dump badging "$RELEASE_APK" | grep -q "package: name='de.spardirekt.ugcclean'"
+          "$aapt" dump badging "$RELEASE_APK" | grep -q "versionName='1.1.0'"
           "$aapt" dump permissions "$RELEASE_APK" | grep -q INTERNET
+          "$aapt" dump strings "$RELEASE_APK" | grep -q "Claude (Anthropic)"
+          "$aapt" dump strings "$RELEASE_APK" | grep -q "sk-ant"
+          python3 -c "import zipfile,sys; z=zipfile.ZipFile('$RELEASE_APK'); found=any(n.endswith('.dex') and b'ClaudeClient' in z.read(n) for n in z.namelist()); sys.exit(0 if found else 'ClaudeClient missing from release APK')"
           mkdir -p dist
           cp "$DEBUG_APK" dist/ugc-clean-debug.apk
           cp "$RELEASE_APK" dist/ugc-clean-release.apk
