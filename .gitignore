@@ -1,1 +1,6 @@
 .claude/
+ugc-clean/local.properties
+ugc-clean/.gradle/
+ugc-clean/build/
+ugc-clean/app/build/
+
