@@ -39,6 +39,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -154,32 +155,16 @@ class StudioViewModel(
 
     init {
         viewModelScope.launch {
-            settings.platformId.collect { id ->
-                _state.update { it.copy(platform = Platform.fromId(id)) }
+            _state.update {
+                it.copy(
+                    platform = Platform.fromId(settings.platformId.first()),
+                    length = AdLength.fromSeconds(settings.lengthSeconds.first()),
+                    formula = AdFormula.fromId(settings.formulaId.first()),
+                    style = VisualStyle.fromId(settings.styleId.first()),
+                    language = AdLanguage.fromId(settings.languageId.first()),
+                    wish = settings.wish.first(),
+                )
             }
-        }
-        viewModelScope.launch {
-            settings.lengthSeconds.collect { sec ->
-                _state.update { it.copy(length = AdLength.fromSeconds(sec)) }
-            }
-        }
-        viewModelScope.launch {
-            settings.formulaId.collect { id ->
-                _state.update { it.copy(formula = AdFormula.fromId(id)) }
-            }
-        }
-        viewModelScope.launch {
-            settings.styleId.collect { id ->
-                _state.update { it.copy(style = VisualStyle.fromId(id)) }
-            }
-        }
-        viewModelScope.launch {
-            settings.languageId.collect { id ->
-                _state.update { it.copy(language = AdLanguage.fromId(id)) }
-            }
-        }
-        viewModelScope.launch {
-            settings.wish.collect { text -> _state.update { it.copy(wish = text) } }
         }
         viewModelScope.launch {
             history.entries.collect { list -> _state.update { it.copy(history = list) } }
@@ -335,7 +320,13 @@ class StudioViewModel(
         val current = _state.value
         val problem = validateGenerate(current.apiKey, current.photos.size)
         if (problem != null) {
-            _state.update { it.copy(error = problem, tab = Tab.STUDIO, showResult = false) }
+            _state.update { now ->
+                if (now.showResult && now.result != null) {
+                    now.copy(error = problem)
+                } else {
+                    now.copy(error = problem, tab = Tab.STUDIO, showResult = false)
+                }
+            }
             return
         }
         generateJob?.cancel()
@@ -398,12 +389,13 @@ class StudioViewModel(
                     it.copy(isGenerating = false, generateStage = null, error = e.message)
                 }
             } catch (e: Exception) {
+                val message = when (e) {
+                    is IllegalArgumentException, is java.io.IOException ->
+                        e.message ?: "Не удалось прочитать фото."
+                    else -> e.message ?: "Неизвестная ошибка."
+                }
                 _state.update {
-                    it.copy(
-                        isGenerating = false,
-                        generateStage = null,
-                        error = e.message ?: "Неизвестная ошибка.",
-                    )
+                    it.copy(isGenerating = false, generateStage = null, error = message)
                 }
             }
         }

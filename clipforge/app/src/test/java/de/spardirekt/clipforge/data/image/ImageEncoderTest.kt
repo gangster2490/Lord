@@ -23,4 +23,12 @@ class ImageEncoderTest {
         assertThat(h).isEqualTo(1600)
         assertThat(w).isEqualTo(800)
     }
+
+    @Test
+    fun localFileOnlyForFileScheme() {
+        assertThat(ImageEncoder.localFile("file", "/tmp/a.jpg")?.path).isEqualTo("/tmp/a.jpg")
+        assertThat(ImageEncoder.localFile(null, "/tmp/a.jpg")?.path).isEqualTo("/tmp/a.jpg")
+        assertThat(ImageEncoder.localFile("content", "/tmp/a.jpg")).isNull()
+        assertThat(ImageEncoder.localFile("file", null)).isNull()
+    }
 }

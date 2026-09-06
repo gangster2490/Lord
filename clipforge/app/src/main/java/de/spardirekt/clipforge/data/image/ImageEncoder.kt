@@ -7,6 +7,7 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import de.spardirekt.clipforge.data.model.EncodedImage
 import java.io.ByteArrayOutputStream
+import java.io.File
 import kotlin.math.max
 
 object ImageEncoder {
@@ -19,8 +20,7 @@ object ImageEncoder {
             ?: guessMime(uri)
             ?: "image/jpeg"
 
-        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: throw IllegalArgumentException("Не удалось прочитать изображение.")
+        val bytes = readBytes(context, uri)
         if (bytes.size > MAX_BYTES) {
             throw IllegalArgumentException("Файл слишком большой — максимум 10 МБ.")
         }
@@ -43,6 +43,21 @@ object ImageEncoder {
         if (longest <= maxEdge) return width to height
         val scale = maxEdge.toFloat() / longest
         return (width * scale).toInt().coerceAtLeast(1) to (height * scale).toInt().coerceAtLeast(1)
+    }
+
+    internal fun localFile(scheme: String?, path: String?): File? {
+        if (path.isNullOrBlank()) return null
+        return when (scheme) {
+            "file", null -> File(path)
+            else -> null
+        }
+    }
+
+    private fun readBytes(context: Context, uri: Uri): ByteArray {
+        context.contentResolver.openInputStream(uri)?.use { return it.readBytes() }
+        val file = localFile(uri.scheme, uri.path)?.takeIf { it.isFile }
+            ?: throw IllegalArgumentException("Не удалось прочитать изображение.")
+        return file.readBytes()
     }
 
     private fun scaleDown(bitmap: Bitmap): Bitmap {

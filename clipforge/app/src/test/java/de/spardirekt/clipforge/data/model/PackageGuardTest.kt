@@ -65,6 +65,31 @@ class PackageGuardTest {
     }
 
     @Test
+    fun keepsCtaWhenFiveOverlaysAlreadyPresent() {
+        val hardened = AdPackage(
+            cta = "Сейчас в корзине",
+            onScreenTexts = listOf("A", "B", "C", "D", "E"),
+        ).guarded(brief())
+        assertThat(hardened.onScreenTexts).hasSize(5)
+        assertThat(hardened.onScreenTexts.last()).isEqualTo("Сейчас в корзине")
+        assertThat(hardened.onScreenTexts).contains("A")
+        assertThat(hardened.onScreenTexts).doesNotContain("E")
+    }
+
+    @Test
+    fun rewritesWrongVeoDurationHeader() {
+        val ad = AdPackage(
+            veoPrompt = "VIDEO LENGTH: Exactly 8 seconds. 9:16 vertical. TikTok Shop. Use the uploaded images as the exact locked product reference.",
+        )
+        val hardened = ad.guarded(brief(platform = Platform.REELS, length = AdLength.FIFTEEN))
+        assertThat(hardened.veoPrompt).contains("Exactly 15 seconds")
+        assertThat(hardened.veoPrompt).contains("Instagram Reels")
+        val lengthLines = hardened.veoPrompt.lines().filter { it.contains("VIDEO LENGTH:", ignoreCase = true) }
+        assertThat(lengthLines).hasSize(1)
+        assertThat(lengthLines.single()).contains("15 seconds")
+    }
+
+    @Test
     fun stripsPriceSpamFromCaption() {
         val ad = AdPackage(caption = "Крем 19,90 € со скидкой 50%")
         val hardened = ad.guarded(brief())

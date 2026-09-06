@@ -7,19 +7,7 @@ import androidx.security.crypto.MasterKey
 
 class SecureApiKeyStore(context: Context) {
 
-    private val prefs: SharedPreferences = run {
-        val app = context.applicationContext
-        val masterKey = MasterKey.Builder(app)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        EncryptedSharedPreferences.create(
-            app,
-            "clipforge_secure",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-        )
-    }
+    private val prefs: SharedPreferences = createPrefs(context.applicationContext)
 
     fun getKey(): String = prefs.getString(KEY, null)?.trim().orEmpty()
 
@@ -42,5 +30,33 @@ class SecureApiKeyStore(context: Context) {
 
     companion object {
         private const val KEY = "openai_api_key"
+        private const val ENCRYPTED_FILE = "clipforge_secure"
+        private const val FALLBACK_FILE = "clipforge_secure_fallback"
+
+        private fun createPrefs(app: Context): SharedPreferences {
+            return try {
+                encryptedPrefs(app)
+            } catch (_: Exception) {
+                try {
+                    app.deleteSharedPreferences(ENCRYPTED_FILE)
+                    encryptedPrefs(app)
+                } catch (_: Exception) {
+                    app.getSharedPreferences(FALLBACK_FILE, Context.MODE_PRIVATE)
+                }
+            }
+        }
+
+        private fun encryptedPrefs(app: Context): SharedPreferences {
+            val masterKey = MasterKey.Builder(app)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            return EncryptedSharedPreferences.create(
+                app,
+                ENCRYPTED_FILE,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+        }
     }
 }

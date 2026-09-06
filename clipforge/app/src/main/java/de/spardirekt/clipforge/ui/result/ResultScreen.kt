@@ -109,7 +109,12 @@ fun ResultScreen(
                 .padding(bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            state.error?.let { ErrorBanner(it) { onEvent(StudioEvent.DismissError) } }
+            state.error?.let {
+                ErrorBanner(
+                    message = it,
+                    onRetry = { onEvent(StudioEvent.Regenerate) },
+                ) { onEvent(StudioEvent.DismissError) }
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AccentPill(state.platform.labelEn, accent)

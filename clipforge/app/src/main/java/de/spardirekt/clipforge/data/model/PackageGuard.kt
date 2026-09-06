@@ -65,9 +65,11 @@ object PackageGuard {
     fun completeVeo(prompt: String, length: AdLength, platform: Platform): String {
         val header = AdSystemPrompt.durationHeader(length, platform)
         var out = prompt.trim()
-        if (!out.contains("VIDEO LENGTH:", ignoreCase = true) ||
-            !out.contains("locked product", ignoreCase = true)
-        ) {
+        val hasCorrectLength = out.contains("Exactly ${length.seconds} seconds", ignoreCase = true)
+        val hasPlatform = out.contains(platform.labelEn, ignoreCase = true)
+        val hasLock = out.contains("locked product", ignoreCase = true)
+        if (!out.contains("VIDEO LENGTH:", ignoreCase = true) || !hasCorrectLength || !hasPlatform || !hasLock) {
+            out = out.replace(Regex("(?im)^VIDEO LENGTH:.*(?:\\r?\\n)?"), "").trim()
             out = if (out.isBlank()) header else "$header\n\n$out"
         }
         if (!out.contains("HUMAN INTERACTION RULES")) {
@@ -140,8 +142,8 @@ object PackageGuard {
 
     fun ensureCtaOverlay(overlays: List<String>, cta: String, platform: Platform): List<String> {
         val clipped = cta.take(platform.overlayMax)
-        val without = overlays.filterNot { it.equals(clipped, ignoreCase = true) }
-        return (without + clipped).distinct().take(5)
+        val without = overlays.filterNot { it.equals(clipped, ignoreCase = true) }.take(4)
+        return (without + clipped).distinct()
     }
 }
 
