@@ -58,7 +58,7 @@ class Pipeline(
         val raw = client.chat(
             apiKey = apiKey,
             systemPrompt = SystemPrompts.ANALYZE,
-            userText = "Analyze these ${images.size} photos of one product. First image is First Frame. JSON only.",
+            userText = "Analyze these ${images.size} photos of one product. First image is First Frame. Later images are support of the same object. JSON only. No Veo headings.",
             imageDataUrls = images,
             jsonMode = true,
         )

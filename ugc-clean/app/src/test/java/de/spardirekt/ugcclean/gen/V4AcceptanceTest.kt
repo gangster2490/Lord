@@ -73,6 +73,8 @@ class V4AcceptanceTest {
     fun testD_genericCategoryReplacementIsForbidden() {
         val prompt = PromptComposer.compose(cover, SpeechLanguage.DE)
         assertThat(prompt).contains("Do not replace it with a generic category product")
+        assertThat(prompt).contains("Do not replace it with a similar product from the same category")
+        assertThat(prompt).contains("A similar product from the same category is a failed generation")
         assertThat(prompt).contains("Do not invent extra components from other product categories")
     }
 
@@ -144,8 +146,12 @@ class V4AcceptanceTest {
         val prompt = PromptComposer.compose(cover, SpeechLanguage.DE)
         assertThat(prompt).contains("First uploaded photo is the First Frame")
         assertThat(prompt).contains("Recreate that exact physical product")
+        assertThat(prompt).contains("Later photos are support only")
+        assertThat(prompt).contains("One video = one desire: keep the microwave clean while heating")
         assertThat(SystemPrompts.ANALYZE).contains("ONE VIDEO = ONE DESIRE")
         assertThat(SystemPrompts.ANALYZE).contains("first photo is the First Frame")
+        assertThat(SystemPrompts.ANALYZE).contains("visually similar product from the same category")
+        assertThat(SystemPrompts.COPY).contains("Sell only the one desire")
     }
 
     @Test

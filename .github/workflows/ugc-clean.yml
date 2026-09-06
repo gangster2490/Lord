@@ -74,7 +74,7 @@ jobs:
           aapt=$(ls -d "$ANDROID_HOME"/build-tools/*/aapt 2>/dev/null | sort | tail -n 1)
           "$aapt" dump badging "$DEBUG_APK" | grep -q "package: name='de.spardirekt.ugcclean.debug'"
           "$aapt" dump badging "$RELEASE_APK" | grep -q "package: name='de.spardirekt.ugcclean'"
-          "$aapt" dump badging "$RELEASE_APK" | grep -q "versionName='1.1.0'"
+          "$aapt" dump badging "$RELEASE_APK" | grep -q "versionName='1.1.1'"
           "$aapt" dump permissions "$RELEASE_APK" | grep -q INTERNET
           "$aapt" dump strings "$RELEASE_APK" | grep -q "Claude (Anthropic)"
           "$aapt" dump strings "$RELEASE_APK" | grep -q "sk-ant"

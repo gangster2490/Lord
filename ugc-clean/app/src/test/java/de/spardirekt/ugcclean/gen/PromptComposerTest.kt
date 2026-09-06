@@ -31,6 +31,18 @@ class PromptComposerTest {
         assertThat(prompt).contains("8.0")
         assertThat(prompt).contains("First Frame")
         assertThat(prompt).contains("Target generator: Veo")
+        assertThat(prompt).contains("One video = one desire: cook evenly without sticking")
+        assertThat(prompt).contains("A similar product from the same category is a failed generation")
+        assertThat(prompt).contains("same number of distinct components")
+    }
+
+    @Test
+    fun compose_doesNotDropDesireOrAllowSameCategoryLookalike() {
+        val prompt = PromptComposer.compose(Fixtures.organizer, SpeechLanguage.DE)
+        assertThat(prompt).contains("One video = one desire: clear the desk in one place")
+        assertThat(prompt).contains("Visible identity-critical facts: white compartments")
+        assertThat(prompt).doesNotContain("similar product from the same category is acceptable")
+        assertThat(PromptComposer.isCanonical(prompt)).isTrue()
     }
 }
 
