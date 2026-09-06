@@ -1,0 +1,6 @@
+-keepattributes *Annotation*, InnerClasses, Signature, Exception
+-keep class de.spardirekt.ugcclean.model.** { *; }
+-dontwarn okhttp3.internal.platform.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
