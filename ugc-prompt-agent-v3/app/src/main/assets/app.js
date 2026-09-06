@@ -1,0 +1,779 @@
+(() => {
+  const native = window.UgcNative;
+    const STEPS = [];
+  const state = {
+    lang: "de",
+    screen: "home",
+    data: {},
+    busy: false,
+    history: [],
+    lastOp: null,
+    lastError: null,
+  };
+
+  function t(key) {
+    const pack = window.I18N[state.lang] || window.I18N.de;
+    return pack[key] || window.I18N.de[key] || key;
+  }
+
+  function $(id) { return document.getElementById(id); }
+
+  function toast(msg) {
+    const el = $("toast");
+    el.textContent = msg;
+    el.classList.remove("hidden");
+    setTimeout(() => el.classList.add("hidden"), 2200);
+  }
+
+  function modal(title, body, actions) {
+    $("modalTitle").textContent = title;
+    $("modalBody").textContent = body;
+    const box = $("modalActions");
+    box.innerHTML = "";
+    actions.forEach((a) => {
+      const b = document.createElement("button");
+      b.textContent = a.label;
+      if (a.secondary) b.className = "secondary";
+      b.onclick = () => { hideModal(); a.onClick && a.onClick(); };
+      box.appendChild(b);
+    });
+    $("modal").classList.remove("hidden");
+  }
+  function hideModal() { $("modal").classList.add("hidden"); }
+
+  function applyI18n() {
+    document.querySelectorAll("[data-i18n]").forEach((el) => {
+      el.textContent = t(el.getAttribute("data-i18n"));
+    });
+  }
+
+  function fmtBytes(n) {
+    if (!n) return "0 B";
+    if (n < 1024) return n + " B";
+    if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1048576).toFixed(1) + " MB";
+  }
+
+  function call(name, ...args) {
+    if (!native || typeof native[name] !== "function") {
+      toast("Native bridge missing");
+      return;
+    }
+    const tracked = ["startPipeline","resumePipeline","testConnection"];
+    if (tracked.indexOf(name) !== -1) state.lastOp = { name: name, args: args };
+    native[name](...args);
+  }
+
+  function ensurePrivacy(next) {
+    if (state.data.settings && state.data.settings.privacyAccepted) {
+      next();
+      return;
+    }
+    const provider = (state.data.settings && state.data.settings.provider) || "OPENAI";
+    modal(t("privacy"), provider, [
+      { label: t("accept"), onClick: () => { call("saveSettings", JSON.stringify({ privacyAccepted: true })); next(); } },
+      { label: t("ignore"), secondary: true },
+    ]);
+  }
+
+  function render() {
+    applyI18n();
+    const pages = $("pages");
+    const steps = $("steps");
+    const homeNav = $("homeNav");
+    const title = $("screenTitle");
+    steps.hidden = true;
+    homeNav.style.display = ["home", "history", "settings", "pause", "export"].includes(state.screen) ? "flex" : "none";
+    title.textContent = titleFor(state.screen);
+    pages.className = "";
+    const errorHtml = state.lastError ? `<section class="card"><p class="err">${escapeHtml(state.lastError.message || state.lastError.code || "error")}</p>${state.lastError.retryable && state.lastOp ? `<button id="retryOp">${t("retry")}</button>` : ""}</section>` : "";
+    pages.innerHTML = errorHtml + htmlFor(state.screen);
+    bind(state.screen);
+    renderSteps();
+    const retry = $("retryOp");
+    if (retry) retry.onclick = () => {
+      const op = state.lastOp;
+      state.lastError = null;
+      if (!op) return;
+      if (op.name === "startPipeline") {
+        call("resumePipeline");
+        return;
+      }
+      if (op.args && op.args.length === 1) call(op.name, op.args[0]);
+      else if (op.args && op.args.length === 2) call(op.name, op.args[0], op.args[1]);
+      else call(op.name);
+    };
+  }
+
+  function stepKey(s) {
+    return ({ photos: "photos", check: "check", analyse: "analyse", firstFrame: "first_frame", scene: "scene", prompt: "prompt", compliance: "compliance", export: "export" })[s];
+  }
+
+  function titleFor(screen) {
+    const map = {
+      home: t("home_title"), history: t("history"), settings: t("settings"),
+      photos: t("photos"), check: t("check"), analyse: t("analyse"), firstFrame: t("first_frame"),
+      scene: t("scene"), prompt: t("prompt"), compliance: t("compliance"), export: t("export"),
+      pause: t("pause"),
+    };
+    return map[screen] || t("home_title");
+  }
+
+  function htmlFor(screen) {
+    switch (screen) {
+      case "home": return homeHtml();
+      case "history": return historyHtml();
+      case "settings": return settingsHtml();
+      case "photos": return homeHtml();
+      case "check": return checkHtml();
+      case "analyse": return analyseHtml();
+      case "firstFrame": return firstFrameHtml();
+      case "scene": return sceneHtml();
+      case "prompt": return promptHtml();
+      case "compliance": return complianceHtml();
+      case "export": return exportHtml();
+      case "pause": return pauseHtml();
+      default: return homeHtml();
+    }
+  }
+
+  function isRunning() {
+    const progress = state.data.progress || {};
+    return !!(state.busy || state.data.pipelineRunning || progress.running);
+  }
+
+  function renderSteps() {
+    const el = $("steps");
+    if (!el) return;
+    const progress = state.data.progress || {};
+    const steps = progress.steps || [];
+    if (!isRunning() || !steps.length) {
+      el.hidden = true;
+      el.innerHTML = "";
+      return;
+    }
+    el.hidden = false;
+    el.innerHTML = steps.map((step) => {
+      const cls = step.done ? "on" : (step.current ? "now" : "");
+      return `<li class="${cls}">${escapeHtml(step.label || "")}</li>`;
+    }).join("");
+  }
+
+  function progressCard() {
+    const progress = state.data.progress || {};
+    const percent = typeof progress.percent === "number" ? progress.percent : 0;
+    const steps = progress.steps || [];
+    const items = steps.map((step) => {
+      const cls = step.done ? "on" : (step.current ? "now" : "");
+      return `<li class="${cls}">${escapeHtml(step.label || "")}</li>`;
+    }).join("");
+    return `<div class="progress-card">
+      <p class="ok">${t("pipeline_background")}</p>
+      <p>${t("pipeline_progress")}: ${escapeHtml(progress.label || t("busy"))} · ${t("pipeline_step")} ${progress.index || 0}/${progress.total || 0}</p>
+      <div class="progress-bar"><span style="width:${percent}%"></span></div>
+      <p class="muted">${percent}%</p>
+      <ol class="progress-steps">${items}</ol>
+    </div>`;
+  }
+    const debug = state.data.startDebug || {};
+    const images = (state.data.images || []).length;
+    const lang = outputLang();
+    const stage = state.data.pipelineStage || (state.data.project && state.data.project.pipelineStage) || "";
+    const paused = state.data.pausedReason || (state.data.project && state.data.project.pausedReason) || "";
+    const hard = paused === "DIFFERENT_PRODUCTS" && (stage === "PAUSED");
+    const imagesOk = images >= 3 && images <= 15;
+    const languageOk = lang === "DEUTSCH" || lang === "РУССКИЙ";
+    const enabled = typeof debug.startEnabled === "boolean"
+      ? !!debug.startEnabled
+      : (imagesOk && languageOk && !hard);
+    const result = enabled && !isRunning();
+    console.log("START conditions", {
+      imageCount: images,
+      imagesOk: imagesOk,
+      language: lang,
+      languageOk: languageOk,
+      stage: stage,
+      pausedReason: paused,
+      hardConflict: hard,
+      busy: state.busy,
+      startEnabled: result,
+      native: debug,
+    });
+    return result;
+  }
+
+  function homeHtml() {
+    const images = state.data.images || [];
+    const enabled = canStart();
+    const lang = outputLang();
+    const stage = state.data.pipelineStage || (state.data.project && state.data.project.pipelineStage) || "";
+    const running = isRunning() && stage !== "READY" && stage !== "EXPORT_READY";
+    const working = running ? progressCard() : "";
+    return `<section class="card">
+      <p>${t("app_eyebrow")}</p>
+      ${working}
+      <div class="thumbs">${images.map((img) => `
+        <div class="thumb ${img.isFirstFrame ? "ff" : ""}" data-id="${img.id}">
+          <img src="${img.thumb}" alt="" />
+          <span class="badge">${img.width}×${img.height}</span>
+        </div>`).join("")}</div>
+      <p>${enabled || running ? "" : t("analyse_need")}</p>
+      <div class="row">
+        <button id="pick" ${running ? "disabled" : ""}>${t("upload")}</button>
+        <button id="clear" class="secondary" ${running ? "disabled" : ""}>${t("clear")}</button>
+      </div>
+      <label>${t("language")}</label>
+      <div class="row lang-toggle">
+        <button id="langRu" class="${lang === "РУССКИЙ" ? "" : "secondary"}">Русский</button>
+        <button id="langDe" class="${lang === "DEUTSCH" ? "" : "secondary"}">Deutsch</button>
+      </div>
+      <div class="row">
+        <button id="startPipe" class="primary-cta" ${enabled ? "" : "disabled"}>${t("start")}</button>
+      </div>
+    </section>`;
+  }
+
+  function outputLang() {
+    const p = state.data.project || {};
+    const s = state.data.settings || {};
+    const v = p.speechLanguage || s.speechLanguage || s.outputLanguage || "DEUTSCH";
+    return v === "РУССКИЙ" ? "РУССКИЙ" : "DEUTSCH";
+  }
+
+  function recId() {
+    return state.data.recommendedFirstFrameId ||
+      (state.data.project && state.data.project.recommendedFirstFrameId) || "";
+  }
+
+  function readinessWarning() {
+    return state.lang === "ru"
+      ? (state.data.readinessWarningRu || "")
+      : (state.data.readinessWarningDe || "");
+  }
+
+  function photosHtml() {
+    const images = (state.data.images || []);
+    const payload = state.data.payload || {};
+    const enabled = !!state.data.analyseEnabled;
+    return `<section class="card">
+      <p>${enabled ? "" : t("analyse_need")}</p>
+      <div class="thumbs">${images.map((img) => `
+        <div class="thumb ${img.isFirstFrame ? "ff" : ""} ${img.id === recId() ? "rec" : ""}" data-id="${img.id}">
+          <img src="${img.thumb}" alt="" />
+          <span class="badge ${img.id === recId() ? "rec" : ""}">${img.id === recId() ? t("recommended_ff") : ""} ${img.isFirstFrame ? "FF" : ""} ${img.width}×${img.height}</span>
+        </div>`).join("")}</div>
+      <div class="kv"><span>${t("payload")}</span><span>${payload.imageCount || 0} · ${fmtBytes(payload.originalBytes)} → ${fmtBytes(payload.compressedBytes)}</span></div>
+      ${payload.warning ? `<p class="warn">Payload groß — extra Kompression möglich.</p>` : ""}
+      <div class="row">
+        <button id="pick">${t("upload")}</button>
+        <button id="clear" class="secondary">${t("clear")}</button>
+      </div>
+      <div class="row">
+        <button id="startPipe" ${enabled ? "" : "disabled"}>${t("start")}</button>
+        <button id="toCheck" class="secondary" ${enabled ? "" : "disabled"}>${t("check")}</button>
+      </div>
+    </section>`;
+  }
+
+  function checkHtml() {
+    const c = (state.data.project && state.data.project.consistency) || {};
+    const warn = c.same_product === false || (typeof c.confidence === "number" && c.confidence < 0.8);
+    const hasResult = c && Object.keys(c).length > 0;
+    const override = !!(state.data.project && state.data.project.consistencyOverride);
+    const canAnalyse = hasResult && (!warn || override);
+    return `<section class="card">
+      <pre>${JSON.stringify(c, null, 2)}</pre>
+      ${warn ? `<p class="warn">${t("mismatch")}</p>` : ""}
+      <div class="row">
+        <button id="runCheck">${t("check")}</button>
+        <button id="review" class="secondary">${t("review_photos")}</button>
+        ${warn ? `<button id="anyway" class="secondary">${t("continue_anyway")}</button>` : ""}
+        <button id="toAnalyse" ${canAnalyse ? "" : "disabled"}>${t("analyse")}</button>
+      </div>
+    </section>`;
+  }
+
+  function analyseHtml() {
+    const a = (state.data.project && state.data.project.analysis) || {};
+    const fp = (state.data.project && state.data.project.identityFingerprint) || {};
+    return `<section class="card">
+      <pre>${JSON.stringify(a, null, 2)}</pre>
+      <h3>${t("fingerprint")}</h3>
+      <pre>${JSON.stringify(fp, null, 2)}</pre>
+      <div class="row">
+        <button id="runAnalyse">${t("analyse")}</button>
+        <button id="toFf" class="secondary" ${a.observed_use_case ? "" : "disabled"}>${t("first_frame")}</button>
+      </div>
+    </section>`;
+  }
+
+  function firstFrameHtml() {
+    const images = state.data.images || [];
+    const q = (state.data.project && state.data.project.firstFrameQuality) || {};
+    const rec = (state.data.project && state.data.project.firstFrameRecommendation) || {};
+    return `<section class="card">
+      <div class="thumbs">${images.map((img) => `
+        <div class="thumb ${img.isFirstFrame ? "ff" : ""} ${img.id === recId() ? "rec" : ""}" data-pick="${img.id}">
+          <img src="${img.thumb}" alt="" />
+          <span class="badge ${img.id === recId() ? "rec" : ""}">${img.id === recId() ? t("recommended_ff") : ""} ${img.isFirstFrame ? "FF" : ""}</span>
+        </div>`).join("")}</div>
+      <pre>${JSON.stringify(q, null, 2)}</pre>
+      <pre>${JSON.stringify(rec, null, 2)}</pre>
+      <div class="row">
+        <button id="quality">${t("check")}</button>
+        <button id="confirmFf">${t("confirm_ff")}</button>
+      </div>
+    </section>`;
+  }
+
+  function sceneHtml() {
+    const scene = (state.data.project && state.data.project.scene) || {};
+    const speech = (state.data.project && state.data.project.speechLanguage) || "DEUTSCH";
+    const risk = (state.data.project && state.data.project.actionRisk) || {};
+    return `<section class="card">
+      <label>${t("speech")}</label>
+      <select id="speech">
+        <option value="OFF" ${speech === "OFF" ? "selected" : ""}>${t("speech_off")}</option>
+        <option value="DEUTSCH" ${speech === "DEUTSCH" ? "selected" : ""}>${t("speech_de")}</option>
+        <option value="РУССКИЙ" ${speech === "РУССКИЙ" ? "selected" : ""}>${t("speech_ru")}</option>
+      </select>
+      ${scene.action_identity_override ? `<p class="warn">${t("action_simplified")}</p>` : ""}
+      <p>${t("action_risk")}: ${risk.risk || "-"}</p>
+      <pre>${JSON.stringify(scene, null, 2)}</pre>
+      <pre>${JSON.stringify(risk, null, 2)}</pre>
+      <div class="row">
+        <button id="genScene">${t("generate_scene")}</button>
+        <button id="newScene" class="secondary">${t("new_scene")}</button>
+        <button id="toPrompt" ${scene.main_action ? "" : "disabled"}>${t("prompt")}</button>
+      </div>
+    </section>`;
+  }
+
+  function promptHtml() {
+    const p = state.data.activePrompt || "";
+    const warn = readinessWarning();
+    return `<section class="card">
+      ${warn ? `<p class="warn">${escapeHtml(warn)}</p>` : ""}
+      <textarea id="promptBox" readonly>${escapeHtml(p)}</textarea>
+      <div class="row">
+        <button id="genPrompt">${t("generate_prompt")}</button>
+        <button id="improve" class="secondary">${t("improve")}</button>
+        <button id="newSpeech" class="secondary">${t("new_speech")}</button>
+        <button id="toComp" ${p ? "" : "disabled"}>${t("compliance")}</button>
+      </div>
+    </section>`;
+  }
+
+  function complianceHtml() {
+    const c = (state.data.project && state.data.project.compliance) || {};
+    const blocked = c.status === "BLOCK";
+    return `<section class="card">
+      <p class="${c.status === "PASS" ? "ok" : c.status === "BLOCK" ? "err" : "warn"}">${c.status || "-"} · ${c.policy_version || ""}</p>
+      <pre>${JSON.stringify(c, null, 2)}</pre>
+      <div class="row">
+        <button id="runComp">${t("run_compliance")}</button>
+        <button id="addW" class="secondary">${t("add_werbung")}</button>
+        <button id="ign" class="secondary">${t("ignore")}</button>
+        <button id="toExport" ${blocked ? "disabled" : ""}>${t("export")}</button>
+      </div>
+    </section>`;
+  }
+
+  function pauseMessage(reason) {
+    const map = {
+      NEED_IMAGES: t("paused_need_images"),
+      DIFFERENT_PRODUCTS: t("paused_different_products"),
+      LOW_CONSISTENCY: t("paused_low_consistency"),
+      READINESS_HIGH: t("paused_readiness"),
+      NO_USABLE_FIRST_FRAME: t("paused_first_frame"),
+      LOW_FIRST_FRAME_CONFIDENCE: t("paused_first_frame"),
+      RESTRICTED_CATEGORY: t("paused_restricted"),
+      COMPLIANCE_BLOCK: t("paused_block"),
+      NO_API_KEY: t("paused_api"),
+      INVALID_API_KEY: t("paused_api"),
+      ONLY_HIGH_RISK: t("paused_high_risk"),
+    };
+    return map[reason] || reason || t("pause");
+  }
+
+  function pauseHtml() {
+    const p = state.data.project || {};
+    const reason = state.data.pausedReason || p.pausedReason || "";
+    const stage = state.data.pipelineStage || p.pipelineStage || "";
+    const warn = (state.data.warnings || p.warnings || []).join("\n");
+    const ru = readinessWarning();
+    return `<section class="card">
+      <h3>${t("pause")}</h3>
+      <p class="warn">${escapeHtml(pauseMessage(reason))}</p>
+      ${ru ? `<p class="warn">${escapeHtml(ru)}</p>` : ""}
+      <p>${t("pipeline_progress")}: ${escapeHtml(stage)}</p>
+      ${warn ? `<pre>${escapeHtml(warn)}</pre>` : ""}
+      <div class="row">
+        <button id="resumePipe">${t("resume")}</button>
+        ${reason === "DIFFERENT_PRODUCTS" || reason === "LOW_CONSISTENCY" ? `<button id="anyway" class="secondary">${t("continue_anyway")}</button>` : ""}
+        <button id="toPhotos" class="secondary">${t("photos")}</button>
+      </div>
+    </section>`;
+  }
+
+  function exportHtml() {
+    const p = state.data.project || {};
+    const prompt = state.data.activePrompt || "";
+    const details = p.details || state.data.details || "";
+    const warnings = (state.data.warnings || p.warnings || []).filter(Boolean);
+    const compliance = p.compliance || {};
+    const advanced = JSON.stringify({
+      consistency: p.consistency || {},
+      analysis: p.analysis || {},
+      fingerprint: p.identityFingerprint || {},
+      readiness: p.identityReadiness || {},
+      evidence: p.evidence || {},
+      actionRisk: p.actionRisk || {},
+      firstFrame: p.firstFrameRecommendation || {},
+      hook: p.hook || state.data.hook || "",
+      hookScore: p.hookScore,
+      selfCheck: p.selfCheck || {},
+      compliance: compliance,
+      warnings: warnings,
+      startDebug: state.data.startDebug || {},
+      duplicateGroups: (p.consistency && p.consistency.duplicate_groups) || [],
+    }, null, 2);
+    return `<section class="card">
+      <div class="row copy-actions">
+        <button id="cpkg" class="primary-cta">${t("copy_video_package")}</button>
+        <button id="cd">${t("copy_details")}</button>
+        <button id="cp">${t("copy_video_prompt")}</button>
+        <button id="cc">${t("copy_caption")}</button>
+        <button id="ch">${t("copy_hashtags")}</button>
+        <button id="ca" class="secondary">${t("copy_all")}</button>
+      </div>
+      <div class="row">
+        <button id="save">${t("save_project")}</button>
+        <button id="adv" class="secondary">${t("advanced_details")}</button>
+      </div>
+      ${veoRefsHtml()}
+      <h3>${t("details")}</h3>
+      <pre id="detailsBox">${escapeHtml(details)}</pre>
+      <h3>${t("video_prompt")}</h3>
+      <pre id="promptBox">${escapeHtml(prompt)}</pre>
+      <h3>${t("caption")}</h3>
+      <pre>${escapeHtml(p.caption || "")}</pre>
+      <h3>${t("hashtags")}</h3>
+      <pre>${escapeHtml((p.hashtags || []).join(" "))}</pre>
+      ${compliance.status === "BLOCK" ? `<p class="err">${t("compliance_result")}: BLOCK</p>` : ""}
+      ${!/\b(werbung|anzeige)\b/i.test(p.caption || "") && (p.caption || "") ? `<p class="muted">${t("disclosure_hint")}</p>` : ""}
+      <pre id="advBox" class="hidden">${escapeHtml(advanced)}</pre>
+    </section>`;
+  }
+
+  function veoRefsHtml() {
+    const refs = state.data.veoReferences || [];
+    if (!refs.length) return "";
+    const items = refs.map((ref) => {
+      const first = ref.role === "FIRST_FRAME";
+      return `<button type="button" class="veo-ref${first ? " first" : ""}" data-ref-id="${escapeHtml(ref.id || "")}">
+        <img src="${ref.thumb || ""}" alt="${escapeHtml(ref.label || "")}" />
+        <span>${escapeHtml(ref.label || "")}</span>
+      </button>`;
+    }).join("");
+    return `<div class="veo-refs">
+      <h3>${t("veo_refs")}</h3>
+      <p class="muted veo-refs-hint">${t("veo_refs_hint")}</p>
+      <div class="veo-ref-strip">${items}</div>
+    </div>`;
+  }
+
+  function showImagePreview(src, label) {
+    if (!src) return;
+    const wrap = $("imagePreview");
+    const img = $("imagePreviewImg");
+    if (!wrap || !img) return;
+    img.src = src;
+    img.alt = label || "";
+    wrap.classList.remove("hidden");
+  }
+
+  function hideImagePreview() {
+    const wrap = $("imagePreview");
+    const img = $("imagePreviewImg");
+    if (img) img.removeAttribute("src");
+    if (wrap) wrap.classList.add("hidden");
+  }
+
+  function historyHtml() {
+    const items = state.history || [];
+    if (!items.length) return `<section class="card"><p>—</p></section>`;
+    return `<section class="card list">${items.map((it) => `
+      <div class="card">
+        <strong>${it.useCase || it.id}</strong>
+        <p>${it.imageCount} · ${it.provider} · ${it.targetGenerator}</p>
+        <div class="row">
+          <button data-open="${it.id}">${t("open")}</button>
+          <button class="secondary" data-dup="${it.id}">${t("duplicate")}</button>
+          <button class="danger" data-del="${it.id}">${t("delete")}</button>
+        </div>
+      </div>`).join("")}</section>`;
+  }
+
+  function settingsHtml() {
+    const s = state.data.settings || {};
+    const st = state.data.providerStatus || {};
+    return `<section class="card">
+      <label>${t("nav_settings")}</label>
+      <select id="appLang">
+        <option value="de" ${s.appLanguage === "de" ? "selected" : ""}>Deutsch</option>
+        <option value="ru" ${s.appLanguage === "ru" ? "selected" : ""}>Русский</option>
+      </select>
+      <label>${t("provider")}</label>
+      <select id="provider">
+        <option value="OPENAI" ${s.provider === "OPENAI" ? "selected" : ""}>OpenAI</option>
+        <option value="GEMINI" ${s.provider === "GEMINI" ? "selected" : ""}>Gemini</option>
+      </select>
+      <label>${t("generator")}</label>
+      <select id="gen">
+        <option value="VEO">VEO</option>
+        <option value="KLING" ${s.targetGenerator === "KLING" ? "selected" : ""}>KLING</option>
+        <option value="GENERIC" ${s.targetGenerator === "GENERIC" ? "selected" : ""}>GENERIC</option>
+      </select>
+      <label>${t("speech")}</label>
+      <select id="speechSet">
+        <option value="OFF" ${s.speechLanguage === "OFF" ? "selected" : ""}>${t("speech_off")}</option>
+        <option value="DEUTSCH" ${s.speechLanguage !== "OFF" && s.speechLanguage !== "РУССКИЙ" ? "selected" : ""}>${t("speech_de")}</option>
+        <option value="РУССКИЙ" ${s.speechLanguage === "РУССКИЙ" ? "selected" : ""}>${t("speech_ru")}</option>
+      </select>
+      <label>${t("caption_lang")}</label>
+      <select id="capLang">
+        <option value="DEUTSCH" ${s.captionLanguage !== "РУССКИЙ" ? "selected" : ""}>${t("speech_de")}</option>
+        <option value="РУССКИЙ" ${s.captionLanguage === "РУССКИЙ" ? "selected" : ""}>${t("speech_ru")}</option>
+      </select>
+      <label>${t("lock")}</label>
+      <select id="lock">
+        <option value="true" ${s.strictProductLock !== false ? "selected" : ""}>ON</option>
+        <option value="false" ${s.strictProductLock === false ? "selected" : ""}>OFF</option>
+      </select>
+      <p>Compliance ${s.policyVersion || ""} · ${s.policyUpdated || ""}</p>
+    </section>
+    ${providerCard("OPENAI", st.OPENAI)}
+    ${providerCard("GEMINI", st.GEMINI)}`;
+  }
+
+  function providerCard(name, status) {
+    const st = status || {};
+    return `<section class="card">
+      <h3>${name}</h3>
+      <p>${st.status || t("not_configured")}</p>
+      <label>${t("api_key")}</label>
+      <input id="key-${name}" type="password" autocomplete="off" />
+      <div class="row">
+        <button data-save="${name}">${t("save_key")}</button>
+        <button class="secondary" data-delkey="${name}">${t("delete_key")}</button>
+        <button class="secondary" data-test="${name}">${t("test")}</button>
+      </div>
+    </section>`;
+  }
+
+  function bind(screen) {
+    $("btnSettings").onclick = () => show("settings");
+    document.querySelectorAll(".bottom-nav button").forEach((b) => {
+      b.classList.toggle("active", b.getAttribute("data-nav") === screen);
+      b.onclick = () => {
+        const nav = b.getAttribute("data-nav");
+        if (nav === "history") call("listHistory");
+        show(nav);
+      };
+    });
+    if (screen === "home") {
+      $("pick").onclick = () => call("startPickImages");
+      $("clear").onclick = () => call("clearImages");
+      $("langDe").onclick = () => {
+        state.lang = "de";
+        call("saveSettings", JSON.stringify({ outputLanguage: "DEUTSCH", appLanguage: "de" }));
+      };
+      $("langRu").onclick = () => {
+        state.lang = "ru";
+        call("saveSettings", JSON.stringify({ outputLanguage: "РУССКИЙ", appLanguage: "ru" }));
+      };
+      $("startPipe").onclick = () => ensurePrivacy(() => call("startPipeline"));
+      document.querySelectorAll(".thumb[data-id]").forEach((el) => {
+        el.ondblclick = () => call("removeImage", el.getAttribute("data-id"));
+      });
+    }
+    if (screen === "check") {
+      $("runCheck").onclick = () => ensurePrivacy(() => call("runConsistency"));
+      $("review").onclick = () => show("photos");
+      const anyway = $("anyway"); if (anyway) anyway.onclick = () => call("continueAnyway");
+      $("toAnalyse").onclick = () => { call("runAnalysis"); show("analyse"); };
+    }
+    if (screen === "analyse") {
+      $("runAnalyse").onclick = () => call("runAnalysis");
+      $("toFf").onclick = () => show("firstFrame");
+    }
+    if (screen === "firstFrame") {
+      document.querySelectorAll("[data-pick]").forEach((el) => {
+        el.onclick = () => call("setFirstFrame", el.getAttribute("data-pick"));
+      });
+      $("quality").onclick = () => call("runFirstFrameQuality");
+      $("confirmFf").onclick = () => show("scene");
+    }
+    if (screen === "scene") {
+      $("speech").onchange = (e) => call("saveSettings", JSON.stringify({ speechLanguage: e.target.value }));
+      $("genScene").onclick = () => call("generateScene");
+      $("newScene").onclick = () => call("newScene");
+      $("toPrompt").onclick = () => { call("generatePrompt"); show("prompt"); };
+    }
+    if (screen === "prompt") {
+      $("genPrompt").onclick = () => call("generatePrompt");
+      $("improve").onclick = () => call("improvePrompt");
+      $("newSpeech").onclick = () => call("newSpeech");
+      $("toComp").onclick = () => { call("generateCaption"); call("runCompliance"); show("compliance"); };
+    }
+    if (screen === "compliance") {
+      $("runComp").onclick = () => call("runCompliance");
+      $("addW").onclick = () => call("addWerbung");
+      $("ign").onclick = () => call("ignoreDisclosure");
+      $("toExport").onclick = () => show("export");
+    }
+    if (screen === "pause") {
+      $("resumePipe").onclick = () => call("resumePipeline");
+      const anyway = $("anyway"); if (anyway) anyway.onclick = () => call("continueAnyway");
+      $("toPhotos").onclick = () => show("home");
+    }
+    if (screen === "export") {
+      const p = state.data.project || {};
+      const prompt = state.data.activePrompt || "";
+      const details = p.details || state.data.details || "";
+      $("cpkg").onclick = () => call("copyVideoPackage");
+      $("cd").onclick = () => call("copyText", details);
+      $("cp").onclick = () => call("copyText", prompt);
+      $("cc").onclick = () => call("copyText", p.caption || "");
+      $("ch").onclick = () => call("copyText", (p.hashtags || []).join(" "));
+      $("ca").onclick = () => call("copyText", state.data.copyAll || [details, prompt, p.caption || "", (p.hashtags || []).join(" ")].join("\n\n"));
+      $("adv").onclick = () => $("advBox").classList.toggle("hidden");
+      $("save").onclick = () => call("saveProjectNow");
+      document.querySelectorAll(".veo-ref").forEach((el) => {
+        el.onclick = () => {
+          const id = el.getAttribute("data-ref-id");
+          const ref = (state.data.veoReferences || []).find((item) => item.id === id) || {};
+          showImagePreview(ref.preview || ref.thumb || "", ref.label || "");
+        };
+      });
+    }
+    if (screen === "history") {
+      document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => call("openProject", b.getAttribute("data-open")));
+      document.querySelectorAll("[data-dup]").forEach((b) => b.onclick = () => call("duplicateProject", b.getAttribute("data-dup")));
+      document.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => {
+        modal(t("confirm_delete"), "", [
+          { label: t("delete"), onClick: () => call("deleteProject", b.getAttribute("data-del")) },
+          { label: t("ignore"), secondary: true },
+        ]);
+      });
+    }
+    if (screen === "settings") {
+      const save = () => call("saveSettings", JSON.stringify({
+        appLanguage: $("appLang").value,
+        provider: $("provider").value,
+        targetGenerator: $("gen").value,
+        speechLanguage: $("speechSet").value,
+        captionLanguage: $("capLang").value,
+        strictProductLock: $("lock").value === "true",
+      }));
+      ["appLang", "provider", "gen", "speechSet", "capLang", "lock"].forEach((id) => {
+        $(id).onchange = () => {
+          if (id === "appLang") state.lang = $("appLang").value;
+          save();
+        };
+      });
+      document.querySelectorAll("[data-save]").forEach((b) => b.onclick = () => {
+        const name = b.getAttribute("data-save");
+        const input = $("key-" + name);
+        call("saveProviderKey", name, input.value);
+        input.value = "";
+      });
+      document.querySelectorAll("[data-delkey]").forEach((b) => b.onclick = () => call("deleteProviderKey", b.getAttribute("data-delkey")));
+      document.querySelectorAll("[data-test]").forEach((b) => b.onclick = () => call("testConnection", b.getAttribute("data-test")));
+    }
+  }
+
+  function show(screen) {
+    state.screen = screen;
+    render();
+  }
+
+  function escapeHtml(s) {
+    return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function repairMojibake(str) {
+    if (!str || typeof str !== "string") return str;
+    if (!/[ÃÂÐÑâ]/.test(str)) return str;
+    try {
+      const bytes = Uint8Array.from(str, (c) => c.charCodeAt(0) & 255);
+      const decoded = new TextDecoder("utf-8").decode(bytes);
+      if (decoded && /[А-яЁё«»]/.test(decoded)) return decoded;
+    } catch (e) {}
+    return str;
+  }
+
+  function repairPayload(value) {
+    if (typeof value === "string") return repairMojibake(value);
+    if (Array.isArray(value)) return value.map(repairPayload);
+    if (value && typeof value === "object") {
+      const out = {};
+      Object.keys(value).forEach((k) => { out[k] = repairPayload(value[k]); });
+      return out;
+    }
+    return value;
+  }
+
+  window.UgcV3App = {
+    onNativeEvent(event, payload) {
+      payload = repairPayload(payload || {});
+      if (payload && payload.settings) state.data = Object.assign(state.data, payload);
+      if (event === "ready" || event === "project" || event === "images" || event === "settings" ||
+          event === "consistency" || event === "analysis" || event === "firstFrame" || event === "firstFrameQuality" ||
+          event === "scene" || event === "prompt" || event === "caption" || event === "compliance" || event === "saved" ||
+          event === "pipeline") {
+        state.data = Object.assign(state.data, payload);
+        if (payload.settings && payload.settings.appLanguage) state.lang = payload.settings.appLanguage;
+        if (event === "pipeline" || event === "ready" || event === "project") {
+          const stage = (payload.project && payload.project.pipelineStage) || payload.pipelineStage || "";
+          if (stage === "EXPORT_READY" || stage === "READY") state.screen = "export";
+          else if (stage === "PAUSED" || stage === "ERROR") state.screen = "pause";
+          else if (state.screen === "home" || state.screen === "photos") state.screen = "home";
+        }
+        if (event === "images" && state.screen !== "export" && state.screen !== "pause") state.screen = "home";
+        render();
+      }
+      if (event === "history") {
+        state.history = payload.items || [];
+        render();
+      }
+      if (event === "busy") {
+        state.busy = !!payload.busy;
+        if (payload.busy) state.lastError = null;
+        render();
+      }
+      if (event === "copied") toast(t("copied"));
+      if (event === "error") {
+        state.lastError = payload;
+        toast(payload.message || payload.code || "error");
+        render();
+      }
+      if (event === "providerStatus") {
+        state.data.providerStatus = payload;
+        if (state.screen === "settings") render();
+      }
+    }
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const preview = $("imagePreview");
+    const close = $("imagePreviewClose");
+    if (close) close.onclick = hideImagePreview;
+    if (preview) preview.onclick = (e) => {
+      if (e.target === preview || e.target === close) hideImagePreview();
+    };
+    render();
+    call("ready");
+  });
+})();

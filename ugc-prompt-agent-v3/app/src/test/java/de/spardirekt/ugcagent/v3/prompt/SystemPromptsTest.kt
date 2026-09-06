@@ -1,0 +1,34 @@
+package de.spardirekt.ugcagent.v3.prompt
+
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SystemPromptsTest {
+    @Test
+    fun v3PromptsAreNotV1Style() {
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("REFERENCE IMAGE OVERRIDES"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("No spoken dialogue"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("Do not overuse"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("PRODUCT IDENTITY LOCK"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("5–10 unique identity-critical visible features"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("8.0 seconds"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("MOVING COMPONENT LOCK"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("freeze-frame"))
+        assertTrue(SystemPrompts.PRODUCT_ANALYSIS.contains("text_claims"))
+        assertTrue(SystemPrompts.PRODUCT_ANALYSIS.contains("first_frame_context"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("one coherent 8-second moment"))
+        assertTrue(SystemPrompts.SCENE.contains("Do not invent a niche story"))
+        assertTrue(SystemPrompts.CONSISTENCY.contains("same_product"))
+        assertTrue(SystemPrompts.CONSISTENCY.contains("duplicate_groups"))
+        assertTrue(SystemPrompts.CONSISTENCY.contains("hard_geometry_conflict"))
+        assertTrue(SystemPrompts.CONSISTENCY.contains("identity-critical visible geometry"))
+        assertTrue(SystemPrompts.CONSISTENCY.contains("packaging"))
+        assertTrue(SystemPrompts.PRODUCT_IDENTITY_FINGERPRINT.contains("identity_critical_components"))
+        assertTrue(SystemPrompts.VIDEO_PROMPT.contains("Write one native spoken line for THIS product"))
+        assertFalse(SystemPrompts.VIDEO_PROMPT.contains("Kitchen example"))
+        assertFalse(SystemPrompts.VIDEO_PROMPT.contains("Fishing example"))
+        assertTrue(SystemPrompts.PRODUCT_ANALYSIS.contains("Never copy leftover setting"))
+        assertTrue(SystemPrompts.SCENE.contains("Do not reuse leftover kitchen, fishing, microwave or pan context"))
+    }
+}
