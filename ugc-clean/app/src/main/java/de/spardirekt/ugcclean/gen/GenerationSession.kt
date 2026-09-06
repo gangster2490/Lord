@@ -65,14 +65,14 @@ class GenerationSession(
                 var result: PipelineResult? = null
                 for (attempt in attempts) {
                     val outcome = runCatching {
-                        Pipeline(liveClient = clients.forKey(attempt.provider, attempt.key), demoClient = clients.demo)
-                            .run(attempt.key, images, language) { stage, percent ->
+                        Pipeline(liveClient = clients.forKey(attempt.provider, attempt.apiKey), demoClient = clients.demo)
+                            .run(attempt.apiKey, images, language) { stage, percent ->
                                 update { it.copy(stage = stage, progressPercent = percent, updatedAt = System.currentTimeMillis()) }
                             }
                     }
                     if (outcome.isSuccess) {
                         result = outcome.getOrThrow()
-                        used = if (Keys.isDemo(attempt.key)) "DEMO" else attempt.provider.name
+                        used = if (Keys.isDemo(attempt.apiKey)) "DEMO" else attempt.provider.name
                         last = null
                         break
                     }
