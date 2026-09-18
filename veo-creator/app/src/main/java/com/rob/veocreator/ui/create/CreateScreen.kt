@@ -1,13 +1,18 @@
 package com.rob.veocreator.ui.create
 
 import android.content.ClipData
+import android.graphics.Bitmap
+import android.graphics.RectF
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,12 +38,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -65,12 +72,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -90,7 +105,9 @@ import com.rob.veocreator.ui.theme.VeoCard
 import com.rob.veocreator.ui.theme.VeoTextSecondary
 import com.rob.veocreator.ui.theme.VeoYellow
 import com.rob.veocreator.util.MediaUtils
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @Composable
@@ -103,6 +120,7 @@ fun CreateScreen(
     val clipboard = LocalClipboardManager.current
     var savedMessage by remember { mutableStateOf<String?>(null) }
     var showFullscreen by remember { mutableStateOf(false) }
+    var cropEditingImage by remember { mutableStateOf<SelectedImage?>(null) }
 
     LaunchedEffect(Unit) { viewModel.refreshApiKeyState() }
 
@@ -139,8 +157,19 @@ fun CreateScreen(
                 onPickFromFiles = { filePickerLauncher.launch(arrayOf("image/jpeg", "image/png", "image/webp")) },
                 onRemove = viewModel::removeImage,
                 onSetPrimary = viewModel::setPrimaryImage,
+                onEditCrop = { cropEditingImage = it },
                 onAnalyze = viewModel::analyzeImages
             )
+
+            val primaryImage = state.images.firstOrNull { it.isPrimary }
+            if (primaryImage != null) {
+                ImageSentToVeoPreview(
+                    image = primaryImage,
+                    referenceCount = if (state.usesReferenceImages) state.referenceImageCount else 0,
+                    lowResWarning = state.primaryLowResWarning,
+                    onEditCrop = { cropEditingImage = primaryImage }
+                )
+            }
 
             state.analysisSuggestion?.let { suggestion ->
                 SuggestionCard(
@@ -286,6 +315,15 @@ fun CreateScreen(
 
         Spacer(Modifier.height(24.dp))
     }
+
+    cropEditingImage?.let { image ->
+        CropEditorDialog(
+            image = image,
+            onDismiss = { cropEditingImage = null },
+            onApply = { rect -> viewModel.setManualCrop(image.id, rect) },
+            onResetAuto = { viewModel.resetCropToAuto(image.id) }
+        )
+    }
 }
 
 @Composable
@@ -342,6 +380,7 @@ private fun ImagePickerSection(
     onPickFromFiles: () -> Unit,
     onRemove: (String) -> Unit,
     onSetPrimary: (String) -> Unit,
+    onEditCrop: (SelectedImage) -> Unit,
     onAnalyze: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -360,7 +399,7 @@ private fun ImagePickerSection(
 
         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             items(images, key = { it.id }) { image ->
-                ImageThumbnail(image, onRemove, onSetPrimary)
+                ImageThumbnail(image, onRemove, onSetPrimary, onEditCrop)
             }
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -384,7 +423,8 @@ private fun ImagePickerSection(
 private fun ImageThumbnail(
     image: SelectedImage,
     onRemove: (String) -> Unit,
-    onSetPrimary: (String) -> Unit
+    onSetPrimary: (String) -> Unit,
+    onEditCrop: (SelectedImage) -> Unit
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(96.dp)) {
         Box(
@@ -412,6 +452,12 @@ private fun ImageThumbnail(
                 )
             }
             IconButton(
+                onClick = { onEditCrop(image) },
+                modifier = Modifier.align(Alignment.BottomStart).size(24.dp)
+            ) {
+                Icon(Icons.Filled.Crop, contentDescription = "Edit crop", tint = Color.White)
+            }
+            IconButton(
                 onClick = { onRemove(image.id) },
                 modifier = Modifier.align(Alignment.TopEnd).size(24.dp)
             ) {
@@ -425,6 +471,68 @@ private fun ImageThumbnail(
                 color = VeoTextSecondary,
                 maxLines = 1
             )
+        }
+    }
+}
+
+@Composable
+private fun ImageSentToVeoPreview(
+    image: SelectedImage,
+    referenceCount: Int,
+    lowResWarning: Boolean,
+    onEditCrop: () -> Unit
+) {
+    val context = LocalContext.current
+    var preview by remember(image.id, image.cropRect) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(image.id, image.cropRect) {
+        preview = withContext(Dispatchers.IO) { MediaUtils.renderCroppedPreview(context, image.uri, image.cropRect) }
+    }
+    val coveragePercent = image.cropRect?.let { ((it.width() * it.height()) * 100).toInt() } ?: 100
+
+    Card(colors = CardDefaults.cardColors(containerColor = VeoCard), shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Image sent to Veo", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                TextButton(onClick = onEditCrop) {
+                    Icon(Icons.Filled.Crop, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Edit Crop")
+                }
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                val bmp = preview
+                if (bmp != null) {
+                    Image(bitmap = bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
+                } else {
+                    CircularProgressIndicator(color = VeoYellow)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Product coverage: ~$coveragePercent%" +
+                    if (referenceCount > 0) " · +$referenceCount reference image(s)" else "",
+                style = MaterialTheme.typography.labelMedium,
+                color = VeoTextSecondary
+            )
+            if (lowResWarning) {
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Product image resolution is too low for reliable product consistency.",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
         }
     }
 }
@@ -596,4 +704,155 @@ private fun statusLabel(state: GenerationState): String = when (state) {
     is GenerationState.Generating -> "Generating video..."
     is GenerationState.Downloading -> "Downloading video..."
     else -> ""
+}
+
+private enum class CropHandle { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, MOVE }
+
+private const val HANDLE_HIT_RADIUS = 0.09f
+private const val MIN_CROP_SIZE = 0.15f
+
+private fun hitTestHandle(rect: RectF, offset: Offset, containerSize: IntSize): CropHandle {
+    if (containerSize.width == 0 || containerSize.height == 0) return CropHandle.MOVE
+    val px = offset.x / containerSize.width
+    val py = offset.y / containerSize.height
+    fun near(x: Float, y: Float) = kotlin.math.abs(px - x) < HANDLE_HIT_RADIUS && kotlin.math.abs(py - y) < HANDLE_HIT_RADIUS
+    return when {
+        near(rect.left, rect.top) -> CropHandle.TOP_LEFT
+        near(rect.right, rect.top) -> CropHandle.TOP_RIGHT
+        near(rect.left, rect.bottom) -> CropHandle.BOTTOM_LEFT
+        near(rect.right, rect.bottom) -> CropHandle.BOTTOM_RIGHT
+        else -> CropHandle.MOVE
+    }
+}
+
+private fun applyCropDrag(rect: RectF, handle: CropHandle, dx: Float, dy: Float): RectF {
+    val r = RectF(rect)
+    when (handle) {
+        CropHandle.TOP_LEFT -> {
+            r.left = (r.left + dx).coerceIn(0f, r.right - MIN_CROP_SIZE)
+            r.top = (r.top + dy).coerceIn(0f, r.bottom - MIN_CROP_SIZE)
+        }
+        CropHandle.TOP_RIGHT -> {
+            r.right = (r.right + dx).coerceIn(r.left + MIN_CROP_SIZE, 1f)
+            r.top = (r.top + dy).coerceIn(0f, r.bottom - MIN_CROP_SIZE)
+        }
+        CropHandle.BOTTOM_LEFT -> {
+            r.left = (r.left + dx).coerceIn(0f, r.right - MIN_CROP_SIZE)
+            r.bottom = (r.bottom + dy).coerceIn(r.top + MIN_CROP_SIZE, 1f)
+        }
+        CropHandle.BOTTOM_RIGHT -> {
+            r.right = (r.right + dx).coerceIn(r.left + MIN_CROP_SIZE, 1f)
+            r.bottom = (r.bottom + dy).coerceIn(r.top + MIN_CROP_SIZE, 1f)
+        }
+        CropHandle.MOVE -> {
+            val w = r.width()
+            val h = r.height()
+            val newLeft = (r.left + dx).coerceIn(0f, 1f - w)
+            val newTop = (r.top + dy).coerceIn(0f, 1f - h)
+            r.left = newLeft
+            r.right = newLeft + w
+            r.top = newTop
+            r.bottom = newTop + h
+        }
+    }
+    return r
+}
+
+@Composable
+private fun CropOverlay(rect: RectF) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val left = rect.left * size.width
+        val top = rect.top * size.height
+        val right = rect.right * size.width
+        val bottom = rect.bottom * size.height
+        val dim = Color.Black.copy(alpha = 0.55f)
+        drawRect(color = dim, topLeft = Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(size.width, top))
+        drawRect(color = dim, topLeft = Offset(0f, bottom), size = androidx.compose.ui.geometry.Size(size.width, size.height - bottom))
+        drawRect(color = dim, topLeft = Offset(0f, top), size = androidx.compose.ui.geometry.Size(left, bottom - top))
+        drawRect(color = dim, topLeft = Offset(right, top), size = androidx.compose.ui.geometry.Size(size.width - right, bottom - top))
+        drawRect(
+            color = VeoYellow,
+            topLeft = Offset(left, top),
+            size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+            style = Stroke(width = 3f)
+        )
+        listOf(Offset(left, top), Offset(right, top), Offset(left, bottom), Offset(right, bottom)).forEach {
+            drawCircle(color = VeoYellow, radius = 12f, center = it)
+        }
+    }
+}
+
+@Composable
+private fun CropEditorDialog(
+    image: SelectedImage,
+    onDismiss: () -> Unit,
+    onApply: (RectF) -> Unit,
+    onResetAuto: () -> Unit
+) {
+    val context = LocalContext.current
+    var bitmap by remember(image.id) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(image.uri) {
+        bitmap = withContext(Dispatchers.IO) { MediaUtils.decodeDownsampledBitmap(context, image.uri, 1024) }
+    }
+    var rect by remember(image.id) { mutableStateOf(image.cropRect ?: RectF(0f, 0f, 1f, 1f)) }
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    var activeHandle by remember { mutableStateOf(CropHandle.MOVE) }
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(Modifier.fillMaxSize().background(Color.Black).padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Edit Crop", color = Color.White, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            val bmp = bitmap
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                if (bmp == null) {
+                    CircularProgressIndicator(color = VeoYellow)
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(bmp.width.toFloat() / bmp.height.toFloat())
+                            .onSizeChanged { containerSize = it }
+                            .pointerInput(image.id) {
+                                detectDragGestures(
+                                    onDragStart = { offset -> activeHandle = hitTestHandle(rect, offset, containerSize) },
+                                    onDragEnd = { activeHandle = CropHandle.MOVE },
+                                    onDragCancel = { activeHandle = CropHandle.MOVE }
+                                ) { change, dragAmount ->
+                                    change.consume()
+                                    val dx = dragAmount.x / containerSize.width.coerceAtLeast(1)
+                                    val dy = dragAmount.y / containerSize.height.coerceAtLeast(1)
+                                    rect = applyCropDrag(rect, activeHandle, dx, dy)
+                                }
+                            }
+                    ) {
+                        Image(bitmap = bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
+                        CropOverlay(rect)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = { rect = RectF(0f, 0f, 1f, 1f) }, modifier = Modifier.weight(1f)) {
+                    Text("Full image")
+                }
+                OutlinedButton(onClick = { onResetAuto(); onDismiss() }, modifier = Modifier.weight(1f)) {
+                    Text("Reset to Auto")
+                }
+                Button(
+                    onClick = { onApply(rect); onDismiss() },
+                    colors = ButtonDefaults.buttonColors(containerColor = VeoYellow, contentColor = Color.Black),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Apply")
+                }
+            }
+        }
+    }
 }

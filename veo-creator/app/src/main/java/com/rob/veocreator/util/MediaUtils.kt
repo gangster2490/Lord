@@ -4,6 +4,8 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Rect
+import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -22,17 +24,32 @@ import kotlin.math.roundToInt
 private const val MAX_DIMENSION_PX = 2048
 private const val MAX_BYTES = 8 * 1024 * 1024
 
+/** Below this on the shorter side, a crop is too small to reliably preserve product detail. */
+const val MIN_USEFUL_DIMENSION_PX = 480
+
 data class ImageLoadResult(
     val inline: InlineImage,
     val originalWidth: Int,
     val originalHeight: Int,
+    /** Dimensions of the crop region in the original image's pixel space, before any further
+     *  downscale-if-still-too-large. Equal to original width/height when no crop was applied. */
+    val cropWidth: Int,
+    val cropHeight: Int,
     val transmittedWidth: Int,
     val transmittedHeight: Int,
     val originalBytes: Int,
     val transmittedBytes: Int,
     val resizeApplied: Boolean,
     val compressionApplied: Boolean
-)
+) {
+    /** What fraction of the original frame the transmitted crop covers. */
+    val productCoveragePercent: Int
+        get() = if (originalWidth == 0 || originalHeight == 0) 100 else
+            (((cropWidth.toLong() * cropHeight) * 100) / (originalWidth.toLong() * originalHeight)).toInt()
+
+    val lowResolutionWarning: Boolean
+        get() = minOf(transmittedWidth, transmittedHeight) < MIN_USEFUL_DIMENSION_PX
+}
 
 object MediaUtils {
 
@@ -40,13 +57,14 @@ object MediaUtils {
     fun loadInlineImage(context: Context, uri: Uri): InlineImage = loadInlineImageWithDiagnostics(context, uri).inline
 
     /**
-     * Reads the original file bytes untouched whenever possible - only resizes/recompresses when
-     * the image is larger than [MAX_DIMENSION_PX] on its longest side or [MAX_BYTES], to avoid
-     * bloating the request. When it does have to shrink, it keeps the source format family
-     * (PNG stays PNG, WEBP stays WEBP, JPEG stays JPEG) at high quality rather than forcing
-     * everything through low-quality JPEG.
+     * Reads the original file bytes untouched whenever possible - only crops (per [cropRect], a
+     * normalized 0f..1f rect) or resizes/recompresses when the image is larger than
+     * [MAX_DIMENSION_PX] on its longest side or [MAX_BYTES], to avoid bloating the request. When
+     * it does have to re-encode, it keeps the source format family (PNG stays PNG, WEBP stays
+     * WEBP, JPEG stays JPEG) at high quality rather than forcing everything through low-quality
+     * JPEG, and never upsamples or artificially sharpens.
      */
-    fun loadInlineImageWithDiagnostics(context: Context, uri: Uri): ImageLoadResult {
+    fun loadInlineImageWithDiagnostics(context: Context, uri: Uri, cropRect: RectF? = null): ImageLoadResult {
         val mimeType = context.contentResolver.getType(uri) ?: guessMimeFromUri(uri) ?: "image/jpeg"
         val originalBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: throw IllegalStateException("Could not read image")
@@ -56,14 +74,19 @@ object MediaUtils {
         val originalWidth = bounds.outWidth
         val originalHeight = bounds.outHeight
 
+        val hasMeaningfulCrop = cropRect != null &&
+            (cropRect.left > 0.005f || cropRect.top > 0.005f || cropRect.right < 0.995f || cropRect.bottom < 0.995f)
+
         val needsResize = maxOf(originalWidth, originalHeight) > MAX_DIMENSION_PX
         val needsShrink = needsResize || originalBytes.size > MAX_BYTES
 
-        if (!needsShrink) {
+        if (!hasMeaningfulCrop && !needsShrink) {
             return ImageLoadResult(
                 inline = InlineImage(GeminiVeoClient.toBase64(originalBytes), mimeType),
                 originalWidth = originalWidth,
                 originalHeight = originalHeight,
+                cropWidth = originalWidth,
+                cropHeight = originalHeight,
                 transmittedWidth = originalWidth,
                 transmittedHeight = originalHeight,
                 originalBytes = originalBytes.size,
@@ -73,16 +96,45 @@ object MediaUtils {
             )
         }
 
-        val sampleSize = calculateInSampleSize(originalWidth, originalHeight, MAX_DIMENSION_PX)
-        val decoded = BitmapFactory.decodeByteArray(
+        val cropPx = if (hasMeaningfulCrop) {
+            Rect(
+                (cropRect!!.left * originalWidth).roundToInt().coerceIn(0, originalWidth - 1),
+                (cropRect.top * originalHeight).roundToInt().coerceIn(0, originalHeight - 1),
+                (cropRect.right * originalWidth).roundToInt().coerceIn(1, originalWidth),
+                (cropRect.bottom * originalHeight).roundToInt().coerceIn(1, originalHeight)
+            )
+        } else Rect(0, 0, originalWidth, originalHeight)
+        val cropWidth = cropPx.width()
+        val cropHeight = cropPx.height()
+
+        // Decode at just enough resolution to crop precisely without loading a huge full bitmap
+        // into memory for large source photos.
+        val decodeTarget = maxOf(MAX_DIMENSION_PX, maxOf(cropWidth, cropHeight))
+        val sampleSize = calculateInSampleSize(originalWidth, originalHeight, decodeTarget)
+        val fullBitmap = BitmapFactory.decodeByteArray(
             originalBytes, 0, originalBytes.size,
             BitmapFactory.Options().apply { inSampleSize = sampleSize }
         ) ?: throw IllegalStateException("Could not decode image")
 
-        val scale = MAX_DIMENSION_PX.toFloat() / maxOf(decoded.width, decoded.height)
-        val finalBitmap = if (scale < 1f) {
-            Bitmap.createScaledBitmap(decoded, (decoded.width * scale).roundToInt(), (decoded.height * scale).roundToInt(), true)
-        } else decoded
+        val scaleFactor = fullBitmap.width.toFloat() / originalWidth
+        val scaledCrop = Rect(
+            (cropPx.left * scaleFactor).roundToInt().coerceIn(0, fullBitmap.width - 1),
+            (cropPx.top * scaleFactor).roundToInt().coerceIn(0, fullBitmap.height - 1),
+            (cropPx.right * scaleFactor).roundToInt().coerceIn(1, fullBitmap.width),
+            (cropPx.bottom * scaleFactor).roundToInt().coerceIn(1, fullBitmap.height)
+        )
+        val croppedBitmap = Bitmap.createBitmap(
+            fullBitmap, scaledCrop.left, scaledCrop.top, scaledCrop.width(), scaledCrop.height()
+        )
+        if (croppedBitmap !== fullBitmap) fullBitmap.recycle()
+
+        val needsFurtherResize = maxOf(croppedBitmap.width, croppedBitmap.height) > MAX_DIMENSION_PX
+        val finalBitmap = if (needsFurtherResize) {
+            val scale = MAX_DIMENSION_PX.toFloat() / maxOf(croppedBitmap.width, croppedBitmap.height)
+            Bitmap.createScaledBitmap(
+                croppedBitmap, (croppedBitmap.width * scale).roundToInt(), (croppedBitmap.height * scale).roundToInt(), true
+            ).also { if (it !== croppedBitmap) croppedBitmap.recycle() }
+        } else croppedBitmap
 
         val format = when {
             mimeType.contains("png") -> Bitmap.CompressFormat.PNG
@@ -99,13 +151,46 @@ object MediaUtils {
             inline = InlineImage(GeminiVeoClient.toBase64(transmittedBytes), mimeType),
             originalWidth = originalWidth,
             originalHeight = originalHeight,
+            cropWidth = cropWidth,
+            cropHeight = cropHeight,
             transmittedWidth = finalBitmap.width,
             transmittedHeight = finalBitmap.height,
             originalBytes = originalBytes.size,
             transmittedBytes = transmittedBytes.size,
-            resizeApplied = needsResize,
+            resizeApplied = needsFurtherResize,
             compressionApplied = true
         )
+    }
+
+    /** Renders just the cropped region at a small preview size - used for the "Image sent to
+     *  Veo" thumbnail so it stays fast even for large source photos. */
+    fun renderCroppedPreview(context: Context, uri: Uri, cropRect: RectF?, maxDim: Int = 512): Bitmap? {
+        val bitmap = decodeDownsampledBitmap(context, uri, maxDim) ?: return null
+        if (cropRect == null) return bitmap
+        val left = (cropRect.left * bitmap.width).roundToInt().coerceIn(0, bitmap.width - 1)
+        val top = (cropRect.top * bitmap.height).roundToInt().coerceIn(0, bitmap.height - 1)
+        val right = (cropRect.right * bitmap.width).roundToInt().coerceIn(left + 1, bitmap.width)
+        val bottom = (cropRect.bottom * bitmap.height).roundToInt().coerceIn(top + 1, bitmap.height)
+        val cropped = Bitmap.createBitmap(bitmap, left, top, right - left, bottom - top)
+        if (cropped !== bitmap) bitmap.recycle()
+        return cropped
+    }
+
+    /** Decodes the full (uncropped) image downsampled for on-screen display, e.g. in the crop editor. */
+    fun decodeDownsampledBitmap(context: Context, uri: Uri, maxDim: Int): Bitmap? {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val sample = calculateInSampleSize(bounds.outWidth, bounds.outHeight, maxDim)
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+
+    /** Original pixel dimensions without decoding the full bitmap - (0, 0) if unreadable. */
+    fun decodeBounds(context: Context, uri: Uri): Pair<Int, Int> {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return 0 to 0
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        return bounds.outWidth to bounds.outHeight
     }
 
     private fun calculateInSampleSize(width: Int, height: Int, targetMax: Int): Int {

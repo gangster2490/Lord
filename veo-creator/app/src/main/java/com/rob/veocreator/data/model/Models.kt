@@ -1,5 +1,6 @@
 package com.rob.veocreator.data.model
 
+import android.graphics.RectF
 import android.net.Uri
 import java.util.UUID
 
@@ -189,7 +190,18 @@ data class SelectedImage(
     val role: ImageRole = ImageRole.UNANALYZED,
     val extractedText: List<String> = emptyList(),
     val notes: String? = null,
-    val isPrimary: Boolean = false
+    val isPrimary: Boolean = false,
+    /** Normalized (0f..1f) crop rect in the original image's coordinate space - null until the
+     *  auto-crop suggestion finishes computing. This is what's actually sent to Veo, not the
+     *  original file. */
+    val cropRect: RectF? = null,
+    /** True once the user has adjusted the crop in the editor - auto re-suggestion must not
+     *  override a deliberate manual crop. */
+    val cropManuallySet: Boolean = false,
+    /** Original file pixel dimensions, filled in alongside the crop suggestion - used to warn
+     *  when the cropped region is too small to preserve reliable product detail. */
+    val originalWidth: Int = 0,
+    val originalHeight: Int = 0
 )
 
 data class ImageAnalysisEntry(

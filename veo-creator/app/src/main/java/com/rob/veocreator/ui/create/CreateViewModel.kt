@@ -1,6 +1,7 @@
 package com.rob.veocreator.ui.create
 
 import android.app.Application
+import android.graphics.RectF
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,7 +23,10 @@ import com.rob.veocreator.data.model.VeoModel
 import com.rob.veocreator.data.model.VideoMode
 import com.rob.veocreator.data.model.generationStrategyLabel
 import com.rob.veocreator.util.ImageLoadResult
+import com.rob.veocreator.util.MIN_USEFUL_DIMENSION_PX
 import com.rob.veocreator.util.MediaUtils
+import com.rob.veocreator.util.ProductCropper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +36,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.IOException
+import kotlin.math.roundToInt
+
+/** Normalized full-frame rect - stored once a crop suggestion finds nothing worth cropping, so
+ *  MediaUtils' "meaningful crop" check treats it as a no-op pass-through. */
+private val FULL_IMAGE_RECT = RectF(0f, 0f, 1f, 1f)
 
 private const val MAX_ANALYSIS_IMAGES = 8
 private const val MAX_REFERENCE_IMAGES = 3
@@ -108,6 +117,19 @@ data class CreateUiState(
                 "Veo 3.1 Lite doesn't support ${resolution.label} - using ${effectiveModel.displayName} instead."
             }
         }
+
+    /** True when the primary image's crop, at its real pixel size, is too small to reliably
+     *  preserve product detail - computed without any extra image decode (crop is a fraction of
+     *  the already-known original dimensions). */
+    val primaryLowResWarning: Boolean
+        get() {
+            val primary = images.firstOrNull { it.isPrimary } ?: return false
+            val crop = primary.cropRect ?: return false
+            if (primary.originalWidth <= 0 || primary.originalHeight <= 0) return false
+            val cropWidthPx = (crop.width() * primary.originalWidth).roundToInt()
+            val cropHeightPx = (crop.height() * primary.originalHeight).roundToInt()
+            return minOf(cropWidthPx, cropHeightPx) < MIN_USEFUL_DIMENSION_PX
+        }
 }
 
 class CreateViewModel(application: Application) : AndroidViewModel(application) {
@@ -172,21 +194,48 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun addImages(uris: List<Uri>) {
+        var newOnes: List<SelectedImage> = emptyList()
         _uiState.update { state ->
             val existingIds = state.images.map { it.uri }.toSet()
-            val newOnes = uris.filterNot { it in existingIds }.map { uri ->
+            newOnes = uris.filterNot { it in existingIds }.map { uri ->
                 val mime = app.contentResolver.getType(uri) ?: "image/jpeg"
                 SelectedImage(uri = uri, mimeType = mime)
             }
             val combined = state.images + newOnes
             applyAutoPrimary(clampDurationForState(state.copy(images = combined, analysisSuggestion = null)))
         }
-        // Auto-classify roles as soon as there's more than one photo, so the primary-selection
-        // scoring and reference-image filtering have real data instead of defaulting to upload order.
-        val current = _uiState.value
-        if (current.images.size > 1 && current.images.any { it.role == ImageRole.UNANALYZED } && !current.isAnalyzing) {
-            analyzeImages()
+        // Role classification (Analyze & Enhance Prompt) stays manual-only - only compute the
+        // auto-crop suggestion automatically, since that's needed just to know what gets sent.
+        newOnes.forEach { computeCropSuggestion(it) }
+    }
+
+    /** Runs the offline heuristic crop suggestion for one image and records its original pixel
+     *  size, unless the user has since set a manual crop for it. */
+    private fun computeCropSuggestion(image: SelectedImage) {
+        viewModelScope.launch(Dispatchers.Default) {
+            val (width, height) = MediaUtils.decodeBounds(app, image.uri)
+            val suggestion = ProductCropper.suggestCrop(app, image.uri) ?: FULL_IMAGE_RECT
+            _uiState.update { state ->
+                state.copy(images = state.images.map { img ->
+                    if (img.id != image.id) return@map img
+                    val newCrop = if (img.cropManuallySet) img.cropRect else suggestion
+                    img.copy(cropRect = newCrop, originalWidth = width, originalHeight = height)
+                })
+            }
         }
+    }
+
+    fun setManualCrop(imageId: String, rect: RectF) = _uiState.update { state ->
+        state.copy(images = state.images.map {
+            if (it.id == imageId) it.copy(cropRect = rect, cropManuallySet = true) else it
+        })
+    }
+
+    fun resetCropToAuto(imageId: String) {
+        _uiState.update { state ->
+            state.copy(images = state.images.map { if (it.id == imageId) it.copy(cropManuallySet = false) else it })
+        }
+        _uiState.value.images.find { it.id == imageId }?.let { computeCropSuggestion(it) }
     }
 
     fun removeImage(id: String) = _uiState.update { state ->
@@ -286,7 +335,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                     RequestMode.IMAGE_TO_VIDEO -> {
                         val primary = state.images.firstOrNull { it.isPrimary } ?: state.images.firstOrNull()
                             ?: throw ApiException(null, "Please select a starting image.")
-                        val loaded = MediaUtils.loadInlineImageWithDiagnostics(app, primary.uri)
+                        val loaded = MediaUtils.loadInlineImageWithDiagnostics(app, primary.uri, primary.cropRect)
                         primaryInline = loaded.inline
                         diagnostics += primary to loaded
                     }
@@ -295,7 +344,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                         if (chosen.isEmpty()) {
                             throw ApiException(null, "Please select at least one product image.")
                         }
-                        val loadedList = chosen.map { it to MediaUtils.loadInlineImageWithDiagnostics(app, it.uri) }
+                        val loadedList = chosen.map { it to MediaUtils.loadInlineImageWithDiagnostics(app, it.uri, it.cropRect) }
                         referenceInline = loadedList.map { it.second.inline }
                         diagnostics += loadedList
                     }
@@ -431,13 +480,18 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             appendLine("Text extraction influenced prompt: ${if (state.textExtractionUsed) "yes" else "no"}")
             if (diagnostics.isNotEmpty()) {
                 appendLine("Image diagnostics:")
-                diagnostics.forEachIndexed { i, (img, d) ->
+                diagnostics.forEach { (img, d) ->
                     val idx = state.images.indexOf(img) + 1
-                    appendLine(
-                        " - img$idx (${img.role.name}): ${d.originalWidth}x${d.originalHeight} " +
-                            "(${d.originalBytes / 1024}KB) -> ${d.transmittedWidth}x${d.transmittedHeight} " +
-                            "(${d.transmittedBytes / 1024}KB) resized=${d.resizeApplied} compressed=${d.compressionApplied}"
-                    )
+                    appendLine(" - img$idx (${img.role.name}):")
+                    appendLine("   Original image: ${d.originalWidth}x${d.originalHeight} (${d.originalBytes / 1024} KB)")
+                    appendLine("   Product crop: ${d.cropWidth}x${d.cropHeight}")
+                    appendLine("   Product coverage: ${d.productCoveragePercent}%")
+                    appendLine("   Image sent to Veo: ${d.transmittedWidth}x${d.transmittedHeight} (${d.transmittedBytes / 1024} KB)")
+                    appendLine("   Resize: ${if (d.resizeApplied) "yes" else "no"}")
+                    appendLine("   Compression: ${if (d.compressionApplied) "yes" else "no"}")
+                    if (d.lowResolutionWarning) {
+                        appendLine("   WARNING: Product image resolution is too low for reliable product consistency.")
+                    }
                 }
             }
             if (finalPrompt != null) {
