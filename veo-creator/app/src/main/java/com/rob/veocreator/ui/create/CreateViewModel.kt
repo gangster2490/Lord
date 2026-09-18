@@ -343,7 +343,8 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             if (requestMode != RequestMode.TEXT_TO_VIDEO) {
                 appendLine("MIME type: ${state.images.firstOrNull()?.mimeType ?: "n/a"}")
             }
-            append("Using Gemini Content inlineData: false")
+            appendLine("Using Gemini Content inlineData: false")
+            append("numberOfVideos present: false")
         }
     }
 

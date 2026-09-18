@@ -118,12 +118,14 @@ class GeminiVeoClient {
                 RequestMode.IMAGE_TO_VIDEO, RequestMode.REFERENCE_IMAGES -> "allow_adult"
             }
 
+            // veo-3.1-generate-preview always generates exactly one video and rejects an explicit
+            // count with 400 "`numberOfVideos` isn't supported by this model." - omit it entirely
+            // rather than sending numberOfVideos/sampleCount/candidateCount with a default value.
             val parameters = JSONObject().apply {
                 put("aspectRatio", aspectRatio.apiValue)
                 put("durationSeconds", effectiveDuration.apiValue)
                 put("resolution", resolution.apiValue)
                 put("personGeneration", personGeneration)
-                put("numberOfVideos", 1)
             }
 
             val body = JSONObject().apply {
