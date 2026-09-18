@@ -13,6 +13,14 @@ enum class VideoMode { TEXT_TO_VIDEO, IMAGE_TO_VIDEO }
  */
 enum class RequestMode { TEXT_TO_VIDEO, IMAGE_TO_VIDEO, REFERENCE_IMAGES }
 
+/** Internal naming for the two image-based strategies, shown in Technical Details. */
+val RequestMode.generationStrategyLabel: String
+    get() = when (this) {
+        RequestMode.TEXT_TO_VIDEO -> "TEXT_TO_VIDEO"
+        RequestMode.IMAGE_TO_VIDEO -> "SAFE_PRODUCT"
+        RequestMode.REFERENCE_IMAGES -> "CONSISTENCY"
+    }
+
 enum class VeoModel(
     val apiName: String,
     val displayName: String,
@@ -90,6 +98,23 @@ enum class ImageRole(val label: String) {
 
     val isTextHeavy: Boolean
         get() = this == SPECIFICATION_IMAGE || this == DESCRIPTION_IMAGE || this == DIMENSION_IMAGE
+
+    /**
+     * How suitable this role is as the starting/hero image for Veo. Text-heavy roles score
+     * negative so they are never picked as primary even if every other image is missing.
+     */
+    val primaryScore: Int
+        get() = when (this) {
+            MAIN_PRODUCT_PHOTO -> 100
+            ALTERNATE_ANGLE -> 70
+            OPEN_CLOSED_STATE -> 65
+            DETAIL_PHOTO -> 50
+            ACCESSORIES -> 30
+            PACKAGING -> 20
+            OTHER -> 10
+            UNANALYZED -> 5
+            SPECIFICATION_IMAGE, DESCRIPTION_IMAGE, DIMENSION_IMAGE -> -100
+        }
 }
 
 data class SelectedImage(

@@ -19,6 +19,8 @@ import com.rob.veocreator.data.model.Resolution
 import com.rob.veocreator.data.model.SelectedImage
 import com.rob.veocreator.data.model.VeoModel
 import com.rob.veocreator.data.model.VideoMode
+import com.rob.veocreator.data.model.generationStrategyLabel
+import com.rob.veocreator.util.ImageLoadResult
 import com.rob.veocreator.util.MediaUtils
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -47,6 +49,12 @@ data class CreateUiState(
     /** Off by default: use one starting image (IMAGE_TO_VIDEO). On: send up to 3 photos as
      *  Veo referenceImages instead - these two are mutually exclusive at the API level. */
     val useMultipleImages: Boolean = false,
+    /** True once the user has explicitly tapped a thumbnail to make it primary - after that,
+     *  automatic re-scoring on analysis results must not override their choice. */
+    val primaryManuallySet: Boolean = false,
+    /** True once an AI-generated suggestion (which may carry extracted spec text) has been
+     *  inserted into the prompt - shown in Technical Details for debugging prompt quality. */
+    val textExtractionUsed: Boolean = false,
     val isAnalyzing: Boolean = false,
     val analysisSuggestion: String? = null,
     val generationState: GenerationState = GenerationState.Idle,
@@ -61,11 +69,13 @@ data class CreateUiState(
             generationState !is GenerationState.Downloading &&
             generationState !is GenerationState.Uploading
 
-    /** Which shape of request this configuration will actually produce. */
+    /** Which shape of request this configuration will actually produce. A single clean image
+     *  always uses SAFE_PRODUCT (IMAGE_TO_VIDEO) regardless of the toggle - CONSISTENCY only
+     *  makes sense once there's more than one usable photo to reference. */
     val requestMode: RequestMode
         get() = when {
             mode == VideoMode.TEXT_TO_VIDEO -> RequestMode.TEXT_TO_VIDEO
-            useMultipleImages && images.any { !it.role.isTextHeavy } -> RequestMode.REFERENCE_IMAGES
+            useMultipleImages && images.count { !it.role.isTextHeavy } > 1 -> RequestMode.REFERENCE_IMAGES
             else -> RequestMode.IMAGE_TO_VIDEO
         }
 
@@ -129,6 +139,16 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     fun setUseMultipleImages(enabled: Boolean) =
         _uiState.update { clampDurationForState(it.copy(useMultipleImages = enabled)) }
 
+    /** Picks the best starting/hero image by role score; ties keep the earliest-uploaded one. */
+    private fun pickBestPrimaryId(images: List<SelectedImage>): String? =
+        images.withIndex().maxByOrNull { (index, img) -> img.role.primaryScore * 1000 - index }?.value?.id
+
+    private fun applyAutoPrimary(state: CreateUiState): CreateUiState {
+        if (state.primaryManuallySet || state.images.isEmpty()) return state
+        val bestId = pickBestPrimaryId(state.images) ?: return state
+        return state.copy(images = state.images.map { it.copy(isPrimary = it.id == bestId) })
+    }
+
     fun addImages(uris: List<Uri>) {
         _uiState.update { state ->
             val existingIds = state.images.map { it.uri }.toSet()
@@ -136,24 +156,34 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 val mime = app.contentResolver.getType(uri) ?: "image/jpeg"
                 SelectedImage(uri = uri, mimeType = mime)
             }
-            var combined = state.images + newOnes
-            if (combined.none { it.isPrimary } && combined.isNotEmpty()) {
-                combined = combined.mapIndexed { index, img -> if (index == 0) img.copy(isPrimary = true) else img }
-            }
-            clampDurationForState(state.copy(images = combined, analysisSuggestion = null))
+            val combined = state.images + newOnes
+            applyAutoPrimary(clampDurationForState(state.copy(images = combined, analysisSuggestion = null)))
+        }
+        // Auto-classify roles as soon as there's more than one photo, so the primary-selection
+        // scoring and reference-image filtering have real data instead of defaulting to upload order.
+        val current = _uiState.value
+        if (current.images.size > 1 && current.images.any { it.role == ImageRole.UNANALYZED } && !current.isAnalyzing) {
+            analyzeImages()
         }
     }
 
     fun removeImage(id: String) = _uiState.update { state ->
-        var remaining = state.images.filterNot { it.id == id }
-        if (remaining.none { it.isPrimary } && remaining.isNotEmpty()) {
-            remaining = remaining.mapIndexed { index, img -> if (index == 0) img.copy(isPrimary = true) else img }
-        }
-        clampDurationForState(state.copy(images = remaining))
+        val remaining = state.images.filterNot { it.id == id }
+        val stillHasManualPrimary = remaining.any { it.isPrimary }
+        applyAutoPrimary(
+            clampDurationForState(
+                state.copy(
+                    images = remaining,
+                    primaryManuallySet = state.primaryManuallySet && stillHasManualPrimary
+                )
+            )
+        )
     }
 
     fun setPrimaryImage(id: String) = _uiState.update { state ->
-        clampDurationForState(state.copy(images = state.images.map { it.copy(isPrimary = it.id == id) }))
+        clampDurationForState(
+            state.copy(images = state.images.map { it.copy(isPrimary = it.id == id) }, primaryManuallySet = true)
+        )
     }
 
     fun dismissSuggestion() = _uiState.update { it.copy(analysisSuggestion = null) }
@@ -161,7 +191,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     fun insertSuggestion() = _uiState.update { state ->
         val suggestion = state.analysisSuggestion ?: return@update state
         val merged = if (state.prompt.isBlank()) suggestion else state.prompt.trimEnd() + "\n\n" + suggestion
-        state.copy(prompt = merged, analysisSuggestion = null)
+        state.copy(prompt = merged, analysisSuggestion = null, textExtractionUsed = true)
     }
 
     /** Calls Gemini vision to classify each photo's role and extract confirmed spec text only. */
@@ -183,10 +213,12 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                         val entry = analysis.entries.find { it.index == idx + 1 } ?: return@mapIndexed img
                         img.copy(role = entry.role, extractedText = entry.extractedText, notes = entry.notes)
                     }
-                    current.copy(
-                        images = updatedImages,
-                        isAnalyzing = false,
-                        analysisSuggestion = analysis.promptEnhancement
+                    applyAutoPrimary(
+                        current.copy(
+                            images = updatedImages,
+                            isAnalyzing = false,
+                            analysisSuggestion = analysis.promptEnhancement
+                        )
                     )
                 }
             }.onFailure {
@@ -219,33 +251,37 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             val requestMode = state.requestMode
-            val technicalContext = buildTechnicalContext(state, requestMode)
+            var technicalContext = buildTechnicalContext(state, requestMode, emptyList(), null)
 
             try {
                 _uiState.update { it.copy(generationState = GenerationState.Uploading, elapsedSeconds = 0) }
 
                 var primaryInline: InlineImage? = null
                 var referenceInline: List<InlineImage> = emptyList()
+                val diagnostics = mutableListOf<Pair<SelectedImage, ImageLoadResult>>()
 
                 when (requestMode) {
                     RequestMode.IMAGE_TO_VIDEO -> {
                         val primary = state.images.firstOrNull { it.isPrimary } ?: state.images.firstOrNull()
                             ?: throw ApiException(null, "Please select a starting image.")
-                        primaryInline = MediaUtils.loadInlineImage(app, primary.uri)
+                        val loaded = MediaUtils.loadInlineImageWithDiagnostics(app, primary.uri)
+                        primaryInline = loaded.inline
+                        diagnostics += primary to loaded
                     }
                     RequestMode.REFERENCE_IMAGES -> {
-                        referenceInline = state.images
-                            .filterNot { it.role.isTextHeavy }
-                            .take(MAX_REFERENCE_IMAGES)
-                            .map { MediaUtils.loadInlineImage(app, it.uri) }
-                        if (referenceInline.isEmpty()) {
+                        val chosen = state.images.filterNot { it.role.isTextHeavy }.take(MAX_REFERENCE_IMAGES)
+                        if (chosen.isEmpty()) {
                             throw ApiException(null, "Please select at least one product image.")
                         }
+                        val loadedList = chosen.map { it to MediaUtils.loadInlineImageWithDiagnostics(app, it.uri) }
+                        referenceInline = loadedList.map { it.second.inline }
+                        diagnostics += loadedList
                     }
                     RequestMode.TEXT_TO_VIDEO -> Unit
                 }
 
-                val finalPrompt = buildFinalPrompt(state.prompt, state.enableTextOverlays)
+                val finalPrompt = buildFinalPrompt(state, requestMode)
+                technicalContext = buildTechnicalContext(state, requestMode, diagnostics, finalPrompt)
 
                 _uiState.update { it.copy(generationState = GenerationState.Submitting) }
 
@@ -326,14 +362,32 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /** Human-readable request context shown in the error card's "Technical details" section. */
-    private fun buildTechnicalContext(state: CreateUiState, requestMode: RequestMode): String {
+    private fun buildTechnicalContext(
+        state: CreateUiState,
+        requestMode: RequestMode,
+        diagnostics: List<Pair<SelectedImage, ImageLoadResult>>,
+        finalPrompt: String?
+    ): String {
         val personGeneration = if (requestMode == RequestMode.TEXT_TO_VIDEO) "allow_all" else "allow_adult"
+        val primaryIndex = state.images.indexOfFirst { it.isPrimary }.let { if (it >= 0) it + 1 else null }
+        val supportingIndexes = if (requestMode == RequestMode.REFERENCE_IMAGES) {
+            state.images.filterNot { it.role.isTextHeavy }
+                .take(MAX_REFERENCE_IMAGES)
+                .map { state.images.indexOf(it) + 1 }
+        } else emptyList()
+
         return buildString {
             appendLine("Model: ${state.model.apiName}")
             appendLine("Mode: ${requestMode.name}")
+            appendLine("Generation mode: ${requestMode.generationStrategyLabel}")
             appendLine("Uploaded images: ${state.images.size}")
             appendLine("Reference images sent: ${state.referenceImageCount}")
             appendLine("Starting image: ${requestMode == RequestMode.IMAGE_TO_VIDEO}")
+            if (requestMode != RequestMode.TEXT_TO_VIDEO) {
+                appendLine("Selected primary image index: ${primaryIndex ?: "n/a"}")
+                appendLine("Supporting image indexes: ${if (supportingIndexes.isEmpty()) "none" else supportingIndexes.joinToString()}")
+                appendLine("Image roles: ${state.images.mapIndexed { i, img -> "${i + 1}=${img.role.name}" }.joinToString()}")
+            }
             appendLine("Aspect ratio: ${state.aspectRatio.apiValue}")
             appendLine("Resolution: ${state.resolution.apiValue}")
             appendLine("Duration: ${state.duration.seconds}")
@@ -345,16 +399,78 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 appendLine("MIME type: ${state.images.firstOrNull()?.mimeType ?: "n/a"}")
             }
             appendLine("Using Gemini Content inlineData: false")
-            append("numberOfVideos present: false")
+            appendLine("numberOfVideos present: false")
+            appendLine("Product lock: ON")
+            appendLine("Text extraction influenced prompt: ${if (state.textExtractionUsed) "yes" else "no"}")
+            if (diagnostics.isNotEmpty()) {
+                appendLine("Image diagnostics:")
+                diagnostics.forEachIndexed { i, (img, d) ->
+                    val idx = state.images.indexOf(img) + 1
+                    appendLine(
+                        " - img$idx (${img.role.name}): ${d.originalWidth}x${d.originalHeight} " +
+                            "(${d.originalBytes / 1024}KB) -> ${d.transmittedWidth}x${d.transmittedHeight} " +
+                            "(${d.transmittedBytes / 1024}KB) resized=${d.resizeApplied} compressed=${d.compressionApplied}"
+                    )
+                }
+            }
+            if (finalPrompt != null) {
+                appendLine("Final generated prompt:")
+                append(finalPrompt)
+            } else {
+                append("Final generated prompt: (not yet built)")
+            }
         }
     }
 
-    private fun buildFinalPrompt(userPrompt: String, overlaysEnabled: Boolean): String {
-        val guard = if (!overlaysEnabled) {
-            "\n\nDo not render any on-screen text, captions, labels, price tags, banners, or logos " +
-                "in the video unless they are physically part of the product packaging already visible " +
-                "in the reference images."
-        } else ""
-        return userPrompt.trim() + guard
+    /**
+     * Builds the prompt as four blocks: a hard product-fidelity constraint (always on for
+     * image-based modes - this is "STRICT PRODUCT LOCK"), a neutral scene framing, the user's
+     * own description, action guidance that only mentions an open/interior reveal when an
+     * open-state reference photo actually exists, and finally the text-overlay guard.
+     */
+    private fun buildFinalPrompt(state: CreateUiState, requestMode: RequestMode): String {
+        val sections = mutableListOf<String>()
+
+        if (requestMode != RequestMode.TEXT_TO_VIDEO) {
+            sections += STRICT_PRODUCT_LOCK_BLOCK
+        }
+        sections += SCENE_BLOCK
+
+        if (state.prompt.isNotBlank()) sections += state.prompt.trim()
+
+        if (requestMode != RequestMode.TEXT_TO_VIDEO) {
+            val hasOpenState = state.images.any { it.role == ImageRole.OPEN_CLOSED_STATE }
+            sections += if (hasOpenState) {
+                "If the product is shown closed in the reference image, you may show it opening " +
+                    "naturally and reveal the interior exactly as visible in the reference images."
+            } else {
+                "Do not show or invent an internal or open state that is not visible in the " +
+                    "reference images. Keep the product in the state shown and focus on cinematic " +
+                    "exterior product shots."
+            }
+        }
+
+        if (!state.enableTextOverlays) {
+            sections += "Do not render any on-screen text, captions, labels, price tags, banners, " +
+                "or logos in the video unless they are physically part of the product packaging " +
+                "already visible in the reference images."
+        }
+
+        return sections.joinToString("\n\n")
+    }
+
+    private companion object {
+        const val STRICT_PRODUCT_LOCK_BLOCK =
+            "Strict product fidelity required. The generated video must depict the exact same " +
+                "product as shown in the reference image(s), used as the ground-truth visual " +
+                "reference. Preserve exact shape, proportions, color, materials, handles, hinges, " +
+                "buttons, openings, cavities, compartments, controls, accessories and surface finish. " +
+                "Do not redesign, reinterpret, or restyle the product. Do not add or remove parts. " +
+                "Do not change its geometry or morph it between frames. Do not invent features that " +
+                "are not visible in the reference images."
+
+        const val SCENE_BLOCK =
+            "Create a realistic product advertisement video. Show the product clearly and " +
+                "naturally with clean lighting and realistic motion, modern e-commerce style."
     }
 }
