@@ -500,34 +500,39 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun cameraOnlySceneBlock(aspectRatioLabel: String, durationSeconds: Int): String {
-        val timeline = if (durationSeconds == 8) {
-            "\n\n0-3 sec: Exact product from the reference image. Slow cinematic push-in.\n" +
-                "3-6 sec: Very subtle camera move around the same product. Keep product geometry unchanged.\n" +
-                "6-8 sec: Clean close-up hero shot of the same product."
-        } else {
-            "\n\nUse a slow cinematic push-in, a very subtle camera move around the same product " +
-                "keeping its geometry unchanged, and end on a clean close-up hero shot of the same product."
-        }
-        return "Create a $durationSeconds-second vertical $aspectRatioLabel commercial product video. " +
-            "Only the CAMERA, LIGHTING and BACKGROUND may change.$timeline"
+        return "Create a $durationSeconds-second vertical $aspectRatioLabel commercial product shot. " +
+            "Keep the exact same camera angle as the uploaded image for the entire video - do not " +
+            "rotate, orbit, or reveal any side of the product not visible in the reference image. " +
+            "Only perform a very slow digital zoom-in, subtle lighting enhancement, soft realistic " +
+            "shadow changes, and slight background depth-of-field. The product itself must remain " +
+            "unchanged from the first frame to the last frame of the video - the last frame must show " +
+            "the exact same product as the first frame."
     }
 
     private companion object {
+        // Deliberately generic ("the product", not any specific item's features) - this block runs
+        // for every upload, so it must never assert appliance-specific details like colors or trim
+        // that would be wrong for a different product. Product-specific details belong in the
+        // user's own prompt text or in AI-extracted analysis, not in this constant.
         const val CAMERA_ONLY_PRODUCT_LOCK_BLOCK =
-            "Strict product fidelity required. Use the uploaded image as the exact visual source " +
-                "of truth. The product must remain the exact same physical object throughout the " +
-                "entire video. Preserve its exact silhouette, proportions, body shape, lid shape, " +
-                "handle shape and position, colors, materials, hinge placement, visible controls and " +
-                "visible surface details. Do not redesign, reinterpret, modernize or improve the " +
-                "product. Do not add parts. Do not remove parts. Do not change geometry. Do not morph " +
-                "the product. Do not invent any feature that is not clearly visible in the reference image."
+            "ABSOLUTE PRODUCT IDENTITY LOCK. The uploaded image is the exact visual master. Do not " +
+                "recreate, reinterpret, or generate a new version of the product. The exact pixels " +
+                "and visible geometry of the product must remain consistent throughout the entire " +
+                "video. Preserve exactly the original silhouette, proportions, body shape, lid or top " +
+                "shape, handle shape, size and position, colors, materials, hinge placement, visible " +
+                "controls, feet, contours and all visible surface details. Do not redesign, " +
+                "reinterpret, modernize or improve the product. Do not add parts. Do not remove parts. " +
+                "Do not change geometry. Do not morph the product. Do not invent any feature that is " +
+                "not clearly visible in the reference image."
 
         const val CAMERA_ONLY_RESTRICTIONS_BLOCK =
-            "Photorealistic. Natural lighting. Clean e-commerce advertising style. Do not open the " +
-                "product, invent an interior, show the product operating, generate food, invent " +
-                "accessories, or add buttons, lights or handles that are not in the reference image. " +
-                "No opening animation. No invented interior. No additional accessories. " +
-                "PRODUCT ACCURACY HAS PRIORITY OVER CREATIVITY."
+            "Photorealistic. Natural lighting. Clean e-commerce advertising style. FORBIDDEN: no " +
+                "larger or differently shaped handle, no indicator lights, no buttons or controls not " +
+                "in the reference image, no thicker or reshaped housing, no additional trim, seams, " +
+                "or vents, no geometry reconstruction, no alternate product design, no rotation, no " +
+                "orbit camera movement, no generating an unseen side of the product, no opening " +
+                "animation, no invented interior, no additional accessories, no morphing between " +
+                "frames, no food. ACCURACY OVER CREATIVITY."
 
         const val STRICT_PRODUCT_LOCK_BLOCK =
             "Strict product fidelity required. The generated video must depict the exact same " +
