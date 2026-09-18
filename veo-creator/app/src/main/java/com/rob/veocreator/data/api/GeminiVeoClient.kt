@@ -123,7 +123,9 @@ class GeminiVeoClient {
             // rather than sending numberOfVideos/sampleCount/candidateCount with a default value.
             val parameters = JSONObject().apply {
                 put("aspectRatio", aspectRatio.apiValue)
-                put("durationSeconds", effectiveDuration.apiValue)
+                // Must be a JSON number, not a quoted string - the API rejects
+                // "durationSeconds": "8" with 400 "needs to be a number."
+                put("durationSeconds", effectiveDuration.seconds)
                 put("resolution", resolution.apiValue)
                 put("personGeneration", personGeneration)
             }
