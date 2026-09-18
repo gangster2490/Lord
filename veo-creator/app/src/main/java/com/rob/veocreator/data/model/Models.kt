@@ -44,17 +44,26 @@ enum class Resolution(val apiValue: String, val label: String) {
     R4K("4k", "4K")
 }
 
-/** Only 720p supports the shorter 4s/6s durations; 1080p and 4k require the full 8s. */
+/**
+ * Only 720p supports the shorter 4s/6s durations; 1080p and 4k require the full 8s.
+ * Requests that include referenceImages are also restricted to 8s regardless of resolution,
+ * per https://ai.google.dev/gemini-api/docs/veo ("8 seconds only if ... using reference images").
+ */
 object ModelCapabilities {
     fun allowedResolutions(model: VeoModel): List<Resolution> = model.supportedResolutions
 
-    fun allowedDurations(resolution: Resolution): List<Duration> =
-        if (resolution == Resolution.R720P) listOf(Duration.D4, Duration.D6, Duration.D8)
+    fun allowedDurations(resolution: Resolution, usesReferenceImages: Boolean = false): List<Duration> =
+        if (resolution == Resolution.R720P && !usesReferenceImages) listOf(Duration.D4, Duration.D6, Duration.D8)
         else listOf(Duration.D8)
 
-    fun isCombinationValid(model: VeoModel, resolution: Resolution, duration: Duration): Boolean {
+    fun isCombinationValid(
+        model: VeoModel,
+        resolution: Resolution,
+        duration: Duration,
+        usesReferenceImages: Boolean = false
+    ): Boolean {
         if (resolution !in allowedResolutions(model)) return false
-        return duration in allowedDurations(resolution)
+        return duration in allowedDurations(resolution, usesReferenceImages)
     }
 }
 
@@ -104,8 +113,12 @@ sealed class GenerationState {
     data class Generating(val operationName: String) : GenerationState()
     data object Downloading : GenerationState()
     data class Completed(val videoFilePath: String) : GenerationState()
-    data class Error(val message: String) : GenerationState()
+    data class Error(val message: String, val technicalDetails: String? = null) : GenerationState()
     data object Cancelled : GenerationState()
 }
 
-class ApiException(val httpCode: Int?, message: String) : Exception(message)
+class ApiException(
+    val httpCode: Int?,
+    message: String,
+    val technicalDetails: String? = null
+) : Exception(message)

@@ -1,6 +1,7 @@
 package com.rob.veocreator.data.api
 
 import android.util.Base64
+import android.util.Log
 import com.rob.veocreator.data.model.ApiException
 import com.rob.veocreator.data.model.AspectRatio
 import com.rob.veocreator.data.model.Duration
@@ -101,11 +102,27 @@ class GeminiVeoClient {
                 }
             }
 
+            // durationSeconds must be 8 whenever reference images or a resolution above 720p is
+            // used - see https://ai.google.dev/gemini-api/docs/veo. The UI already enforces this,
+            // this is just a last-line-of-defense guard against sending an invalid combination.
+            val effectiveDuration = if (referenceImages.isNotEmpty() || resolution != Resolution.R720P) {
+                Duration.D8
+            } else duration
+
             val parameters = JSONObject().apply {
                 put("aspectRatio", aspectRatio.apiValue)
-                put("durationSeconds", duration.apiValue)
+                put("durationSeconds", effectiveDuration.apiValue)
                 put("resolution", resolution.apiValue)
-                put("personGeneration", if (primaryImage != null) "allow_adult" else "allow_all")
+                // personGeneration="allow_adult" is documented as required for image-to-video,
+                // but the live Veo 3.1 preview API currently rejects that exact value with a 400
+                // "unsupported" error (see https://discuss.ai.google.dev - "Veo 3.1 image-to-video
+                // rejects documented personGeneration=allow_adult"). Only send it for pure
+                // text-to-video, where "allow_all" is confirmed working, and omit it entirely for
+                // image-based requests so the API falls back to its own default instead of us
+                // sending a value it currently refuses.
+                if (primaryImage == null && referenceImages.isEmpty()) {
+                    put("personGeneration", "allow_all")
+                }
                 put("numberOfVideos", 1)
             }
 
@@ -113,6 +130,11 @@ class GeminiVeoClient {
                 put("instances", JSONArray().put(instance))
                 put("parameters", parameters)
             }
+
+            Log.d(TAG, "submitGeneration model=${model.apiName} aspectRatio=${aspectRatio.apiValue} " +
+                "duration=${effectiveDuration.apiValue} resolution=${resolution.apiValue} " +
+                "images=${(if (primaryImage != null) 1 else 0) + referenceImages.size} " +
+                "referenceImages=${referenceImages.size}")
 
             val request = Request.Builder()
                 .url("$BASE_URL/models/${model.apiName}:predictLongRunning")
@@ -122,6 +144,7 @@ class GeminiVeoClient {
 
             client.newCall(request).execute().use { response ->
                 val bodyStr = response.body?.string()
+                Log.d(TAG, "submitGeneration response httpCode=${response.code}")
                 if (!response.isSuccessful) throw mapHttpError(response.code, bodyStr)
                 val json = JSONObject(bodyStr ?: "{}")
                 json.optString("name").takeIf { it.isNotBlank() }
@@ -141,6 +164,7 @@ class GeminiVeoClient {
 
                 client.newCall(request).execute().use { response ->
                     val bodyStr = response.body?.string()
+                    Log.d(TAG, "pollOperation httpCode=${response.code}")
                     if (!response.isSuccessful) throw mapHttpError(response.code, bodyStr)
                     val json = JSONObject(bodyStr ?: "{}")
                     val done = json.optBoolean("done", false)
@@ -283,6 +307,8 @@ class GeminiVeoClient {
 
     private fun describeOperationError(error: JSONObject): String {
         val message = error.optString("message", "Generation failed.")
+        val code = error.optInt("code", -1)
+        Log.w(TAG, "operation error code=$code message=$message")
         return when {
             message.contains("safety", ignoreCase = true) ||
                 message.contains("blocked", ignoreCase = true) ||
@@ -293,9 +319,12 @@ class GeminiVeoClient {
     }
 
     private fun mapHttpError(code: Int, body: String?): ApiException {
-        val serverMessage = body?.let {
-            runCatching { JSONObject(it).optJSONObject("error")?.optString("message") }.getOrNull()
-        }
+        val errorJson = body?.let { runCatching { JSONObject(it).optJSONObject("error") }.getOrNull() }
+        val serverMessage = errorJson?.optString("message")?.takeIf { it.isNotBlank() }
+        val serverStatus = errorJson?.optString("status")?.takeIf { it.isNotBlank() }
+
+        Log.w(TAG, "API error httpCode=$code status=$serverStatus message=$serverMessage")
+
         val message = when (code) {
             401 -> "Invalid Gemini API key. Please check it in Settings."
             403 -> "This API key doesn't have permission to use the Veo video generation API."
@@ -304,10 +333,14 @@ class GeminiVeoClient {
             in 500..599 -> "Google's server had a problem. Please try again shortly."
             else -> serverMessage ?: "Request failed (HTTP $code)."
         }
-        return ApiException(code, message)
+        val technicalDetails = "HTTP $code" +
+            (serverStatus?.let { " · $it" } ?: "") +
+            (serverMessage?.let { " · $it" } ?: "")
+        return ApiException(code, message, technicalDetails)
     }
 
     companion object {
+        private const val TAG = "VeoCreatorAPI"
         private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
         private const val VISION_MODEL = "gemini-2.5-flash"
 

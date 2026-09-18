@@ -56,6 +56,19 @@ data class CreateUiState(
             generationState !is GenerationState.Generating &&
             generationState !is GenerationState.Downloading &&
             generationState !is GenerationState.Uploading
+
+    /** How many of the uploaded photos would actually be sent as Veo referenceImages. */
+    val referenceImageCount: Int
+        get() {
+            if (mode != VideoMode.IMAGE_TO_VIDEO) return 0
+            val primary = images.firstOrNull { it.isPrimary } ?: return 0
+            return images.filterNot { it.id == primary.id }
+                .filterNot { it.role.isTextHeavy }
+                .take(MAX_REFERENCE_IMAGES)
+                .size
+        }
+
+    val usesReferenceImages: Boolean get() = referenceImageCount > 0
 }
 
 class CreateViewModel(application: Application) : AndroidViewModel(application) {
@@ -73,7 +86,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(hasApiKey = apiKeyStore.hasApiKey()) }
     }
 
-    fun setMode(mode: VideoMode) = _uiState.update { it.copy(mode = mode) }
+    fun setMode(mode: VideoMode) = _uiState.update { clampDurationForState(it.copy(mode = mode)) }
 
     fun setPrompt(text: String) = _uiState.update { it.copy(prompt = text) }
 
@@ -82,7 +95,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     fun setModel(model: VeoModel) = _uiState.update { state ->
         val allowedRes = ModelCapabilities.allowedResolutions(model)
         val resolution = if (state.resolution in allowedRes) state.resolution else allowedRes.first()
-        val allowedDur = ModelCapabilities.allowedDurations(resolution)
+        val allowedDur = ModelCapabilities.allowedDurations(resolution, state.usesReferenceImages)
         val duration = if (state.duration in allowedDur) state.duration else allowedDur.last()
         state.copy(model = model, resolution = resolution, duration = duration)
     }
@@ -90,12 +103,19 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     fun setAspectRatio(ratio: AspectRatio) = _uiState.update { it.copy(aspectRatio = ratio) }
 
     fun setResolution(resolution: Resolution) = _uiState.update { state ->
-        val allowedDur = ModelCapabilities.allowedDurations(resolution)
+        val allowedDur = ModelCapabilities.allowedDurations(resolution, state.usesReferenceImages)
         val duration = if (state.duration in allowedDur) state.duration else allowedDur.last()
         state.copy(resolution = resolution, duration = duration)
     }
 
     fun setDuration(duration: Duration) = _uiState.update { it.copy(duration = duration) }
+
+    /** Re-clamps duration to what's still allowed after the image set (and therefore
+     *  referenceImageCount) changes - e.g. adding a 2nd/3rd image forces 8s. */
+    private fun clampDurationForState(state: CreateUiState): CreateUiState {
+        val allowedDur = ModelCapabilities.allowedDurations(state.resolution, state.usesReferenceImages)
+        return if (state.duration in allowedDur) state else state.copy(duration = allowedDur.last())
+    }
 
     fun setTextOverlaysEnabled(enabled: Boolean) = _uiState.update { it.copy(enableTextOverlays = enabled) }
 
@@ -110,7 +130,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             if (combined.none { it.isPrimary } && combined.isNotEmpty()) {
                 combined = combined.mapIndexed { index, img -> if (index == 0) img.copy(isPrimary = true) else img }
             }
-            state.copy(images = combined, analysisSuggestion = null)
+            clampDurationForState(state.copy(images = combined, analysisSuggestion = null))
         }
     }
 
@@ -119,11 +139,11 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         if (remaining.none { it.isPrimary } && remaining.isNotEmpty()) {
             remaining = remaining.mapIndexed { index, img -> if (index == 0) img.copy(isPrimary = true) else img }
         }
-        state.copy(images = remaining)
+        clampDurationForState(state.copy(images = remaining))
     }
 
     fun setPrimaryImage(id: String) = _uiState.update { state ->
-        state.copy(images = state.images.map { it.copy(isPrimary = it.id == id) })
+        clampDurationForState(state.copy(images = state.images.map { it.copy(isPrimary = it.id == id) }))
     }
 
     fun dismissSuggestion() = _uiState.update { it.copy(analysisSuggestion = null) }
@@ -265,7 +285,9 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                     it.copy(generationState = GenerationState.Error("Network unavailable. Check your connection and try again."))
                 }
             } catch (api: ApiException) {
-                _uiState.update { it.copy(generationState = GenerationState.Error(api.message ?: "Generation failed.")) }
+                _uiState.update {
+                    it.copy(generationState = GenerationState.Error(api.message ?: "Generation failed.", api.technicalDetails))
+                }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _uiState.update { it.copy(generationState = GenerationState.Error(e.message ?: "Unexpected error.")) }

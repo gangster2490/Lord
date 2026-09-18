@@ -187,7 +187,7 @@ fun CreateScreen(
         )
 
         SectionLabel("Duration")
-        val allowedDur = ModelCapabilities.allowedDurations(state.resolution)
+        val allowedDur = ModelCapabilities.allowedDurations(state.resolution, state.usesReferenceImages)
         ChipRow(
             Duration.entries.toList(),
             state.duration,
@@ -195,6 +195,13 @@ fun CreateScreen(
             viewModel::setDuration,
             enabledPredicate = { it in allowedDur }
         )
+        if (state.usesReferenceImages) {
+            Text(
+                "Locked to 8s: using ${state.referenceImageCount} reference image(s) for product consistency.",
+                style = MaterialTheme.typography.labelMedium,
+                color = VeoTextSecondary
+            )
+        }
 
         Button(
             onClick = viewModel::generate,
@@ -505,6 +512,7 @@ private fun GenerationStatusSection(
             }
         }
         is GenerationState.Error -> {
+            var detailsExpanded by remember(state) { mutableStateOf(false) }
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
                 shape = RoundedCornerShape(16.dp)
@@ -512,6 +520,19 @@ private fun GenerationStatusSection(
                 Column(Modifier.padding(16.dp)) {
                     Text("Error", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                     Text(state.message, style = MaterialTheme.typography.bodyMedium)
+                    if (!state.technicalDetails.isNullOrBlank()) {
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = { detailsExpanded = !detailsExpanded }) {
+                            Text(if (detailsExpanded) "Hide technical details" else "Technical details")
+                        }
+                        if (detailsExpanded) {
+                            Text(
+                                state.technicalDetails,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = VeoTextSecondary
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                     TextButton(onClick = onReset) { Text("Dismiss") }
                 }
