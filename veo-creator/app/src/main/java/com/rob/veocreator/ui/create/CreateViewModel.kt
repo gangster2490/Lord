@@ -1,0 +1,286 @@
+package com.rob.veocreator.ui.create
+
+import android.app.Application
+import android.net.Uri
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.rob.veocreator.VeoCreatorApp
+import com.rob.veocreator.data.api.InlineImage
+import com.rob.veocreator.data.api.OperationResult
+import com.rob.veocreator.data.db.HistoryEntity
+import com.rob.veocreator.data.model.ApiException
+import com.rob.veocreator.data.model.AspectRatio
+import com.rob.veocreator.data.model.Duration
+import com.rob.veocreator.data.model.GenerationState
+import com.rob.veocreator.data.model.ImageRole
+import com.rob.veocreator.data.model.ModelCapabilities
+import com.rob.veocreator.data.model.Resolution
+import com.rob.veocreator.data.model.SelectedImage
+import com.rob.veocreator.data.model.VeoModel
+import com.rob.veocreator.data.model.VideoMode
+import com.rob.veocreator.util.MediaUtils
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import java.io.IOException
+
+private const val MAX_ANALYSIS_IMAGES = 8
+private const val MAX_REFERENCE_IMAGES = 3
+private const val POLL_INTERVAL_MS = 10_000L
+private const val MAX_POLL_MINUTES = 10
+
+data class CreateUiState(
+    val mode: VideoMode = VideoMode.IMAGE_TO_VIDEO,
+    val prompt: String = "",
+    val model: VeoModel = VeoModel.VEO_3_1,
+    val aspectRatio: AspectRatio = AspectRatio.PORTRAIT_9_16,
+    val resolution: Resolution = Resolution.R720P,
+    val duration: Duration = Duration.D8,
+    val images: List<SelectedImage> = emptyList(),
+    val enableTextOverlays: Boolean = false,
+    val isAnalyzing: Boolean = false,
+    val analysisSuggestion: String? = null,
+    val generationState: GenerationState = GenerationState.Idle,
+    val elapsedSeconds: Int = 0,
+    val hasApiKey: Boolean = false
+) {
+    val canGenerate: Boolean
+        get() = hasApiKey && prompt.isNotBlank() &&
+            (mode == VideoMode.TEXT_TO_VIDEO || images.any { it.isPrimary }) &&
+            generationState !is GenerationState.Submitting &&
+            generationState !is GenerationState.Generating &&
+            generationState !is GenerationState.Downloading &&
+            generationState !is GenerationState.Uploading
+}
+
+class CreateViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val app get() = getApplication<VeoCreatorApp>()
+    private val client get() = app.veoClient
+    private val apiKeyStore get() = app.apiKeyStore
+
+    private val _uiState = MutableStateFlow(CreateUiState())
+    val uiState: StateFlow<CreateUiState> = _uiState.asStateFlow()
+
+    private var generationJob: Job? = null
+
+    fun refreshApiKeyState() {
+        _uiState.update { it.copy(hasApiKey = apiKeyStore.hasApiKey()) }
+    }
+
+    fun setMode(mode: VideoMode) = _uiState.update { it.copy(mode = mode) }
+
+    fun setPrompt(text: String) = _uiState.update { it.copy(prompt = text) }
+
+    fun clearPrompt() = _uiState.update { it.copy(prompt = "") }
+
+    fun setModel(model: VeoModel) = _uiState.update { state ->
+        val allowedRes = ModelCapabilities.allowedResolutions(model)
+        val resolution = if (state.resolution in allowedRes) state.resolution else allowedRes.first()
+        val allowedDur = ModelCapabilities.allowedDurations(resolution)
+        val duration = if (state.duration in allowedDur) state.duration else allowedDur.last()
+        state.copy(model = model, resolution = resolution, duration = duration)
+    }
+
+    fun setAspectRatio(ratio: AspectRatio) = _uiState.update { it.copy(aspectRatio = ratio) }
+
+    fun setResolution(resolution: Resolution) = _uiState.update { state ->
+        val allowedDur = ModelCapabilities.allowedDurations(resolution)
+        val duration = if (state.duration in allowedDur) state.duration else allowedDur.last()
+        state.copy(resolution = resolution, duration = duration)
+    }
+
+    fun setDuration(duration: Duration) = _uiState.update { it.copy(duration = duration) }
+
+    fun setTextOverlaysEnabled(enabled: Boolean) = _uiState.update { it.copy(enableTextOverlays = enabled) }
+
+    fun addImages(uris: List<Uri>) {
+        _uiState.update { state ->
+            val existingIds = state.images.map { it.uri }.toSet()
+            val newOnes = uris.filterNot { it in existingIds }.map { uri ->
+                val mime = app.contentResolver.getType(uri) ?: "image/jpeg"
+                SelectedImage(uri = uri, mimeType = mime)
+            }
+            var combined = state.images + newOnes
+            if (combined.none { it.isPrimary } && combined.isNotEmpty()) {
+                combined = combined.mapIndexed { index, img -> if (index == 0) img.copy(isPrimary = true) else img }
+            }
+            state.copy(images = combined, analysisSuggestion = null)
+        }
+    }
+
+    fun removeImage(id: String) = _uiState.update { state ->
+        var remaining = state.images.filterNot { it.id == id }
+        if (remaining.none { it.isPrimary } && remaining.isNotEmpty()) {
+            remaining = remaining.mapIndexed { index, img -> if (index == 0) img.copy(isPrimary = true) else img }
+        }
+        state.copy(images = remaining)
+    }
+
+    fun setPrimaryImage(id: String) = _uiState.update { state ->
+        state.copy(images = state.images.map { it.copy(isPrimary = it.id == id) })
+    }
+
+    fun dismissSuggestion() = _uiState.update { it.copy(analysisSuggestion = null) }
+
+    fun insertSuggestion() = _uiState.update { state ->
+        val suggestion = state.analysisSuggestion ?: return@update state
+        val merged = if (state.prompt.isBlank()) suggestion else state.prompt.trimEnd() + "\n\n" + suggestion
+        state.copy(prompt = merged, analysisSuggestion = null)
+    }
+
+    /** Calls Gemini vision to classify each photo's role and extract confirmed spec text only. */
+    fun analyzeImages() {
+        val state = _uiState.value
+        val apiKey = apiKeyStore.getApiKey() ?: return
+        if (state.images.isEmpty() || state.isAnalyzing) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAnalyzing = true) }
+            val imagesToAnalyze = state.images.take(MAX_ANALYSIS_IMAGES)
+            val inline = imagesToAnalyze.map { MediaUtils.loadInlineImage(app, it.uri) }
+
+            val result = client.analyzeImages(apiKey, inline, state.prompt)
+            result.onSuccess { analysis ->
+                _uiState.update { current ->
+                    val updatedImages = current.images.mapIndexed { idx, img ->
+                        if (idx >= imagesToAnalyze.size) return@mapIndexed img
+                        val entry = analysis.entries.find { it.index == idx + 1 } ?: return@mapIndexed img
+                        img.copy(role = entry.role, extractedText = entry.extractedText, notes = entry.notes)
+                    }
+                    current.copy(
+                        images = updatedImages,
+                        isAnalyzing = false,
+                        analysisSuggestion = analysis.promptEnhancement
+                    )
+                }
+            }.onFailure {
+                _uiState.update { it.copy(isAnalyzing = false) }
+            }
+        }
+    }
+
+    fun cancelGeneration() {
+        generationJob?.cancel()
+        generationJob = null
+        _uiState.update { it.copy(generationState = GenerationState.Cancelled) }
+    }
+
+    fun resetToIdle() = _uiState.update { it.copy(generationState = GenerationState.Idle, elapsedSeconds = 0) }
+
+    fun generate() {
+        val state = _uiState.value
+        if (!state.canGenerate) return
+        val apiKey = apiKeyStore.getApiKey() ?: return
+
+        generationJob = viewModelScope.launch {
+            val elapsedJob = launch {
+                var seconds = 0
+                while (isActive) {
+                    delay(1000)
+                    seconds += 1
+                    _uiState.update { it.copy(elapsedSeconds = seconds) }
+                }
+            }
+
+            try {
+                _uiState.update { it.copy(generationState = GenerationState.Uploading, elapsedSeconds = 0) }
+
+                var primaryInline: InlineImage? = null
+                var referenceInline: List<InlineImage> = emptyList()
+
+                if (state.mode == VideoMode.IMAGE_TO_VIDEO) {
+                    val primary = state.images.firstOrNull { it.isPrimary }
+                        ?: throw ApiException(null, "Please select a starting image.")
+                    primaryInline = MediaUtils.loadInlineImage(app, primary.uri)
+
+                    referenceInline = state.images
+                        .filterNot { it.id == primary.id }
+                        .filterNot { it.role.isTextHeavy }
+                        .take(MAX_REFERENCE_IMAGES)
+                        .map { MediaUtils.loadInlineImage(app, it.uri) }
+                }
+
+                val finalPrompt = buildFinalPrompt(state.prompt, state.enableTextOverlays)
+
+                _uiState.update { it.copy(generationState = GenerationState.Submitting) }
+
+                val operationName = client.submitGeneration(
+                    apiKey = apiKey,
+                    model = state.model,
+                    prompt = finalPrompt,
+                    primaryImage = primaryInline,
+                    referenceImages = referenceInline,
+                    aspectRatio = state.aspectRatio,
+                    duration = state.duration,
+                    resolution = state.resolution
+                ).getOrThrow()
+
+                _uiState.update { it.copy(generationState = GenerationState.Generating(operationName)) }
+
+                val deadline = System.currentTimeMillis() + MAX_POLL_MINUTES * 60_000L
+                var videoUri: String? = null
+                while (isActive && videoUri == null) {
+                    if (System.currentTimeMillis() > deadline) {
+                        throw ApiException(null, "Generation timed out after $MAX_POLL_MINUTES minutes.")
+                    }
+                    delay(POLL_INTERVAL_MS)
+                    when (val result = client.pollOperation(apiKey, operationName).getOrThrow()) {
+                        is OperationResult.Pending -> Unit
+                        is OperationResult.Done -> videoUri = result.videoUri
+                        is OperationResult.Failed -> throw ApiException(null, result.message)
+                    }
+                }
+
+                val finalUri = videoUri ?: return@launch
+                _uiState.update { it.copy(generationState = GenerationState.Downloading) }
+
+                val destination = MediaUtils.newVideoCacheFile(app)
+                client.downloadVideo(apiKey, finalUri, destination).getOrThrow()
+
+                app.database.historyDao().insert(
+                    HistoryEntity(
+                        prompt = state.prompt,
+                        createdAtMillis = System.currentTimeMillis(),
+                        model = state.model.displayName,
+                        aspectRatio = state.aspectRatio.label,
+                        durationSeconds = state.duration.seconds,
+                        resolution = state.resolution.label,
+                        mode = state.mode.name,
+                        filePath = destination.absolutePath,
+                        thumbnailPath = null
+                    )
+                )
+                val count = app.database.historyDao().count()
+                if (count > 100) app.database.historyDao().trimOldest(count - 100)
+
+                _uiState.update { it.copy(generationState = GenerationState.Completed(destination.absolutePath)) }
+            } catch (io: IOException) {
+                _uiState.update {
+                    it.copy(generationState = GenerationState.Error("Network unavailable. Check your connection and try again."))
+                }
+            } catch (api: ApiException) {
+                _uiState.update { it.copy(generationState = GenerationState.Error(api.message ?: "Generation failed.")) }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _uiState.update { it.copy(generationState = GenerationState.Error(e.message ?: "Unexpected error.")) }
+            } finally {
+                elapsedJob.cancel()
+            }
+        }
+    }
+
+    private fun buildFinalPrompt(userPrompt: String, overlaysEnabled: Boolean): String {
+        val guard = if (!overlaysEnabled) {
+            "\n\nDo not render any on-screen text, captions, labels, price tags, banners, or logos " +
+                "in the video unless they are physically part of the product packaging already visible " +
+                "in the reference images."
+        } else ""
+        return userPrompt.trim() + guard
+    }
+}
