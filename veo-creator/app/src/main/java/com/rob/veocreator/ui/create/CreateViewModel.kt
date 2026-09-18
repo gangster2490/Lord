@@ -14,6 +14,7 @@ import com.rob.veocreator.data.model.Duration
 import com.rob.veocreator.data.model.GenerationState
 import com.rob.veocreator.data.model.ImageRole
 import com.rob.veocreator.data.model.ModelCapabilities
+import com.rob.veocreator.data.model.ModelChoice
 import com.rob.veocreator.data.model.RequestMode
 import com.rob.veocreator.data.model.Resolution
 import com.rob.veocreator.data.model.SelectedImage
@@ -40,7 +41,7 @@ private const val MAX_POLL_MINUTES = 10
 data class CreateUiState(
     val mode: VideoMode = VideoMode.IMAGE_TO_VIDEO,
     val prompt: String = "",
-    val model: VeoModel = VeoModel.VEO_3_1,
+    val modelChoice: ModelChoice = ModelChoice.AUTO_CHEAPEST,
     val aspectRatio: AspectRatio = AspectRatio.PORTRAIT_9_16,
     val resolution: Resolution = Resolution.R720P,
     val duration: Duration = Duration.D8,
@@ -86,6 +87,20 @@ data class CreateUiState(
         } else 0
 
     val usesReferenceImages: Boolean get() = requestMode == RequestMode.REFERENCE_IMAGES
+
+    /** The concrete Veo model actually used - resolved from [modelChoice] + [resolution]. */
+    val effectiveModel: VeoModel get() = modelChoice.resolve(resolution)
+
+    val estimatedCostUsd: Double? get() = effectiveModel.estimatedCost(resolution, duration)
+
+    /** Non-null only when AUTO didn't land on the cheapest model of all (Lite), so the UI can
+     *  explain why a pricier model was required instead of leaving the user guessing. */
+    val costExplanation: String?
+        get() {
+            if (modelChoice != ModelChoice.AUTO_CHEAPEST) return null
+            if (effectiveModel == VeoModel.VEO_3_1_LITE) return null
+            return "Veo 3.1 Lite doesn't support ${resolution.label} - using ${effectiveModel.displayName} instead."
+        }
 }
 
 class CreateViewModel(application: Application) : AndroidViewModel(application) {
@@ -109,12 +124,12 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
     fun clearPrompt() = _uiState.update { it.copy(prompt = "") }
 
-    fun setModel(model: VeoModel) = _uiState.update { state ->
-        val allowedRes = ModelCapabilities.allowedResolutions(model)
+    fun setModelChoice(choice: ModelChoice) = _uiState.update { state ->
+        val allowedRes = choice.allowedResolutions()
         val resolution = if (state.resolution in allowedRes) state.resolution else allowedRes.first()
         val allowedDur = ModelCapabilities.allowedDurations(resolution, state.usesReferenceImages)
         val duration = if (state.duration in allowedDur) state.duration else allowedDur.last()
-        state.copy(model = model, resolution = resolution, duration = duration)
+        state.copy(modelChoice = choice, resolution = resolution, duration = duration)
     }
 
     fun setAspectRatio(ratio: AspectRatio) = _uiState.update { it.copy(aspectRatio = ratio) }
@@ -287,7 +302,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
                 val operationName = client.submitGeneration(
                     apiKey = apiKey,
-                    model = state.model,
+                    model = state.effectiveModel,
                     prompt = finalPrompt,
                     requestMode = requestMode,
                     primaryImage = primaryInline,
@@ -323,7 +338,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                     HistoryEntity(
                         prompt = state.prompt,
                         createdAtMillis = System.currentTimeMillis(),
-                        model = state.model.displayName,
+                        model = state.effectiveModel.displayName,
                         aspectRatio = state.aspectRatio.label,
                         durationSeconds = state.duration.seconds,
                         resolution = state.resolution.label,
@@ -377,7 +392,11 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         } else emptyList()
 
         return buildString {
-            appendLine("Model: ${state.model.apiName}")
+            appendLine("Model: ${state.effectiveModel.apiName}")
+            appendLine("Model selection: ${state.modelChoice.label}")
+            val cost = state.effectiveModel.estimatedCost(state.resolution, state.duration)
+            appendLine("Estimated API cost: ${cost?.let { "$" + "%.2f".format(it) } ?: "n/a"}")
+            state.costExplanation?.let { appendLine("Cost note: $it") }
             appendLine("Mode: ${requestMode.name}")
             appendLine("Generation mode: ${requestMode.generationStrategyLabel}")
             appendLine("Uploaded images: ${state.images.size}")
@@ -430,23 +449,36 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
      */
     private fun buildFinalPrompt(state: CreateUiState, requestMode: RequestMode): String {
         val sections = mutableListOf<String>()
+        val hasOpenState = state.images.any { it.role == ImageRole.OPEN_CLOSED_STATE }
 
-        if (requestMode != RequestMode.TEXT_TO_VIDEO) {
-            sections += STRICT_PRODUCT_LOCK_BLOCK
-        }
-        sections += SCENE_BLOCK
+        // CAMERA_ONLY_PRODUCT_AD: the strictest default, used whenever there's exactly one image
+        // to go on and no visual evidence of an open/interior state - the single most common case
+        // and the one most prone to hallucinated redesign, so only camera/lighting/background may move.
+        val useCameraOnlyTemplate = requestMode == RequestMode.IMAGE_TO_VIDEO &&
+            state.images.size <= 1 && !hasOpenState
 
-        if (state.prompt.isNotBlank()) sections += state.prompt.trim()
+        if (useCameraOnlyTemplate) {
+            sections += CAMERA_ONLY_PRODUCT_LOCK_BLOCK
+            sections += cameraOnlySceneBlock(state.aspectRatio.label, state.duration.seconds)
+            if (state.prompt.isNotBlank()) sections += state.prompt.trim()
+            sections += CAMERA_ONLY_RESTRICTIONS_BLOCK
+        } else {
+            if (requestMode != RequestMode.TEXT_TO_VIDEO) {
+                sections += STRICT_PRODUCT_LOCK_BLOCK
+            }
+            sections += SCENE_BLOCK
 
-        if (requestMode != RequestMode.TEXT_TO_VIDEO) {
-            val hasOpenState = state.images.any { it.role == ImageRole.OPEN_CLOSED_STATE }
-            sections += if (hasOpenState) {
-                "If the product is shown closed in the reference image, you may show it opening " +
-                    "naturally and reveal the interior exactly as visible in the reference images."
-            } else {
-                "Do not show or invent an internal or open state that is not visible in the " +
-                    "reference images. Keep the product in the state shown and focus on cinematic " +
-                    "exterior product shots."
+            if (state.prompt.isNotBlank()) sections += state.prompt.trim()
+
+            if (requestMode != RequestMode.TEXT_TO_VIDEO) {
+                sections += if (hasOpenState) {
+                    "If the product is shown closed in the reference image, you may show it opening " +
+                        "naturally and reveal the interior exactly as visible in the reference images."
+                } else {
+                    "Do not show or invent an internal or open state that is not visible in the " +
+                        "reference images. Keep the product in the state shown and focus on cinematic " +
+                        "exterior product shots."
+                }
             }
         }
 
@@ -459,7 +491,36 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         return sections.joinToString("\n\n")
     }
 
+    private fun cameraOnlySceneBlock(aspectRatioLabel: String, durationSeconds: Int): String {
+        val timeline = if (durationSeconds == 8) {
+            "\n\n0-3 sec: Exact product from the reference image. Slow cinematic push-in.\n" +
+                "3-6 sec: Very subtle camera move around the same product. Keep product geometry unchanged.\n" +
+                "6-8 sec: Clean close-up hero shot of the same product."
+        } else {
+            "\n\nUse a slow cinematic push-in, a very subtle camera move around the same product " +
+                "keeping its geometry unchanged, and end on a clean close-up hero shot of the same product."
+        }
+        return "Create a $durationSeconds-second vertical $aspectRatioLabel commercial product video. " +
+            "Only the CAMERA, LIGHTING and BACKGROUND may change.$timeline"
+    }
+
     private companion object {
+        const val CAMERA_ONLY_PRODUCT_LOCK_BLOCK =
+            "Strict product fidelity required. Use the uploaded image as the exact visual source " +
+                "of truth. The product must remain the exact same physical object throughout the " +
+                "entire video. Preserve its exact silhouette, proportions, body shape, lid shape, " +
+                "handle shape and position, colors, materials, hinge placement, visible controls and " +
+                "visible surface details. Do not redesign, reinterpret, modernize or improve the " +
+                "product. Do not add parts. Do not remove parts. Do not change geometry. Do not morph " +
+                "the product. Do not invent any feature that is not clearly visible in the reference image."
+
+        const val CAMERA_ONLY_RESTRICTIONS_BLOCK =
+            "Photorealistic. Natural lighting. Clean e-commerce advertising style. Do not open the " +
+                "product, invent an interior, show the product operating, generate food, invent " +
+                "accessories, or add buttons, lights or handles that are not in the reference image. " +
+                "No opening animation. No invented interior. No additional accessories. " +
+                "PRODUCT ACCURACY HAS PRIORITY OVER CREATIVITY."
+
         const val STRICT_PRODUCT_LOCK_BLOCK =
             "Strict product fidelity required. The generated video must depict the exact same " +
                 "product as shown in the reference image(s), used as the ground-truth visual " +

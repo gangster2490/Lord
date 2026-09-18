@@ -81,7 +81,7 @@ import com.rob.veocreator.data.model.ImageRole
 import com.rob.veocreator.data.model.ModelCapabilities
 import com.rob.veocreator.data.model.Resolution
 import com.rob.veocreator.data.model.SelectedImage
-import com.rob.veocreator.data.model.VeoModel
+import com.rob.veocreator.data.model.ModelChoice
 import com.rob.veocreator.data.model.VideoMode
 import com.rob.veocreator.ui.components.FullscreenVideoDialog
 import com.rob.veocreator.ui.components.VideoPlayerView
@@ -184,13 +184,13 @@ fun CreateScreen(
         }
 
         SectionLabel("Model")
-        ChipRow(VeoModel.entries.toList(), state.model, { it.displayName }, viewModel::setModel)
+        ChipRow(ModelChoice.entries.toList(), state.modelChoice, { it.label }, viewModel::setModelChoice)
 
         SectionLabel("Aspect Ratio")
         ChipRow(AspectRatio.entries.toList(), state.aspectRatio, { it.label }, viewModel::setAspectRatio)
 
         SectionLabel("Resolution")
-        val allowedRes = ModelCapabilities.allowedResolutions(state.model)
+        val allowedRes = state.modelChoice.allowedResolutions()
         ChipRow(
             Resolution.entries.toList(),
             state.resolution,
@@ -215,6 +215,8 @@ fun CreateScreen(
                 color = VeoTextSecondary
             )
         }
+
+        CostEstimateCard(state)
 
         Button(
             onClick = viewModel::generate,
@@ -440,6 +442,35 @@ private fun SuggestionCard(suggestion: String, onInsert: () -> Unit, onDismiss: 
                     Text("Insert into prompt")
                 }
                 TextButton(onClick = onDismiss) { Text("Dismiss") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CostEstimateCard(state: CreateUiState) {
+    Card(colors = CardDefaults.cardColors(containerColor = VeoCard), shape = RoundedCornerShape(14.dp)) {
+        Column(Modifier.padding(14.dp)) {
+            Text("Model: ${state.effectiveModel.displayName}", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "${state.resolution.label} · ${state.duration.label}",
+                style = MaterialTheme.typography.labelMedium,
+                color = VeoTextSecondary
+            )
+            Spacer(Modifier.height(6.dp))
+            val cost = state.estimatedCostUsd
+            Text(
+                "Estimated API cost: " + (cost?.let { "$" + "%.2f".format(it) } ?: "n/a"),
+                style = MaterialTheme.typography.bodyLarge,
+                color = VeoYellow
+            )
+            if (state.modelChoice == ModelChoice.AUTO_CHEAPEST) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    state.costExplanation ?: "Cheapest compatible model selected automatically",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = VeoTextSecondary
+                )
             }
         }
     }

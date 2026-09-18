@@ -24,23 +24,73 @@ val RequestMode.generationStrategyLabel: String
 enum class VeoModel(
     val apiName: String,
     val displayName: String,
-    val supportedResolutions: List<Resolution>
+    val supportedResolutions: List<Resolution>,
+    /** Cheapest first - used by ModelChoice.AUTO_CHEAPEST to pick the lowest-cost compatible model. */
+    val costRank: Int,
+    private val pricePerSecondByResolution: Map<Resolution, Double>
 ) {
-    VEO_3_1(
-        apiName = "veo-3.1-generate-preview",
-        displayName = "Veo 3.1",
-        supportedResolutions = listOf(Resolution.R720P, Resolution.R1080P, Resolution.R4K)
+    VEO_3_1_LITE(
+        apiName = "veo-3.1-lite-generate-preview",
+        displayName = "Veo 3.1 Lite",
+        supportedResolutions = listOf(Resolution.R720P, Resolution.R1080P),
+        costRank = 0,
+        pricePerSecondByResolution = mapOf(Resolution.R720P to 0.05, Resolution.R1080P to 0.08)
     ),
     VEO_3_1_FAST(
         apiName = "veo-3.1-fast-generate-preview",
         displayName = "Veo 3.1 Fast",
-        supportedResolutions = listOf(Resolution.R720P, Resolution.R1080P, Resolution.R4K)
+        supportedResolutions = listOf(Resolution.R720P, Resolution.R1080P, Resolution.R4K),
+        costRank = 1,
+        pricePerSecondByResolution = mapOf(Resolution.R720P to 0.10, Resolution.R1080P to 0.12, Resolution.R4K to 0.30)
     ),
-    VEO_3_1_LITE(
-        apiName = "veo-3.1-lite-generate-preview",
-        displayName = "Veo 3.1 Lite",
-        supportedResolutions = listOf(Resolution.R720P, Resolution.R1080P)
-    )
+    VEO_3_1(
+        apiName = "veo-3.1-generate-preview",
+        displayName = "Veo 3.1",
+        supportedResolutions = listOf(Resolution.R720P, Resolution.R1080P, Resolution.R4K),
+        costRank = 2,
+        pricePerSecondByResolution = mapOf(Resolution.R720P to 0.40, Resolution.R1080P to 0.40, Resolution.R4K to 0.60)
+    );
+
+    /** Per https://ai.google.dev/gemini-api/docs/pricing - null if this model/resolution pair is unsupported. */
+    fun pricePerSecond(resolution: Resolution): Double? = pricePerSecondByResolution[resolution]
+
+    fun estimatedCost(resolution: Resolution, duration: Duration): Double? =
+        pricePerSecond(resolution)?.times(duration.seconds)
+}
+
+/** What the user picks in the Model chip row. AUTO_CHEAPEST is the default and resolves to the
+ *  lowest-cost VeoModel that still supports the currently selected resolution. */
+enum class ModelChoice(val label: String) {
+    AUTO_CHEAPEST("AUTO — Cheapest"),
+    LITE("Veo 3.1 Lite"),
+    FAST("Veo 3.1 Fast"),
+    STANDARD("Veo 3.1");
+
+    /** The concrete model this choice maps to for the given resolution. For a fixed choice whose
+     *  model doesn't support that resolution (shouldn't happen - the UI disables that combination)
+     *  this falls back to the cheapest model that does, same as AUTO. */
+    fun resolve(resolution: Resolution): VeoModel {
+        val fixed = when (this) {
+            AUTO_CHEAPEST -> null
+            LITE -> VeoModel.VEO_3_1_LITE
+            FAST -> VeoModel.VEO_3_1_FAST
+            STANDARD -> VeoModel.VEO_3_1
+        }
+        if (fixed != null && resolution in fixed.supportedResolutions) return fixed
+        return VeoModel.entries
+            .filter { resolution in it.supportedResolutions }
+            .minByOrNull { it.costRank }
+            ?: VeoModel.VEO_3_1
+    }
+
+    /** Every resolution supported by at least one model - AUTO can always find a compatible model,
+     *  so all resolutions stay selectable; a fixed choice is limited to what that model supports. */
+    fun allowedResolutions(): List<Resolution> = when (this) {
+        AUTO_CHEAPEST -> Resolution.entries.filter { res -> VeoModel.entries.any { res in it.supportedResolutions } }
+        LITE -> VeoModel.VEO_3_1_LITE.supportedResolutions
+        FAST -> VeoModel.VEO_3_1_FAST.supportedResolutions
+        STANDARD -> VeoModel.VEO_3_1.supportedResolutions
+    }
 }
 
 enum class AspectRatio(val apiValue: String, val label: String) {
