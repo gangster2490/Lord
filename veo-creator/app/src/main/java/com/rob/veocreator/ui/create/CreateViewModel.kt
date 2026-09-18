@@ -47,6 +47,14 @@ private const val MAX_REFERENCE_IMAGES = 3
 private const val POLL_INTERVAL_MS = 10_000L
 private const val MAX_POLL_MINUTES = 10
 
+/** Best-3 selection for referenceImages: excludes text-heavy roles entirely and prioritizes
+ *  clean product photos (main/front view first, then alternate angle, then detail/open-state)
+ *  over packaging or unclassified shots, per ImageRole.primaryScore. */
+private fun selectReferenceImages(images: List<SelectedImage>): List<SelectedImage> =
+    images.filterNot { it.role.isTextHeavy }
+        .sortedByDescending { it.role.primaryScore }
+        .take(MAX_REFERENCE_IMAGES)
+
 data class CreateUiState(
     val mode: VideoMode = VideoMode.IMAGE_TO_VIDEO,
     val prompt: String = "",
@@ -57,8 +65,13 @@ data class CreateUiState(
     val images: List<SelectedImage> = emptyList(),
     val enableTextOverlays: Boolean = false,
     /** Off by default: use one starting image (IMAGE_TO_VIDEO). On: send up to 3 photos as
-     *  Veo referenceImages instead - these two are mutually exclusive at the API level. */
+     *  Veo referenceImages instead - these two are mutually exclusive at the API level. Ignored
+     *  while [productFidelityMode] is on, since that decides automatically. */
     val useMultipleImages: Boolean = false,
+    /** On by default. Prioritizes exact product consistency over cost: never resolves to Veo
+     *  3.1 Lite, and automatically uses REFERENCE_IMAGES the moment 2+ suitable photos exist
+     *  instead of requiring the user to flip [useMultipleImages] manually. */
+    val productFidelityMode: Boolean = true,
     /** True once the user has explicitly tapped a thumbnail to make it primary - after that,
      *  automatic re-scoring on analysis results must not override their choice. */
     val primaryManuallySet: Boolean = false,
@@ -79,36 +92,54 @@ data class CreateUiState(
             generationState !is GenerationState.Downloading &&
             generationState !is GenerationState.Uploading
 
-    /** Which shape of request this configuration will actually produce. A single clean image
-     *  always uses SAFE_PRODUCT (IMAGE_TO_VIDEO) regardless of the toggle - CONSISTENCY only
-     *  makes sense once there's more than one usable photo to reference. */
+    /** Which shape of request this configuration will actually produce. In Product Fidelity mode
+     *  (the default), 2+ suitable photos automatically switch to CONSISTENCY regardless of the
+     *  manual toggle; a single clean image always uses SAFE_PRODUCT (IMAGE_TO_VIDEO), since
+     *  CONSISTENCY only makes sense once there's more than one usable photo to reference. */
     val requestMode: RequestMode
-        get() = when {
-            mode == VideoMode.TEXT_TO_VIDEO -> RequestMode.TEXT_TO_VIDEO
-            useMultipleImages && images.count { !it.role.isTextHeavy } > 1 -> RequestMode.REFERENCE_IMAGES
-            else -> RequestMode.IMAGE_TO_VIDEO
+        get() {
+            if (mode == VideoMode.TEXT_TO_VIDEO) return RequestMode.TEXT_TO_VIDEO
+            val suitableCount = images.count { !it.role.isTextHeavy }
+            val wantsReferenceImages = if (productFidelityMode) suitableCount > 1 else useMultipleImages
+            return if (wantsReferenceImages && suitableCount > 1) RequestMode.REFERENCE_IMAGES else RequestMode.IMAGE_TO_VIDEO
+        }
+
+    /** Which photos actually get sent as Veo image data for the current configuration. */
+    val sentImages: List<SelectedImage>
+        get() = when (requestMode) {
+            RequestMode.IMAGE_TO_VIDEO -> images.filter { it.isPrimary }
+            RequestMode.REFERENCE_IMAGES -> selectReferenceImages(images)
+            RequestMode.TEXT_TO_VIDEO -> emptyList()
         }
 
     /** How many of the uploaded photos would actually be sent as Veo referenceImages. */
     val referenceImageCount: Int
-        get() = if (requestMode == RequestMode.REFERENCE_IMAGES) {
-            images.filterNot { it.role.isTextHeavy }.take(MAX_REFERENCE_IMAGES).size
-        } else 0
+        get() = if (requestMode == RequestMode.REFERENCE_IMAGES) selectReferenceImages(images).size else 0
 
     val usesReferenceImages: Boolean get() = requestMode == RequestMode.REFERENCE_IMAGES
 
-    /** The concrete Veo model actually used - resolved from [modelChoice] + [resolution], and
+    private val costBasedModel: VeoModel get() = modelChoice.resolve(resolution, usesReferenceImages)
+
+    /** The concrete Veo model actually used - resolved from [modelChoice] + [resolution], then
      *  transparently upgraded off Lite whenever referenceImages are required (Lite doesn't
-     *  support them at all). */
-    val effectiveModel: VeoModel get() = modelChoice.resolve(resolution, usesReferenceImages)
+     *  support them at all) or whenever Product Fidelity mode is on (Lite is never used when
+     *  exact product consistency is required - Fast is the floor). */
+    val effectiveModel: VeoModel
+        get() {
+            val base = costBasedModel
+            return if (productFidelityMode && base == VeoModel.VEO_3_1_LITE) VeoModel.VEO_3_1_FAST else base
+        }
 
     val estimatedCostUsd: Double? get() = effectiveModel.estimatedCost(resolution, duration)
 
-    /** Non-null whenever AUTO (or a fixed Lite choice, for the referenceImages case) didn't land
-     *  on the requested/cheapest model, so the UI can explain why instead of leaving the user
-     *  guessing why a pricier model - or a different one than they picked - was used. */
+    /** Non-null whenever the model actually used differs from what [modelChoice] alone would
+     *  have picked, so the UI can explain why instead of leaving the user guessing. */
     val costExplanation: String?
         get() {
+            val base = costBasedModel
+            if (effectiveModel != base) {
+                return "Using ${effectiveModel.displayName} for Product Fidelity mode - Lite is not used when exact product consistency is required."
+            }
             val canOverride = modelChoice == ModelChoice.AUTO_CHEAPEST || modelChoice == ModelChoice.LITE
             if (!canOverride || effectiveModel == VeoModel.VEO_3_1_LITE) return null
             return if (usesReferenceImages) {
@@ -118,17 +149,16 @@ data class CreateUiState(
             }
         }
 
-    /** True when the primary image's crop, at its real pixel size, is too small to reliably
+    /** True when any transmitted image's crop, at its real pixel size, is too small to reliably
      *  preserve product detail - computed without any extra image decode (crop is a fraction of
      *  the already-known original dimensions). */
-    val primaryLowResWarning: Boolean
-        get() {
-            val primary = images.firstOrNull { it.isPrimary } ?: return false
-            val crop = primary.cropRect ?: return false
-            if (primary.originalWidth <= 0 || primary.originalHeight <= 0) return false
-            val cropWidthPx = (crop.width() * primary.originalWidth).roundToInt()
-            val cropHeightPx = (crop.height() * primary.originalHeight).roundToInt()
-            return minOf(cropWidthPx, cropHeightPx) < MIN_USEFUL_DIMENSION_PX
+    val anySentImageLowRes: Boolean
+        get() = sentImages.any { img ->
+            val crop = img.cropRect ?: return@any false
+            if (img.originalWidth <= 0 || img.originalHeight <= 0) return@any false
+            val w = (crop.width() * img.originalWidth).roundToInt()
+            val h = (crop.height() * img.originalHeight).roundToInt()
+            minOf(w, h) < MIN_USEFUL_DIMENSION_PX
         }
 }
 
@@ -182,6 +212,9 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setUseMultipleImages(enabled: Boolean) =
         _uiState.update { clampDurationForState(it.copy(useMultipleImages = enabled)) }
+
+    fun setProductFidelityMode(enabled: Boolean) =
+        _uiState.update { clampDurationForState(it.copy(productFidelityMode = enabled)) }
 
     /** Picks the best starting/hero image by role score; ties keep the earliest-uploaded one. */
     private fun pickBestPrimaryId(images: List<SelectedImage>): String? =
@@ -340,7 +373,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                         diagnostics += primary to loaded
                     }
                     RequestMode.REFERENCE_IMAGES -> {
-                        val chosen = state.images.filterNot { it.role.isTextHeavy }.take(MAX_REFERENCE_IMAGES)
+                        val chosen = selectReferenceImages(state.images)
                         if (chosen.isEmpty()) {
                             throw ApiException(null, "Please select at least one product image.")
                         }
@@ -441,13 +474,12 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     ): String {
         val personGeneration = if (requestMode == RequestMode.TEXT_TO_VIDEO) "allow_all" else "allow_adult"
         val primaryIndex = state.images.indexOfFirst { it.isPrimary }.let { if (it >= 0) it + 1 else null }
-        val supportingIndexes = if (requestMode == RequestMode.REFERENCE_IMAGES) {
-            state.images.filterNot { it.role.isTextHeavy }
-                .take(MAX_REFERENCE_IMAGES)
-                .map { state.images.indexOf(it) + 1 }
+        val selectedReferenceIndexes = if (requestMode == RequestMode.REFERENCE_IMAGES) {
+            selectReferenceImages(state.images).map { state.images.indexOf(it) + 1 }
         } else emptyList()
 
         return buildString {
+            appendLine("Product Fidelity mode: ${if (state.productFidelityMode) "ON" else "OFF"}")
             appendLine("Model: ${state.effectiveModel.apiName}")
             appendLine("Model selection: ${state.modelChoice.label}")
             val cost = state.effectiveModel.estimatedCost(state.resolution, state.duration)
@@ -461,7 +493,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             appendLine("Starting image sent: ${requestMode == RequestMode.IMAGE_TO_VIDEO}")
             if (requestMode != RequestMode.TEXT_TO_VIDEO) {
                 appendLine("Selected primary image index: ${primaryIndex ?: "n/a"}")
-                appendLine("Supporting image indexes: ${if (supportingIndexes.isEmpty()) "none" else supportingIndexes.joinToString()}")
+                appendLine("Selected reference image indexes: ${if (selectedReferenceIndexes.isEmpty()) "none" else selectedReferenceIndexes.joinToString()}")
                 appendLine("Image roles: ${state.images.mapIndexed { i, img -> "${i + 1}=${img.role.name}" }.joinToString()}")
             }
             appendLine("Aspect ratio: ${state.aspectRatio.apiValue}")
@@ -513,6 +545,21 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         val sections = mutableListOf<String>()
         val hasOpenState = state.images.any { it.role == ImageRole.OPEN_CLOSED_STATE }
 
+        // Product Fidelity mode replaces prompt engineering with a short, fixed instruction and
+        // instead relies on the generation STRATEGY (Fast-or-better model, real referenceImages
+        // when available) to hold product identity - a longer, more elaborate prompt didn't fix
+        // drift once generation actually started, so this stays deliberately minimal.
+        if (state.productFidelityMode && requestMode != RequestMode.TEXT_TO_VIDEO) {
+            sections += productFidelityPromptBlock(state.aspectRatio.label, state.duration.seconds)
+            if (state.prompt.isNotBlank()) sections += state.prompt.trim()
+            if (!state.enableTextOverlays) {
+                sections += "Do not render any on-screen text, captions, labels, price tags, banners, " +
+                    "or logos in the video unless they are physically part of the product packaging " +
+                    "already visible in the reference images."
+            }
+            return sections.joinToString("\n\n")
+        }
+
         // CAMERA_ONLY_PRODUCT_AD: the strictest default, used whenever there's exactly one image
         // to go on and no visual evidence of an open/interior state - the single most common case
         // and the one most prone to hallucinated redesign, so only camera/lighting/background may move.
@@ -552,6 +599,13 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
         return sections.joinToString("\n\n")
     }
+
+    private fun productFidelityPromptBlock(aspectRatioLabel: String, durationSeconds: Int): String =
+        "Keep the exact same product from the uploaded reference images. " +
+            "Preserve exact shape, proportions, colors, materials, handle, lid, body geometry and " +
+            "all visible details. Do not redesign, replace or reinterpret the product. Do not add " +
+            "new buttons, lights, handles or accessories. Create a realistic $durationSeconds-second " +
+            "vertical $aspectRatioLabel product advertisement with subtle camera movement only."
 
     private fun cameraOnlySceneBlock(aspectRatioLabel: String, durationSeconds: Int): String {
         return "Create a $durationSeconds-second vertical $aspectRatioLabel commercial product shot. " +

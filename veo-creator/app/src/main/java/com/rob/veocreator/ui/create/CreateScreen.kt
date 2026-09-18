@@ -161,15 +161,11 @@ fun CreateScreen(
                 onAnalyze = viewModel::analyzeImages
             )
 
-            val primaryImage = state.images.firstOrNull { it.isPrimary }
-            if (primaryImage != null) {
-                ImageSentToVeoPreview(
-                    image = primaryImage,
-                    referenceCount = if (state.usesReferenceImages) state.referenceImageCount else 0,
-                    lowResWarning = state.primaryLowResWarning,
-                    onEditCrop = { cropEditingImage = primaryImage }
-                )
-            }
+            ImagesSentToVeoSection(
+                images = state.sentImages,
+                lowResWarning = state.anySentImageLowRes,
+                onEditCrop = { cropEditingImage = it }
+            )
 
             state.analysisSuggestion?.let { suggestion ->
                 SuggestionCard(
@@ -181,15 +177,36 @@ fun CreateScreen(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Use multiple images for product consistency", style = MaterialTheme.typography.titleMedium)
+                    Text("Product Fidelity mode", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Off: one starting image animates. On: up to 3 photos are sent as Veo " +
-                            "reference images instead (no starting frame, locked to 8s).",
+                        "On by default: never uses Lite, and automatically sends up to 3 photos as " +
+                            "reference images once you upload more than one - overrides the toggle below.",
                         style = MaterialTheme.typography.labelMedium,
                         color = VeoTextSecondary
                     )
                 }
-                Switch(checked = state.useMultipleImages, onCheckedChange = viewModel::setUseMultipleImages)
+                Switch(checked = state.productFidelityMode, onCheckedChange = viewModel::setProductFidelityMode)
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Use multiple images for product consistency", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (state.productFidelityMode) {
+                            "Ignored while Product Fidelity mode is on - it decides this automatically."
+                        } else {
+                            "Off: one starting image animates. On: up to 3 photos are sent as Veo " +
+                                "reference images instead (no starting frame, locked to 8s)."
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = VeoTextSecondary
+                    )
+                }
+                Switch(
+                    checked = state.useMultipleImages,
+                    onCheckedChange = viewModel::setUseMultipleImages,
+                    enabled = !state.productFidelityMode
+                )
             }
         }
 
@@ -475,54 +492,31 @@ private fun ImageThumbnail(
     }
 }
 
+/** Shows the actual processed image(s) that will go into the API request - whichever the
+ *  current mode sends: the one starting image, or up to 3 selected reference images - so the
+ *  user can visually verify them (and correct the crop) before spending a generation. */
 @Composable
-private fun ImageSentToVeoPreview(
-    image: SelectedImage,
-    referenceCount: Int,
+private fun ImagesSentToVeoSection(
+    images: List<SelectedImage>,
     lowResWarning: Boolean,
-    onEditCrop: () -> Unit
+    onEditCrop: (SelectedImage) -> Unit
 ) {
-    val context = LocalContext.current
-    var preview by remember(image.id, image.cropRect) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(image.id, image.cropRect) {
-        preview = withContext(Dispatchers.IO) { MediaUtils.renderCroppedPreview(context, image.uri, image.cropRect) }
-    }
-    val coveragePercent = image.cropRect?.let { ((it.width() * it.height()) * 100).toInt() } ?: 100
-
+    if (images.isEmpty()) return
     Card(colors = CardDefaults.cardColors(containerColor = VeoCard), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Image sent to Veo", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                TextButton(onClick = onEditCrop) {
-                    Icon(Icons.Filled.Crop, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Edit Crop")
+            Text("Images sent to Veo", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(10.dp))
+            if (images.size == 1) {
+                SentImageThumbnail(images[0], onEditCrop, Modifier.fillMaxWidth().height(220.dp))
+            } else {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(images, key = { it.id }) { image ->
+                        SentImageThumbnail(image, onEditCrop, Modifier.width(160.dp).height(160.dp))
+                    }
                 }
             }
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(220.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black),
-                contentAlignment = Alignment.Center
-            ) {
-                val bmp = preview
-                if (bmp != null) {
-                    Image(bitmap = bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
-                } else {
-                    CircularProgressIndicator(color = VeoYellow)
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Product coverage: ~$coveragePercent%" +
-                    if (referenceCount > 0) " · +$referenceCount reference image(s)" else "",
-                style = MaterialTheme.typography.labelMedium,
-                color = VeoTextSecondary
-            )
             if (lowResWarning) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
@@ -534,6 +528,44 @@ private fun ImageSentToVeoPreview(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SentImageThumbnail(image: SelectedImage, onEditCrop: (SelectedImage) -> Unit, modifier: Modifier) {
+    val context = LocalContext.current
+    var preview by remember(image.id, image.cropRect) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(image.id, image.cropRect) {
+        preview = withContext(Dispatchers.IO) { MediaUtils.renderCroppedPreview(context, image.uri, image.cropRect) }
+    }
+    val coveragePercent = image.cropRect?.let { ((it.width() * it.height()) * 100).toInt() } ?: 100
+
+    Column(modifier) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            val bmp = preview
+            if (bmp != null) {
+                Image(bitmap = bmp.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize())
+            } else {
+                CircularProgressIndicator(color = VeoYellow, modifier = Modifier.size(24.dp))
+            }
+            IconButton(onClick = { onEditCrop(image) }, modifier = Modifier.align(Alignment.BottomEnd).size(28.dp)) {
+                Icon(Icons.Filled.Crop, contentDescription = "Edit crop", tint = Color.White)
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "$coveragePercent% · ${image.role.label}",
+            style = MaterialTheme.typography.labelMedium,
+            color = VeoTextSecondary,
+            maxLines = 1
+        )
     }
 }
 
