@@ -5,6 +5,14 @@ import java.util.UUID
 
 enum class VideoMode { TEXT_TO_VIDEO, IMAGE_TO_VIDEO }
 
+/**
+ * The Veo REST API treats a starting "image" and "referenceImages" as mutually exclusive -
+ * https://ai.google.dev/gemini-api/docs/veo shows them in separate, non-overlapping examples.
+ * Sending both in the same instance is what previously caused a 400 INVALID_ARGUMENT
+ * "Unsupported video generation request" response.
+ */
+enum class RequestMode { TEXT_TO_VIDEO, IMAGE_TO_VIDEO, REFERENCE_IMAGES }
+
 enum class VeoModel(
     val apiName: String,
     val displayName: String,

@@ -14,6 +14,7 @@ import com.rob.veocreator.data.model.Duration
 import com.rob.veocreator.data.model.GenerationState
 import com.rob.veocreator.data.model.ImageRole
 import com.rob.veocreator.data.model.ModelCapabilities
+import com.rob.veocreator.data.model.RequestMode
 import com.rob.veocreator.data.model.Resolution
 import com.rob.veocreator.data.model.SelectedImage
 import com.rob.veocreator.data.model.VeoModel
@@ -43,6 +44,9 @@ data class CreateUiState(
     val duration: Duration = Duration.D8,
     val images: List<SelectedImage> = emptyList(),
     val enableTextOverlays: Boolean = false,
+    /** Off by default: use one starting image (IMAGE_TO_VIDEO). On: send up to 3 photos as
+     *  Veo referenceImages instead - these two are mutually exclusive at the API level. */
+    val useMultipleImages: Boolean = false,
     val isAnalyzing: Boolean = false,
     val analysisSuggestion: String? = null,
     val generationState: GenerationState = GenerationState.Idle,
@@ -51,24 +55,27 @@ data class CreateUiState(
 ) {
     val canGenerate: Boolean
         get() = hasApiKey && prompt.isNotBlank() &&
-            (mode == VideoMode.TEXT_TO_VIDEO || images.any { it.isPrimary }) &&
+            (mode == VideoMode.TEXT_TO_VIDEO || images.isNotEmpty()) &&
             generationState !is GenerationState.Submitting &&
             generationState !is GenerationState.Generating &&
             generationState !is GenerationState.Downloading &&
             generationState !is GenerationState.Uploading
 
-    /** How many of the uploaded photos would actually be sent as Veo referenceImages. */
-    val referenceImageCount: Int
-        get() {
-            if (mode != VideoMode.IMAGE_TO_VIDEO) return 0
-            val primary = images.firstOrNull { it.isPrimary } ?: return 0
-            return images.filterNot { it.id == primary.id }
-                .filterNot { it.role.isTextHeavy }
-                .take(MAX_REFERENCE_IMAGES)
-                .size
+    /** Which shape of request this configuration will actually produce. */
+    val requestMode: RequestMode
+        get() = when {
+            mode == VideoMode.TEXT_TO_VIDEO -> RequestMode.TEXT_TO_VIDEO
+            useMultipleImages && images.any { !it.role.isTextHeavy } -> RequestMode.REFERENCE_IMAGES
+            else -> RequestMode.IMAGE_TO_VIDEO
         }
 
-    val usesReferenceImages: Boolean get() = referenceImageCount > 0
+    /** How many of the uploaded photos would actually be sent as Veo referenceImages. */
+    val referenceImageCount: Int
+        get() = if (requestMode == RequestMode.REFERENCE_IMAGES) {
+            images.filterNot { it.role.isTextHeavy }.take(MAX_REFERENCE_IMAGES).size
+        } else 0
+
+    val usesReferenceImages: Boolean get() = requestMode == RequestMode.REFERENCE_IMAGES
 }
 
 class CreateViewModel(application: Application) : AndroidViewModel(application) {
@@ -118,6 +125,9 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setTextOverlaysEnabled(enabled: Boolean) = _uiState.update { it.copy(enableTextOverlays = enabled) }
+
+    fun setUseMultipleImages(enabled: Boolean) =
+        _uiState.update { clampDurationForState(it.copy(useMultipleImages = enabled)) }
 
     fun addImages(uris: List<Uri>) {
         _uiState.update { state ->
@@ -208,22 +218,31 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
 
+            val requestMode = state.requestMode
+            val technicalContext = buildTechnicalContext(state, requestMode)
+
             try {
                 _uiState.update { it.copy(generationState = GenerationState.Uploading, elapsedSeconds = 0) }
 
                 var primaryInline: InlineImage? = null
                 var referenceInline: List<InlineImage> = emptyList()
 
-                if (state.mode == VideoMode.IMAGE_TO_VIDEO) {
-                    val primary = state.images.firstOrNull { it.isPrimary }
-                        ?: throw ApiException(null, "Please select a starting image.")
-                    primaryInline = MediaUtils.loadInlineImage(app, primary.uri)
-
-                    referenceInline = state.images
-                        .filterNot { it.id == primary.id }
-                        .filterNot { it.role.isTextHeavy }
-                        .take(MAX_REFERENCE_IMAGES)
-                        .map { MediaUtils.loadInlineImage(app, it.uri) }
+                when (requestMode) {
+                    RequestMode.IMAGE_TO_VIDEO -> {
+                        val primary = state.images.firstOrNull { it.isPrimary } ?: state.images.firstOrNull()
+                            ?: throw ApiException(null, "Please select a starting image.")
+                        primaryInline = MediaUtils.loadInlineImage(app, primary.uri)
+                    }
+                    RequestMode.REFERENCE_IMAGES -> {
+                        referenceInline = state.images
+                            .filterNot { it.role.isTextHeavy }
+                            .take(MAX_REFERENCE_IMAGES)
+                            .map { MediaUtils.loadInlineImage(app, it.uri) }
+                        if (referenceInline.isEmpty()) {
+                            throw ApiException(null, "Please select at least one product image.")
+                        }
+                    }
+                    RequestMode.TEXT_TO_VIDEO -> Unit
                 }
 
                 val finalPrompt = buildFinalPrompt(state.prompt, state.enableTextOverlays)
@@ -234,6 +253,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                     apiKey = apiKey,
                     model = state.model,
                     prompt = finalPrompt,
+                    requestMode = requestMode,
                     primaryImage = primaryInline,
                     referenceImages = referenceInline,
                     aspectRatio = state.aspectRatio,
@@ -282,18 +302,42 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.update { it.copy(generationState = GenerationState.Completed(destination.absolutePath)) }
             } catch (io: IOException) {
                 _uiState.update {
-                    it.copy(generationState = GenerationState.Error("Network unavailable. Check your connection and try again."))
+                    it.copy(generationState = GenerationState.Error(
+                        "Network unavailable. Check your connection and try again.",
+                        technicalContext
+                    ))
                 }
             } catch (api: ApiException) {
                 _uiState.update {
-                    it.copy(generationState = GenerationState.Error(api.message ?: "Generation failed.", api.technicalDetails))
+                    it.copy(generationState = GenerationState.Error(
+                        api.message ?: "Generation failed.",
+                        technicalContext + (api.technicalDetails?.let { d -> "\n\n$d" } ?: "")
+                    ))
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _uiState.update { it.copy(generationState = GenerationState.Error(e.message ?: "Unexpected error.")) }
+                _uiState.update {
+                    it.copy(generationState = GenerationState.Error(e.message ?: "Unexpected error.", technicalContext))
+                }
             } finally {
                 elapsedJob.cancel()
             }
+        }
+    }
+
+    /** Human-readable request context shown in the error card's "Technical details" section. */
+    private fun buildTechnicalContext(state: CreateUiState, requestMode: RequestMode): String {
+        val personGeneration = if (requestMode == RequestMode.TEXT_TO_VIDEO) "allow_all" else "allow_adult"
+        return buildString {
+            appendLine("Model: ${state.model.apiName}")
+            appendLine("Mode: ${requestMode.name}")
+            appendLine("Uploaded images: ${state.images.size}")
+            appendLine("Reference images sent: ${state.referenceImageCount}")
+            appendLine("Starting image: ${requestMode == RequestMode.IMAGE_TO_VIDEO}")
+            appendLine("Aspect ratio: ${state.aspectRatio.apiValue}")
+            appendLine("Resolution: ${state.resolution.apiValue}")
+            appendLine("Duration: ${state.duration.apiValue}")
+            append("Person generation: $personGeneration")
         }
     }
 

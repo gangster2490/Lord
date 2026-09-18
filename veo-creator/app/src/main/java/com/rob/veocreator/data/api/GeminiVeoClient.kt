@@ -8,6 +8,7 @@ import com.rob.veocreator.data.model.Duration
 import com.rob.veocreator.data.model.ImageAnalysisEntry
 import com.rob.veocreator.data.model.ImageAnalysisResult
 import com.rob.veocreator.data.model.ImageRole
+import com.rob.veocreator.data.model.RequestMode
 import com.rob.veocreator.data.model.Resolution
 import com.rob.veocreator.data.model.VeoModel
 import kotlinx.coroutines.Dispatchers
@@ -64,10 +65,16 @@ class GeminiVeoClient {
         }
     }
 
+    /**
+     * [requestMode] decides which of [primaryImage] / [referenceImages] is actually used - the
+     * two are mutually exclusive in the real API (see the class doc on RequestMode), so whichever
+     * one doesn't match the mode is ignored even if the caller passed it in by mistake.
+     */
     suspend fun submitGeneration(
         apiKey: String,
         model: VeoModel,
         prompt: String,
+        requestMode: RequestMode,
         primaryImage: InlineImage?,
         referenceImages: List<InlineImage>,
         aspectRatio: AspectRatio,
@@ -75,17 +82,19 @@ class GeminiVeoClient {
         resolution: Resolution
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
+            val usesReferenceImages = requestMode == RequestMode.REFERENCE_IMAGES && referenceImages.isNotEmpty()
+            val usesStartingImage = requestMode == RequestMode.IMAGE_TO_VIDEO && primaryImage != null
+
             val instance = JSONObject().apply {
                 put("prompt", prompt)
-                if (primaryImage != null) {
+                if (usesStartingImage) {
                     put("image", JSONObject().apply {
                         put("inlineData", JSONObject().apply {
-                            put("mimeType", primaryImage.mimeType)
+                            put("mimeType", primaryImage!!.mimeType)
                             put("data", primaryImage.base64)
                         })
                     })
-                }
-                if (referenceImages.isNotEmpty()) {
+                } else if (usesReferenceImages) {
                     val refsArray = JSONArray()
                     referenceImages.forEach { ref ->
                         refsArray.put(JSONObject().apply {
@@ -105,24 +114,22 @@ class GeminiVeoClient {
             // durationSeconds must be 8 whenever reference images or a resolution above 720p is
             // used - see https://ai.google.dev/gemini-api/docs/veo. The UI already enforces this,
             // this is just a last-line-of-defense guard against sending an invalid combination.
-            val effectiveDuration = if (referenceImages.isNotEmpty() || resolution != Resolution.R720P) {
+            val effectiveDuration = if (usesReferenceImages || resolution != Resolution.R720P) {
                 Duration.D8
             } else duration
+
+            // Per https://ai.google.dev/gemini-api/docs/veo: "allow_all" only for text-to-video /
+            // extension, "allow_adult" only for image-to-video / interpolation / reference images.
+            val personGeneration = when (requestMode) {
+                RequestMode.TEXT_TO_VIDEO -> "allow_all"
+                RequestMode.IMAGE_TO_VIDEO, RequestMode.REFERENCE_IMAGES -> "allow_adult"
+            }
 
             val parameters = JSONObject().apply {
                 put("aspectRatio", aspectRatio.apiValue)
                 put("durationSeconds", effectiveDuration.apiValue)
                 put("resolution", resolution.apiValue)
-                // personGeneration="allow_adult" is documented as required for image-to-video,
-                // but the live Veo 3.1 preview API currently rejects that exact value with a 400
-                // "unsupported" error (see https://discuss.ai.google.dev - "Veo 3.1 image-to-video
-                // rejects documented personGeneration=allow_adult"). Only send it for pure
-                // text-to-video, where "allow_all" is confirmed working, and omit it entirely for
-                // image-based requests so the API falls back to its own default instead of us
-                // sending a value it currently refuses.
-                if (primaryImage == null && referenceImages.isEmpty()) {
-                    put("personGeneration", "allow_all")
-                }
+                put("personGeneration", personGeneration)
                 put("numberOfVideos", 1)
             }
 
@@ -131,10 +138,7 @@ class GeminiVeoClient {
                 put("parameters", parameters)
             }
 
-            Log.d(TAG, "submitGeneration model=${model.apiName} aspectRatio=${aspectRatio.apiValue} " +
-                "duration=${effectiveDuration.apiValue} resolution=${resolution.apiValue} " +
-                "images=${(if (primaryImage != null) 1 else 0) + referenceImages.size} " +
-                "referenceImages=${referenceImages.size}")
+            logSanitizedRequest(model.apiName, requestMode, body)
 
             val request = Request.Builder()
                 .url("$BASE_URL/models/${model.apiName}:predictLongRunning")
@@ -151,6 +155,39 @@ class GeminiVeoClient {
                     ?: throw ApiException(null, "Gemini did not return an operation id.")
             }
         }
+    }
+
+    /** Logs the exact JSON sent to Google with all image bytes redacted, for debugging 400s. */
+    private fun logSanitizedRequest(modelName: String, requestMode: RequestMode, body: JSONObject) {
+        val sanitized = JSONObject().apply {
+            put("model", modelName)
+            put("mode", requestMode.name)
+            put("endpoint", ":predictLongRunning")
+            put("instances", redactImageData(body.optJSONArray("instances") ?: JSONArray()))
+            put("parameters", body.optJSONObject("parameters") ?: JSONObject())
+        }
+        val text = sanitized.toString(2)
+        // Logcat truncates long single lines; chunk so the full sanitized body is readable.
+        text.chunked(3500).forEachIndexed { index, chunk ->
+            Log.d(TAG, "submitGeneration request[$index]: $chunk")
+        }
+    }
+
+    private fun redactImageData(value: Any): Any = when (value) {
+        is JSONObject -> {
+            val copy = JSONObject()
+            value.keys().forEach { key ->
+                val v = value.get(key)
+                copy.put(key, if (key == "data" && v is String) "<IMAGE_DATA_REMOVED>" else redactImageData(v))
+            }
+            copy
+        }
+        is JSONArray -> {
+            val copy = JSONArray()
+            for (i in 0 until value.length()) copy.put(redactImageData(value.get(i)))
+            copy
+        }
+        else -> value
     }
 
     suspend fun pollOperation(apiKey: String, operationName: String): Result<OperationResult> =

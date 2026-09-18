@@ -149,6 +149,19 @@ fun CreateScreen(
                     onDismiss = viewModel::dismissSuggestion
                 )
             }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Use multiple images for product consistency", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Off: one starting image animates. On: up to 3 photos are sent as Veo " +
+                            "reference images instead (no starting frame, locked to 8s).",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = VeoTextSecondary
+                    )
+                }
+                Switch(checked = state.useMultipleImages, onCheckedChange = viewModel::setUseMultipleImages)
+            }
         }
 
         PromptSection(
