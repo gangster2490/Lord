@@ -85,6 +85,16 @@ class GeminiVeoClient {
             val usesReferenceImages = requestMode == RequestMode.REFERENCE_IMAGES && referenceImages.isNotEmpty()
             val usesStartingImage = requestMode == RequestMode.IMAGE_TO_VIDEO && primaryImage != null
 
+            // Veo 3.1 Lite supports image/lastFrame but never referenceImages - the caller (view
+            // model) is responsible for routing to Fast/Standard instead, but this is the
+            // last-line-of-defense guard in case that routing is ever bypassed.
+            if (usesReferenceImages && !model.supportsReferenceImages) {
+                throw ApiException(
+                    null,
+                    "${model.displayName} does not support reference images. Use Veo 3.1 Fast or Veo 3.1."
+                )
+            }
+
             // Veo's "image" (Vertex-style predict Image object) is NOT the same shape as Gemini
             // Content.Part.inlineData - sending inlineData here gets a 400 "`inlineData` isn't
             // supported by this model." The Veo Image object is {bytesBase64Encoded, mimeType}.

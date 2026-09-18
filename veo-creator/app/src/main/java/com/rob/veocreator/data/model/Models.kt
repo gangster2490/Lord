@@ -27,6 +27,9 @@ enum class VeoModel(
     val supportedResolutions: List<Resolution>,
     /** Cheapest first - used by ModelChoice.AUTO_CHEAPEST to pick the lowest-cost compatible model. */
     val costRank: Int,
+    /** Veo 3.1 Lite supports image input and lastFrame but NOT referenceImages - only Fast and
+     *  Standard do. Routing must never send referenceImages to a model where this is false. */
+    val supportsReferenceImages: Boolean,
     private val pricePerSecondByResolution: Map<Resolution, Double>
 ) {
     VEO_3_1_LITE(
@@ -34,6 +37,7 @@ enum class VeoModel(
         displayName = "Veo 3.1 Lite",
         supportedResolutions = listOf(Resolution.R720P, Resolution.R1080P),
         costRank = 0,
+        supportsReferenceImages = false,
         pricePerSecondByResolution = mapOf(Resolution.R720P to 0.05, Resolution.R1080P to 0.08)
     ),
     VEO_3_1_FAST(
@@ -41,6 +45,7 @@ enum class VeoModel(
         displayName = "Veo 3.1 Fast",
         supportedResolutions = listOf(Resolution.R720P, Resolution.R1080P, Resolution.R4K),
         costRank = 1,
+        supportsReferenceImages = true,
         pricePerSecondByResolution = mapOf(Resolution.R720P to 0.10, Resolution.R1080P to 0.12, Resolution.R4K to 0.30)
     ),
     VEO_3_1(
@@ -48,6 +53,7 @@ enum class VeoModel(
         displayName = "Veo 3.1",
         supportedResolutions = listOf(Resolution.R720P, Resolution.R1080P, Resolution.R4K),
         costRank = 2,
+        supportsReferenceImages = true,
         pricePerSecondByResolution = mapOf(Resolution.R720P to 0.40, Resolution.R1080P to 0.40, Resolution.R4K to 0.60)
     );
 
@@ -66,19 +72,28 @@ enum class ModelChoice(val label: String) {
     FAST("Veo 3.1 Fast"),
     STANDARD("Veo 3.1");
 
-    /** The concrete model this choice maps to for the given resolution. For a fixed choice whose
-     *  model doesn't support that resolution (shouldn't happen - the UI disables that combination)
-     *  this falls back to the cheapest model that does, same as AUTO. */
-    fun resolve(resolution: Resolution): VeoModel {
+    /**
+     * The concrete model this choice maps to for the given resolution and whether the request
+     * needs referenceImages. Veo 3.1 Lite never supports referenceImages, so a fixed LITE choice
+     * (or AUTO) transparently upgrades to the cheapest model that does - Fast first, then
+     * Standard - whenever [requiresReferenceImages] is true. A fixed choice whose model doesn't
+     * support the resolution (shouldn't happen - the UI disables that combination) falls back the
+     * same way.
+     */
+    fun resolve(resolution: Resolution, requiresReferenceImages: Boolean = false): VeoModel {
         val fixed = when (this) {
             AUTO_CHEAPEST -> null
             LITE -> VeoModel.VEO_3_1_LITE
             FAST -> VeoModel.VEO_3_1_FAST
             STANDARD -> VeoModel.VEO_3_1
         }
-        if (fixed != null && resolution in fixed.supportedResolutions) return fixed
+        val fixedIsCompatible = fixed != null &&
+            resolution in fixed.supportedResolutions &&
+            (!requiresReferenceImages || fixed.supportsReferenceImages)
+        if (fixedIsCompatible) return fixed!!
+
         return VeoModel.entries
-            .filter { resolution in it.supportedResolutions }
+            .filter { resolution in it.supportedResolutions && (!requiresReferenceImages || it.supportsReferenceImages) }
             .minByOrNull { it.costRank }
             ?: VeoModel.VEO_3_1
     }

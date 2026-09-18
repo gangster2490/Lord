@@ -88,18 +88,25 @@ data class CreateUiState(
 
     val usesReferenceImages: Boolean get() = requestMode == RequestMode.REFERENCE_IMAGES
 
-    /** The concrete Veo model actually used - resolved from [modelChoice] + [resolution]. */
-    val effectiveModel: VeoModel get() = modelChoice.resolve(resolution)
+    /** The concrete Veo model actually used - resolved from [modelChoice] + [resolution], and
+     *  transparently upgraded off Lite whenever referenceImages are required (Lite doesn't
+     *  support them at all). */
+    val effectiveModel: VeoModel get() = modelChoice.resolve(resolution, usesReferenceImages)
 
     val estimatedCostUsd: Double? get() = effectiveModel.estimatedCost(resolution, duration)
 
-    /** Non-null only when AUTO didn't land on the cheapest model of all (Lite), so the UI can
-     *  explain why a pricier model was required instead of leaving the user guessing. */
+    /** Non-null whenever AUTO (or a fixed Lite choice, for the referenceImages case) didn't land
+     *  on the requested/cheapest model, so the UI can explain why instead of leaving the user
+     *  guessing why a pricier model - or a different one than they picked - was used. */
     val costExplanation: String?
         get() {
-            if (modelChoice != ModelChoice.AUTO_CHEAPEST) return null
-            if (effectiveModel == VeoModel.VEO_3_1_LITE) return null
-            return "Veo 3.1 Lite doesn't support ${resolution.label} - using ${effectiveModel.displayName} instead."
+            val canOverride = modelChoice == ModelChoice.AUTO_CHEAPEST || modelChoice == ModelChoice.LITE
+            if (!canOverride || effectiveModel == VeoModel.VEO_3_1_LITE) return null
+            return if (usesReferenceImages) {
+                "Switched to ${effectiveModel.displayName} because Lite does not support reference images."
+            } else {
+                "Veo 3.1 Lite doesn't support ${resolution.label} - using ${effectiveModel.displayName} instead."
+            }
         }
 }
 
@@ -401,7 +408,8 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             appendLine("Generation mode: ${requestMode.generationStrategyLabel}")
             appendLine("Uploaded images: ${state.images.size}")
             appendLine("Reference images sent: ${state.referenceImageCount}")
-            appendLine("Starting image: ${requestMode == RequestMode.IMAGE_TO_VIDEO}")
+            appendLine("Reference image support on selected model: ${state.effectiveModel.supportsReferenceImages}")
+            appendLine("Starting image sent: ${requestMode == RequestMode.IMAGE_TO_VIDEO}")
             if (requestMode != RequestMode.TEXT_TO_VIDEO) {
                 appendLine("Selected primary image index: ${primaryIndex ?: "n/a"}")
                 appendLine("Supporting image indexes: ${if (supportingIndexes.isEmpty()) "none" else supportingIndexes.joinToString()}")

@@ -464,7 +464,7 @@ private fun CostEstimateCard(state: CreateUiState) {
                 style = MaterialTheme.typography.bodyLarge,
                 color = VeoYellow
             )
-            if (state.modelChoice == ModelChoice.AUTO_CHEAPEST) {
+            if (state.modelChoice == ModelChoice.AUTO_CHEAPEST || state.costExplanation != null) {
                 Spacer(Modifier.height(4.dp))
                 Text(
                     state.costExplanation ?: "Cheapest compatible model selected automatically",
