@@ -85,25 +85,18 @@ class GeminiVeoClient {
             val usesReferenceImages = requestMode == RequestMode.REFERENCE_IMAGES && referenceImages.isNotEmpty()
             val usesStartingImage = requestMode == RequestMode.IMAGE_TO_VIDEO && primaryImage != null
 
+            // Veo's "image" (Vertex-style predict Image object) is NOT the same shape as Gemini
+            // Content.Part.inlineData - sending inlineData here gets a 400 "`inlineData` isn't
+            // supported by this model." The Veo Image object is {bytesBase64Encoded, mimeType}.
             val instance = JSONObject().apply {
                 put("prompt", prompt)
                 if (usesStartingImage) {
-                    put("image", JSONObject().apply {
-                        put("inlineData", JSONObject().apply {
-                            put("mimeType", primaryImage!!.mimeType)
-                            put("data", primaryImage.base64)
-                        })
-                    })
+                    put("image", veoImageJson(primaryImage!!))
                 } else if (usesReferenceImages) {
                     val refsArray = JSONArray()
                     referenceImages.forEach { ref ->
                         refsArray.put(JSONObject().apply {
-                            put("image", JSONObject().apply {
-                                put("inlineData", JSONObject().apply {
-                                    put("mimeType", ref.mimeType)
-                                    put("data", ref.base64)
-                                })
-                            })
+                            put("image", veoImageJson(ref))
                             put("referenceType", "asset")
                         })
                     }
@@ -157,6 +150,12 @@ class GeminiVeoClient {
         }
     }
 
+    /** The Veo REST "Image" object: {bytesBase64Encoded, mimeType} - distinct from Gemini inlineData. */
+    private fun veoImageJson(image: InlineImage): JSONObject = JSONObject().apply {
+        put("bytesBase64Encoded", image.base64)
+        put("mimeType", image.mimeType)
+    }
+
     /** Logs the exact JSON sent to Google with all image bytes redacted, for debugging 400s. */
     private fun logSanitizedRequest(modelName: String, requestMode: RequestMode, body: JSONObject) {
         val sanitized = JSONObject().apply {
@@ -178,7 +177,8 @@ class GeminiVeoClient {
             val copy = JSONObject()
             value.keys().forEach { key ->
                 val v = value.get(key)
-                copy.put(key, if (key == "data" && v is String) "<IMAGE_DATA_REMOVED>" else redactImageData(v))
+                val isImageBytesField = (key == "data" || key == "bytesBase64Encoded") && v is String
+                copy.put(key, if (isImageBytesField) "<IMAGE_DATA_REMOVED>" else redactImageData(v))
             }
             copy
         }

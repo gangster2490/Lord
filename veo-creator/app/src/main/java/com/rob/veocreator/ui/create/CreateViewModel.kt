@@ -337,7 +337,13 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
             appendLine("Aspect ratio: ${state.aspectRatio.apiValue}")
             appendLine("Resolution: ${state.resolution.apiValue}")
             appendLine("Duration: ${state.duration.apiValue}")
-            append("Person generation: $personGeneration")
+            appendLine("Person generation: $personGeneration")
+            appendLine("Transport: REST (Gemini API v1beta, x-goog-api-key)")
+            appendLine("Image encoding: Veo Image object (bytesBase64Encoded + mimeType)")
+            if (requestMode != RequestMode.TEXT_TO_VIDEO) {
+                appendLine("MIME type: ${state.images.firstOrNull()?.mimeType ?: "n/a"}")
+            }
+            append("Using Gemini Content inlineData: false")
         }
     }
 
