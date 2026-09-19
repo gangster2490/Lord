@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
@@ -48,14 +50,18 @@ fun BuchungenScreen(initialFilter: BuchungFilter, onOpenIncome: (String) -> Unit
             )
 
             Row(
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 listOf(
                     BuchungFilter.ALLE to "Alle",
                     BuchungFilter.EINNAHMEN to "Einnahmen",
                     BuchungFilter.AUSGABEN to "Ausgaben",
-                    BuchungFilter.FROZEN to "Frozen",
+                    BuchungFilter.FROZEN to "Eingefroren",
+                    BuchungFilter.AVAILABLE to "Verfügbar",
+                    BuchungFilter.PAID_OUT to "Ausgezahlt",
                 ).forEach { (filter, label) ->
                     FilterChip(
                         selected = state.filter == filter,

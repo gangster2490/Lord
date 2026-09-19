@@ -22,10 +22,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -85,8 +90,10 @@ fun DashboardScreen(
                 frozenCents = state.summary.frozenCents,
                 availableCents = state.summary.availableCents,
                 paidOutCents = state.summary.paidOutCents,
+                onEarnedClick = { onBuchungen(BuchungFilter.EINNAHMEN) },
                 onFrozenClick = { onBuchungen(BuchungFilter.FROZEN) },
-                onOtherClick = { onBuchungen(BuchungFilter.ALLE) },
+                onAvailableClick = { onBuchungen(BuchungFilter.AVAILABLE) },
+                onPaidOutClick = { onBuchungen(BuchungFilter.PAID_OUT) },
             )
 
             ActionMenu(
@@ -158,15 +165,45 @@ private fun BigResultRow(label: String, valueCents: Long, emphasize: Boolean = f
             label,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = if (emphasize) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
         )
-        Text(
-            valueCents.asEuro(),
-            fontSize = if (emphasize) 28.sp else 24.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.End,
+        AutoSizeEuroText(
+            text = valueCents.asEuro(),
+            maxFontSize = if (emphasize) 28.sp else 24.sp,
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }
+
+/**
+ * Rendert einen Eurobetrag garantiert einzeilig (nie abgeschnitten/umgebrochen): startet bei
+ * [maxFontSize] und reduziert die Schriftgröße schrittweise, bis der Text ohne Overflow in die
+ * verfügbare Breite passt. Löst das Umbruch-Problem bei großen Beträgen auf schmalen Bildschirmen,
+ * ohne das Layout selbst zu verändern.
+ */
+@Composable
+private fun AutoSizeEuroText(text: String, maxFontSize: TextUnit, modifier: Modifier = Modifier) {
+    var fontSize by remember(text, maxFontSize) { mutableStateOf(maxFontSize) }
+    Text(
+        text,
+        fontSize = fontSize,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.End,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+        modifier = modifier,
+        onTextLayout = { result ->
+            if (result.hasVisualOverflow && fontSize.value > MIN_EURO_FONT_SIZE_VALUE) {
+                fontSize = (fontSize.value - 1).sp
+            }
+        },
+    )
+}
+
+private const val MIN_EURO_FONT_SIZE_VALUE = 14f
 
 /** Separater Auszahlungsstatus-Block - wird NIE mit Einnahmen/Ausgaben vermischt (§13: Frozen != Ausgezahlt). */
 @Composable
@@ -175,16 +212,18 @@ private fun PayoutStatusBlock(
     frozenCents: Long,
     availableCents: Long,
     paidOutCents: Long,
+    onEarnedClick: () -> Unit,
     onFrozenClick: () -> Unit,
-    onOtherClick: () -> Unit,
+    onAvailableClick: () -> Unit,
+    onPaidOutClick: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("TikTok-Auszahlungsstatus", style = MaterialTheme.typography.titleSmall)
-            PayoutStatusRow("Earned (angezeigt)", earnedCents, onOtherClick)
+            PayoutStatusRow("Earned (angezeigt)", earnedCents, onEarnedClick)
             PayoutStatusRow("Eingefroren", frozenCents, onFrozenClick)
-            PayoutStatusRow("Verfügbar", availableCents, onOtherClick)
-            PayoutStatusRow("Ausgezahlt", paidOutCents, onOtherClick)
+            PayoutStatusRow("Verfügbar", availableCents, onAvailableClick)
+            PayoutStatusRow("Ausgezahlt", paidOutCents, onPaidOutClick)
         }
     }
 }

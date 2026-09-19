@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.tiktokshop.buchhaltung.data.model.Cents
 import de.tiktokshop.buchhaltung.data.model.EntryType
+import de.tiktokshop.buchhaltung.data.model.ExpenseEntry
+import de.tiktokshop.buchhaltung.data.model.IncomeEntry
 import de.tiktokshop.buchhaltung.data.model.IncomeStatus
 import de.tiktokshop.buchhaltung.data.repository.LedgerRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,7 +15,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 
-enum class BuchungFilter { ALLE, EINNAHMEN, AUSGABEN, FROZEN }
+enum class BuchungFilter { ALLE, EINNAHMEN, AUSGABEN, FROZEN, AVAILABLE, PAID_OUT }
 
 /** Eine Zeile in der "Buchungen"-Liste (§15) - vereinheitlicht Einnahme/Ausgabe für Anzeige/Suche. */
 data class BuchungRow(
@@ -25,6 +27,8 @@ data class BuchungRow(
     val amountCents: Cents,
     val type: EntryType,
     val isFrozen: Boolean,
+    /** Auszahlungsstatus der Einnahme (null bei Ausgaben) - für Verfügbar/Ausgezahlt-Filter. */
+    val incomeStatus: IncomeStatus? = null,
 )
 
 data class BuchungenUiState(
@@ -51,43 +55,9 @@ class BuchungenViewModel(
         filter,
         query,
     ) { incomes, expenses, currentFilter, currentQuery ->
-        val incomeRows = incomes.map { income ->
-            BuchungRow(
-                id = income.id,
-                date = income.date,
-                description = income.payer ?: income.platform,
-                category = income.incomeType,
-                amountCents = income.amountCents,
-                type = EntryType.INCOME,
-                isFrozen = income.status == IncomeStatus.FROZEN,
-            )
-        }
-        val expenseRows = expenses.map { expense ->
-            BuchungRow(
-                id = expense.id,
-                date = expense.date,
-                description = expense.merchant ?: "Ausgabe",
-                category = expense.category.label,
-                amountCents = -expense.grossAmountCents,
-                type = EntryType.EXPENSE,
-                isFrozen = false,
-            )
-        }
-        val all = (incomeRows + expenseRows).sortedByDescending { it.date }
-
-        val byFilter = when (currentFilter) {
-            BuchungFilter.ALLE -> all
-            BuchungFilter.EINNAHMEN -> all.filter { it.type == EntryType.INCOME }
-            BuchungFilter.AUSGABEN -> all.filter { it.type == EntryType.EXPENSE }
-            BuchungFilter.FROZEN -> all.filter { it.isFrozen }
-        }
-        val searched = if (currentQuery.isBlank()) {
-            byFilter
-        } else {
-            byFilter.filter {
-                it.description.contains(currentQuery, ignoreCase = true) || it.category.contains(currentQuery, ignoreCase = true)
-            }
-        }
+        val all = buchungRows(incomes, expenses)
+        val byFilter = applyBuchungFilter(all, currentFilter)
+        val searched = applySearch(byFilter, currentQuery)
 
         BuchungenUiState(currentFilter, currentQuery, searched)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), BuchungenUiState(initialFilter))
@@ -98,5 +68,55 @@ class BuchungenViewModel(
 
     fun setQuery(newQuery: String) {
         query.value = newQuery
+    }
+}
+
+/** Vereinheitlicht Einnahmen/Ausgaben zu [BuchungRow]s, neueste zuerst. */
+internal fun buchungRows(incomes: List<IncomeEntry>, expenses: List<ExpenseEntry>): List<BuchungRow> {
+    val incomeRows = incomes.map { income ->
+        BuchungRow(
+            id = income.id,
+            date = income.date,
+            description = income.payer ?: income.platform,
+            category = income.incomeType,
+            amountCents = income.amountCents,
+            type = EntryType.INCOME,
+            isFrozen = income.status == IncomeStatus.FROZEN,
+            incomeStatus = income.status,
+        )
+    }
+    val expenseRows = expenses.map { expense ->
+        BuchungRow(
+            id = expense.id,
+            date = expense.date,
+            description = expense.merchant ?: "Ausgabe",
+            category = expense.category.label,
+            amountCents = -expense.grossAmountCents,
+            type = EntryType.EXPENSE,
+            isFrozen = false,
+        )
+    }
+    return (incomeRows + expenseRows).sortedByDescending { it.date }
+}
+
+/**
+ * Filtert die vereinheitlichten Buchungen für die vier Auszahlungsstatus-Zeilen im Dashboard
+ * (Earned/Eingefroren/Verfügbar/Ausgezahlt): jede Zeile führt jetzt zu ihrer eigenen,
+ * korrekt gefilterten Ansicht statt alle auf BuchungFilter.ALLE.
+ */
+internal fun applyBuchungFilter(rows: List<BuchungRow>, filter: BuchungFilter): List<BuchungRow> = when (filter) {
+    BuchungFilter.ALLE -> rows
+    BuchungFilter.EINNAHMEN -> rows.filter { it.type == EntryType.INCOME }
+    BuchungFilter.AUSGABEN -> rows.filter { it.type == EntryType.EXPENSE }
+    BuchungFilter.FROZEN -> rows.filter { it.isFrozen }
+    BuchungFilter.AVAILABLE -> rows.filter { it.incomeStatus == IncomeStatus.AVAILABLE }
+    BuchungFilter.PAID_OUT -> rows.filter { it.incomeStatus == IncomeStatus.PAID_OUT }
+}
+
+internal fun applySearch(rows: List<BuchungRow>, query: String): List<BuchungRow> = if (query.isBlank()) {
+    rows
+} else {
+    rows.filter {
+        it.description.contains(query, ignoreCase = true) || it.category.contains(query, ignoreCase = true)
     }
 }
