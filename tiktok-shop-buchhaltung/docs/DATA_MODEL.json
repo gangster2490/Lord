@@ -1,0 +1,66 @@
+{
+  "enums": {
+    "EntryType": ["INCOME", "EXPENSE"],
+    "IncomeStatus": ["ACCRUED", "FROZEN", "AVAILABLE", "PAID_OUT", "REVERSED"],
+    "ExpenseCategory": [
+      "VIDEO_PRODUCTS",
+      "SHIPPING",
+      "SOFTWARE_SUBSCRIPTIONS",
+      "AI_SERVICES",
+      "PHONE_INTERNET",
+      "CAMERA_AUDIO_LIGHTING",
+      "COMPUTER_PHONE_ACCESSORIES",
+      "ADVERTISING",
+      "TRAVEL",
+      "OFFICE_SUPPLIES",
+      "FEES",
+      "OTHER"
+    ]
+  },
+  "IncomeEntry": {
+    "id": "uuid",
+    "date": "YYYY-MM-DD",
+    "platform": "string",
+    "incomeType": "string",
+    "amount": "decimal",
+    "currency": "EUR",
+    "status": "IncomeStatus",
+    "payoutDate": "YYYY-MM-DD|null",
+    "paidOutAmount": "decimal|null",
+    "note": "string|null",
+    "receiptUris": ["string"],
+    "ocrRawText": "string|null",
+    "ocrConfidence": "0..1|null",
+    "confirmed": "boolean",
+    "createdAt": "datetime",
+    "updatedAt": "datetime"
+  },
+  "ExpenseEntry": {
+    "id": "uuid",
+    "date": "YYYY-MM-DD",
+    "merchant": "string|null",
+    "category": "ExpenseCategory",
+    "grossAmount": "decimal",
+    "currency": "EUR",
+    "vatAmount": "decimal|null",
+    "businessUsePercent": "0..100",
+    "businessAmount": "decimal",
+    "paymentMethod": "string|null",
+    "note": "string|null",
+    "receiptUris": ["string"],
+    "ocrRawText": "string|null",
+    "ocrConfidence": "0..1|null",
+    "confirmed": "boolean",
+    "createdAt": "datetime",
+    "updatedAt": "datetime"
+  },
+  "StatusHistory": {
+    "id": "uuid",
+    "incomeEntryId": "uuid",
+    "oldStatus": "IncomeStatus|null",
+    "newStatus": "IncomeStatus",
+    "changedAt": "datetime",
+    "note": "string|null",
+    "receiptUri": "string|null"
+  }
+}
