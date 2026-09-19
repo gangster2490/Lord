@@ -1,8 +1,10 @@
 package de.tiktokshop.buchhaltung.data.db
 
 import androidx.room.TypeConverter
+import de.tiktokshop.buchhaltung.data.model.ActivityPhase
 import de.tiktokshop.buchhaltung.data.model.ExpenseCategory
 import de.tiktokshop.buchhaltung.data.model.IncomeStatus
+import de.tiktokshop.buchhaltung.data.model.SourceDocumentType
 import java.time.Instant
 import java.time.LocalDate
 
@@ -30,6 +32,18 @@ class Converters {
 
     @TypeConverter
     fun toExpenseCategory(value: String?): ExpenseCategory? = value?.let(ExpenseCategory::valueOf)
+
+    @TypeConverter
+    fun fromActivityPhase(value: ActivityPhase?): String? = value?.name
+
+    @TypeConverter
+    fun toActivityPhase(value: String?): ActivityPhase? = value?.let(ActivityPhase::valueOf)
+
+    @TypeConverter
+    fun fromSourceDocumentType(value: SourceDocumentType?): String? = value?.name
+
+    @TypeConverter
+    fun toSourceDocumentType(value: String?): SourceDocumentType? = value?.let(SourceDocumentType::valueOf)
 
     /** Belegpfade werden als einfache, mit '|' getrennte Liste gespeichert (keine '|' in Pfaden). */
     @TypeConverter

@@ -69,6 +69,73 @@ Erreichbar über den neuen Dashboard-Button "Beleg / Screenshot scannen". Die bi
 Einzel-Erfassungsscreens (`ui/income/IncomeCaptureScreen`, `ui/expense/ExpenseCaptureScreen`)
 bleiben für die manuelle Erfassung eines einzelnen Belegs erhalten.
 
+## TikTok-Excel-Import ("TikTok Excel importieren")
+
+Importiert offizielle TikTok-Shop-Earnings-Reports (`.xlsx`, ein oder mehrere gleichzeitig)
+als `IncomeEntry`s - ohne OCR, direkt aus der Tabelle:
+
+1. **`data/xlsx/XlsxReader`**: minimaler, selbst geschriebener OOXML-SpreadsheetML-Reader
+   (ZIP + `javax.xml.parsers`/`org.w3c.dom`, beides Standard-Java/Android-APIs) - **bewusst
+   ohne Apache POI**, da `poi-ooxml` auf Android AWT-/ImageIO-Klassen nachzieht, die dort nicht
+   existieren, und eine häufige Absturzursache ist. Behandelt XLSX' "sparse rows" korrekt
+   (komplett leere Zeilen fehlen im XML ganz und dürfen nicht einfach nach Position
+   durchnummeriert werden, siehe Testfall "reads Sheet1 header row").
+2. **`data/importer/TikTokExcelParser`**: sucht die Kopfzeile dynamisch (sie steht real in
+   Zeile 6, davor stehen Disclaimer/Metadaten wie "Date period"/"Creator name"), liest Spalten
+   über ihren Namen statt feste Position (Anzahl VAT-Spalten variiert), mappt
+   `Type of earnings` über `TikTokEarningTypeMapper` (Standard/Shop ads commission -> Provision,
+   Seller/Affiliate partner bonus -> Bonus, Rewards -> Rewards). Beträge sind reine
+   Dezimalstrings mit Punkt (z. B. "2.37"), kein deutsches Komma-Format.
+3. **Dublettenschutz (`data/repository/ImportRepository`, §8)**: Schlüssel ist die Kombination
+   aus TikTok **Transaction ID + Type of earnings**, nicht die Transaction ID allein (siehe
+   "Reale Datenbefunde" unten - wichtige Abweichung von der ursprünglichen Annahme "Transaction
+   ID ist eindeutig"). `preview()` liest+hasht die Datei und prüft gegen die Datenbank, OHNE
+   etwas zu speichern; erst `commit()` (nach Nutzerbestätigung) persistiert. Dateien mit
+   identischem Hash werden als "bereits importiert" erkannt (`SourceDocument.hash`).
+4. **`data/model/SourceDocument`**: jede importierte Datei wird unverändert und dauerhaft unter
+   `filesDir/imports/` gesichert (nie gelöscht, auch nicht mit den daraus erzeugten Buchungen) -
+   Audit-Trail.
+5. **`data/model/ImportBatch`** ("Import-Verlauf"): pro Importversuch (auch bei 0 neuen
+   Zeilen) ein Protokolleintrag mit Dateiname, Zeitraum, Zeilenzahl, neu/Dubletten, Summe.
+6. **UI**: `ui/importer/ImportExcelScreen` (Mehrfachauswahl über
+   `ActivityResultContracts.OpenMultipleDocuments`, pro Datei eine Vorschau-Karte mit "X neue
+   Transaktionen / X bereits vorhanden / Gesamteinnahmen / Zeitraum", Fehler bleiben sichtbar
+   bis der Nutzer explizit auf "Fertig" tippt - kein automatisches Wegnavigieren) und
+   `ui/importer/ImportHistoryScreen`.
+
+Erreichbar über die neuen Dashboard-Buttons "TikTok Excel importieren" und "Import-Verlauf".
+
+### Datenbefunde aus der Entwicklung (Test-Fixtures sind anonymisiert)
+
+Parser und Importer wurden während der Entwicklung gegen alle 8 vom Nutzer bereitgestellten
+echten Monats-Reports (Januar-August) geprüft, bevor sie fertiggestellt wurden. Die dabei
+gefundenen strukturellen Eigenheiten sind wichtig für die Korrektheit und deshalb weiterhin
+über anonymisierte Fixtures abgedeckt (`app/src/test/resources/tiktok_reports/`,
+Erzeugungsskript nicht im Repo) - **die echten Dateien selbst (mit echten Beträgen/
+Geschäftspartnernamen) wurden bewusst nicht committet**, die konkreten Zahlen aus der
+Original-Analyse hat der Nutzer separat im Chat erhalten. Zwei Befunde haben die ursprüngliche
+Spezifikationsannahme korrigiert:
+
+1. **Eine TikTok Transaction ID ist NICHT immer eindeutig.** Dieselbe ID kann mit
+   unterschiedlichem "Type of earnings" mehrfach auftreten (z. B. einmal "Seller bonus", einmal
+   "Standard commission" für denselben zugrunde liegenden Verkauf) - zwei echte, unterschiedliche
+   Einnahmen. Ein einfacher `UNIQUE`-Index nur auf die Transaction ID hätte beim Import eine der
+   beiden Zeilen still verworfen (SQLite `INSERT OR REPLACE` beim Constraint-Konflikt). Der
+   Dublettenschlüssel ist deshalb `externalTransactionId` + `externalEarningType` gemeinsam
+   (composite `UNIQUE INDEX`), siehe Kommentar an `IncomeEntry`. `TikTokExcelParserTest`
+   ("the same Transaction ID with two different earning types...") und `ImportRepositoryTest`
+   decken das gegen eine In-Memory-Room-DB ab.
+2. **Eine Zeile kann ein leeres "Income"-Feld haben.** Der Parser erfindet hier keinen Betrag,
+   sondern meldet die Zeile als überspringbaren Fehler (`TikTokEarningsRowError`) - sichtbar in
+   der Import-Vorschau, nicht stillschweigend als 0 € gezählt (`TikTokExcelParserTest`).
+3. **Beobachtung beim Original-Datensatz (nicht Teil der Test-Fixtures):** die Summe einer der
+   acht echten Monatsdateien wich von der in den Steuerunterlagen dokumentierten Arbeitsstand-
+   Summe für denselben Monat ab - vermutlich eine andere/spätere Export-Version als die in der
+   Steuer-Arbeitsmappe verwendete. Die App zeigt bewusst nur, was in den tatsächlich
+   importierten Dateien steht, und erfindet nichts, um eine extern dokumentierte Summe zu
+   treffen. **Falls Steuerunterlagen und App-Summe abweichen, deutet das auf eine andere/
+   aktuellere Report-Datei hin, die nachimportiert werden sollte - kein App-Fehler.**
+
 ## Wichtigste fachliche Regel
 
 `IncomeStatus` trennt strikt zwischen angezeigter Provision (`ACCRUED`), `FROZEN`,
@@ -117,10 +184,17 @@ Reine JUnit-Tests (kein Android-Gerät/Emulator nötig) unter `app/src/test/...`
   nie als Händler übernommen), `CategorySuggesterTest`/`IncomeTypeSuggesterTest` (alle
   vorgegebenen Auto-Kategorien), `IgnoreTermsTest` (Monate/Kopfzeilen), `AiVisionMapperTest`
   (AI-DTO -> Domain erfindet nie fehlende Felder).
+- **TikTok-Excel-Import** – `XlsxReaderTest` und `TikTokExcelParserTest` laufen gegen
+  anonymisierte Fixtures, die strukturell echte TikTok-Earnings-Reports nachbilden (siehe
+  "Datenbefunde aus der Entwicklung" oben); `ImportRepositoryTest` ist ein Robolectric-
+  Integrationstest gegen eine echte In-Memory-Room-Datenbank (§34: "import a report", "import
+  the same report twice" ohne Dubletten, "import zwei Monate" ohne Cross-Contamination).
 
-**TC05** (Statushistorie) und **TC08** (Backup/Restore-Rundlauf) benötigen eine echte
-Room-Datenbank bzw. Datei-I/O und sind als Instrumented Tests (`androidTest`) vorgesehen,
-aber in diesem Durchgang nicht ausprogrammiert.
+**TC05** (Statushistorie) benötigt eine echte Room-Datenbank/Instrumented-Test-Setup und ist
+in diesem Durchgang nicht ausprogrammiert; **TC08** (Backup/Restore) ist jetzt für das
+erweiterte Schema (siehe unten) angepasst, aber nur durch Kompilierung/manuelle Prüfung
+abgesichert, nicht durch einen dedizierten neuen Test (ehrlich benannt, nicht als "getestet"
+behauptet).
 
 ```bash
 cd tiktok-shop-buchhaltung
@@ -129,15 +203,17 @@ cd tiktok-shop-buchhaltung
 
 > **Build-Status**: `./gradlew testDebugUnitTest`, `./gradlew assembleDebug` und
 > `./gradlew assembleRelease` (R8/Minify) wurden tatsächlich ausgeführt (Android SDK 35 +
-> Build-Tools 35.0.0) – Ergebnis: **BUILD SUCCESSFUL**, alle 65 Unit-Tests grün. Beim ersten
-> Durchlauf des Grundgerüsts wurden mehrere reale Fehler gefunden und behoben, die eine reine
-> Code-Review nicht aufgedeckt hätte: fehlende Farbe `ic_launcher_background`
-> (aapt2-Linking-Fehler), fehlende `kotlinx-coroutines-play-services`-Abhängigkeit für
-> `Task.await()`, `Icons.Filled.ArrowBack` als nicht importierte Extension-Property. Beim
-> Mehrfach-Transaktions-Scan wurde zusätzlich ein echter `AmountParser`-Bug gefunden und
-> behoben: Zeilen, die Datum und Betrag zusammen enthalten (z. B. "03.07.2026 10,99 €"),
-> ließen den Betrag fälschlich als mehrdeutig gelten, weil das Datum wie ein zweiter
-> Betragskandidat aussah - jetzt werden Datumsangaben vor der Betragssuche herausgefiltert.
+> Build-Tools 35.0.0) – Ergebnis: **BUILD SUCCESSFUL**, alle 79 Unit-Tests grün (mehrfach mit
+> `--rerun` gegengeprüft, nicht nur Gradle-Cache-Treffer). Beim ersten Durchlauf des
+> Grundgerüsts wurden mehrere reale Fehler gefunden und behoben, die eine reine Code-Review
+> nicht aufgedeckt hätte: fehlende Farbe `ic_launcher_background` (aapt2-Linking-Fehler),
+> fehlende `kotlinx-coroutines-play-services`-Abhängigkeit für `Task.await()`,
+> `Icons.Filled.ArrowBack` als nicht importierte Extension-Property. Beim Mehrfach-
+> Transaktions-Scan wurde zusätzlich ein echter `AmountParser`-Bug gefunden und behoben:
+> Zeilen, die Datum und Betrag zusammen enthalten (z. B. "03.07.2026 10,99 €"), ließen den
+> Betrag fälschlich als mehrdeutig gelten. Beim Excel-Import wurden zwei weitere reale Bugs
+> gefunden und behoben (siehe "Reale Datenbefunde" oben): das Sparse-Row-Problem im
+> XLSX-Reader und die Transaction-ID-Eindeutigkeitsannahme.
 
 ## Build
 
@@ -164,4 +240,28 @@ Package id: `de.tiktokshop.buchhaltung`
   OCR).
 - Ein eigener Einstellungsscreen für `BackendConfigStore` (Backend-URL/Token eingeben) fehlt
   noch - aktuell nur über die Klasse selbst nutzbar.
-- Instrumented Test für die Room-Migration `MIGRATION_1_2` (`merchant_rules`-Tabelle).
+- Instrumented Test für die Room-Migrationen `MIGRATION_1_2`/`MIGRATION_2_3` (Schema-SQL wurde
+  manuell gegen Rooms generierte `schemas/3.json` abgeglichen, aber kein
+  `MigrationTestHelper`-Test).
+
+### Noch nicht umgesetzt aus der 37-Punkte-Spezifikation (bewusst nicht als "fertig" gemeldet)
+
+Diese Session hat PHASE 1-3 umgesetzt (Analyse, Plan, TikTok-Excel-Import mit
+Dublettenschutz/Import-Verlauf). Noch offen, in der vom Nutzer vorgegebenen Reihenfolge:
+
+- **PHASE 4/5** (teilweise aus einer früheren Session vorhanden): Mehrfach-Transaktions-OCR
+  und AI-Vision-Fallback existieren bereits (`scan/`, `ai/`), aber der Excel-Import nutzt sie
+  noch nicht für die `payoutStatus`/`taxRelevance`-Feinsteuerung aus §4.
+- **PHASE 6**: "Steuer-Arbeitsstand"-Screen, "Offene Nachweise" (`OpenEvidenceItem`,
+  §23 mit den 6 vorgegebenen Punkten), `BusinessAsset` (§24, MSI-Laptop-Beispiel) - noch keine
+  Entities, kein Screen.
+- **PHASE 7**: Export/Backup/Restore für die neuen Entities (`SourceDocument`, `ImportBatch`,
+  `MerchantRule`, künftige `OpenEvidenceItem`/`BusinessAsset`) - aktuell sichert Backup nur
+  `IncomeEntry`/`ExpenseEntry`/`StatusHistory` (jetzt inkl. der in Phase 3 neuen Felder) sowie
+  `MerchantRule` NICHT und importierte Excel-Dateien/`SourceDocument`s NICHT. EÜR-Style-
+  Zusammenfassungsexport (§25) und PDF/Steuerdokument-Referenzbereich (§26) fehlen.
+- **PHASE 8**: Der EÜR-Datei-Tab "Prüfen" nennt Kie.ai/Picir.ai/Kiti-USD-Ausgaben, die laut
+  Steuerübersicht bewusst noch NICHT in die Summe übernommen sind - das entspricht §23 (Offene
+  Nachweise) und wird erst mit deren Umsetzung in der App abbildbar.
+
+Kein Punkt aus dieser Liste wird hier als "erledigt" behauptet.

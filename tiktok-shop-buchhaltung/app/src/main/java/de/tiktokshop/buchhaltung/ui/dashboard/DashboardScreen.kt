@@ -36,6 +36,8 @@ fun DashboardScreen(
     onExport: () -> Unit,
     onBackup: () -> Unit,
     onScan: () -> Unit,
+    onImportExcel: () -> Unit,
+    onImportHistory: () -> Unit,
 ) {
     val app = rememberApp()
     val viewModel: DashboardViewModel = viewModel(
@@ -86,8 +88,14 @@ fun DashboardScreen(
             Button(onClick = onAusgabeErfassen, modifier = Modifier.fillMaxWidth()) {
                 Text("Ausgabe manuell erfassen")
             }
+            Button(onClick = onImportExcel, modifier = Modifier.fillMaxWidth()) {
+                Text("TikTok Excel importieren")
+            }
             Button(onClick = onBelegePruefen, modifier = Modifier.fillMaxWidth()) {
                 Text("Belege prüfen")
+            }
+            Button(onClick = onImportHistory, modifier = Modifier.fillMaxWidth()) {
+                Text("Import-Verlauf")
             }
             Button(onClick = onExport, modifier = Modifier.fillMaxWidth()) {
                 Text("Export")

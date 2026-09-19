@@ -17,6 +17,8 @@ import de.tiktokshop.buchhaltung.ui.detail.ExpenseDetailScreen
 import de.tiktokshop.buchhaltung.ui.detail.IncomeDetailScreen
 import de.tiktokshop.buchhaltung.ui.expense.ExpenseCaptureScreen
 import de.tiktokshop.buchhaltung.ui.export.ExportScreen
+import de.tiktokshop.buchhaltung.ui.importer.ImportExcelScreen
+import de.tiktokshop.buchhaltung.ui.importer.ImportHistoryScreen
 import de.tiktokshop.buchhaltung.ui.income.IncomeCaptureScreen
 import de.tiktokshop.buchhaltung.ui.review.ReviewScreen
 import de.tiktokshop.buchhaltung.ui.scan.ScanScreen
@@ -34,6 +36,8 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onExport = { navController.navigate(Routes.EXPORT) },
                 onBackup = { navController.navigate(Routes.BACKUP) },
                 onScan = { navController.navigate(Routes.SCAN_GRAPH) },
+                onImportExcel = { navController.navigate(Routes.IMPORT_EXCEL) },
+                onImportHistory = { navController.navigate(Routes.IMPORT_HISTORY) },
             )
         }
         composable(Routes.INCOME_CAPTURE) {
@@ -72,6 +76,13 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         }
         composable(Routes.EXPORT) { ExportScreen() }
         composable(Routes.BACKUP) { BackupScreen() }
+        composable(Routes.IMPORT_EXCEL) {
+            ImportExcelScreen(
+                onDone = { navController.popBackStack() },
+                onCancel = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.IMPORT_HISTORY) { ImportHistoryScreen() }
 
         navigation(startDestination = Routes.SCAN, route = Routes.SCAN_GRAPH) {
             composable(Routes.SCAN) { backStackEntry ->

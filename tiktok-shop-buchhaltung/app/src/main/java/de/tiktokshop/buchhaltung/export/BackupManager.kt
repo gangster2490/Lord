@@ -44,6 +44,14 @@ private data class BackupIncome(
     val imageHash: String?,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
+    val externalTransactionId: String? = null,
+    val externalEarningType: String? = null,
+    val payer: String? = null,
+    val payerCountry: String? = null,
+    val platformExpenseCents: Long? = null,
+    val activityPhase: String = "REGULAR_BUSINESS",
+    val taxRelevant: Boolean = true,
+    val sourceDocumentId: String? = null,
 )
 
 @Serializable
@@ -66,6 +74,9 @@ private data class BackupExpense(
     val imageHash: String?,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
+    val activityPhase: String = "REGULAR_BUSINESS",
+    val taxRelevant: Boolean = true,
+    val sourceDocumentId: String? = null,
 )
 
 @Serializable
@@ -115,6 +126,14 @@ class BackupManager(private val context: Context, private val repository: Ledger
                     imageHash = it.imageHash,
                     createdAtEpochMillis = it.createdAt.toEpochMilli(),
                     updatedAtEpochMillis = it.updatedAt.toEpochMilli(),
+                    externalTransactionId = it.externalTransactionId,
+                    externalEarningType = it.externalEarningType,
+                    payer = it.payer,
+                    payerCountry = it.payerCountry,
+                    platformExpenseCents = it.platformExpenseCents,
+                    activityPhase = it.activityPhase.name,
+                    taxRelevant = it.taxRelevant,
+                    sourceDocumentId = it.sourceDocumentId,
                 )
             },
             expenses = expenses.map {
@@ -137,6 +156,9 @@ class BackupManager(private val context: Context, private val repository: Ledger
                     imageHash = it.imageHash,
                     createdAtEpochMillis = it.createdAt.toEpochMilli(),
                     updatedAtEpochMillis = it.updatedAt.toEpochMilli(),
+                    activityPhase = it.activityPhase.name,
+                    taxRelevant = it.taxRelevant,
+                    sourceDocumentId = it.sourceDocumentId,
                 )
             },
             statusHistory = history.map {
@@ -217,6 +239,14 @@ class BackupManager(private val context: Context, private val repository: Ledger
                     imageHash = backup.imageHash,
                     createdAt = Instant.ofEpochMilli(backup.createdAtEpochMillis),
                     updatedAt = Instant.ofEpochMilli(backup.updatedAtEpochMillis),
+                    externalTransactionId = backup.externalTransactionId,
+                    externalEarningType = backup.externalEarningType,
+                    payer = backup.payer,
+                    payerCountry = backup.payerCountry,
+                    platformExpenseCents = backup.platformExpenseCents,
+                    activityPhase = de.tiktokshop.buchhaltung.data.model.ActivityPhase.valueOf(backup.activityPhase),
+                    taxRelevant = backup.taxRelevant,
+                    sourceDocumentId = backup.sourceDocumentId,
                 ),
             )
         }
@@ -242,6 +272,9 @@ class BackupManager(private val context: Context, private val repository: Ledger
                     imageHash = backup.imageHash,
                     createdAt = Instant.ofEpochMilli(backup.createdAtEpochMillis),
                     updatedAt = Instant.ofEpochMilli(backup.updatedAtEpochMillis),
+                    activityPhase = de.tiktokshop.buchhaltung.data.model.ActivityPhase.valueOf(backup.activityPhase),
+                    taxRelevant = backup.taxRelevant,
+                    sourceDocumentId = backup.sourceDocumentId,
                 ),
             )
         }
