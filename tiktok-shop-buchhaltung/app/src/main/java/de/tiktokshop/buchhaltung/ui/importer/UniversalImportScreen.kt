@@ -73,7 +73,10 @@ fun UniversalImportScreen(onDone: () -> Unit, onCancel: () -> Unit) {
                 ImportStep.PICK -> PickContent(onPick = { filePicker.launch(IMPORT_MIME_TYPES) }, onCancel = onCancel)
                 ImportStep.LOADING -> LoadingContent(state.filename)
                 ImportStep.COLUMN_MAPPING -> {
-                    val sheet = state.preview?.sheets?.firstOrNull { !it.isConfident }
+                    // Bei mehreren nicht sicher erkannten Sheets wird das mit den MEISTEN
+                    // bereits erkannten Spalten vorausgewählt (§9: "Sheet mit maximaler Anzahl
+                    // erkennbarer Header-Spalten"), statt einfach das erste zu nehmen.
+                    val sheet = state.preview?.sheets?.filter { !it.isConfident }?.maxByOrNull { it.columnMapping.size }
                     if (sheet != null) {
                         ColumnMappingScreen(
                             sheet = sheet,

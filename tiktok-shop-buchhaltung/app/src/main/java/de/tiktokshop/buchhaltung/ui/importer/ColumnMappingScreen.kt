@@ -36,6 +36,9 @@ private val ROLE_LABELS = mapOf(
     ColumnRole.CATEGORY to "Kategorie",
     ColumnRole.CURRENCY to "Währung",
     ColumnRole.TRANSACTION_ID to "Transaction ID",
+    ColumnRole.BUSINESS_PERCENT to "Geschäftlich %",
+    ColumnRole.STATUS to "Status",
+    ColumnRole.SOURCE to "Quelle",
 )
 
 /**

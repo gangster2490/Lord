@@ -173,9 +173,9 @@ class UniversalImportRepositoryTest {
         repository.commitUniversal(einnahmenPreview)
 
         val ausgabenFile = "generic_ausgaben.xlsx"
-        val ausgabenPreviewRaw = repository.previewUniversal(uriForGenericFixture(ausgabenFile), ausgabenFile)
-        // Ohne Vorzeichen zunächst als Einnahme vermutet - Nutzer schaltet im Preview um (§3).
-        val ausgabenPreview = repository.setAmbiguousRowsType(ausgabenPreviewRaw, EntryType.EXPENSE)
+        val ausgabenPreview = repository.previewUniversal(uriForGenericFixture(ausgabenFile), ausgabenFile)
+        // Ohne Vorzeichen, aber Sheet-Name "Ausgaben" gibt den Ausschlag - kein manuelles
+        // Umschalten nötig (siehe UniversalSpreadsheetImporterTest zur Sheet-Namen-Heuristik).
         assertThat(ausgabenPreview.newExpenseCount).isEqualTo(15)
         repository.commitUniversal(ausgabenPreview)
 
@@ -186,5 +186,38 @@ class UniversalImportRepositoryTest {
         assertThat(summary.displayedTotalCents).isEqualTo(197697L) // Einnahmen: 1.976,97 EUR
         assertThat(summary.expensesCents).isEqualTo(82007L) // Ausgaben: 820,07 EUR
         assertThat(summary.earnedMinusExpensesCents).isEqualTo(115690L) // Ergebnis: 1.156,90 EUR
+    }
+
+    /**
+     * Verpflichtender Integrationstest (Nutzer-Vorgabe): Import von "Ausgaben_2026_APK_Import.xlsx"
+     * (Sheet "Ausgaben_2026", 9 Spalten inkl. "Geschäftlich (%)"/Status/Quelle, Kopfzeile durch
+     * 15 Titel-/Leerzeilen nach unten verschoben) muss 63 Ausgaben mit Gesamtsumme 820,07 EUR
+     * ergeben - vorher wurde die Datei fälschlich mit "keine tabellarischen Daten" abgelehnt.
+     * Fixture ist eine synthetische, strukturell identische Nachbildung (siehe Kommentar in
+     * [de.tiktokshop.buchhaltung.data.importer.UniversalSpreadsheetImporterTest]).
+     */
+    @Test
+    fun `Ausgaben_2026_APK_Import xlsx imports as 63 expenses totalling 820,07 EUR`() = runTest {
+        val filename = "Ausgaben_2026_APK_Import.xlsx"
+        val preview = repository.previewUniversal(uriForGenericFixture(filename), filename)
+
+        assertThat(preview.newExpenseCount).isEqualTo(63)
+        assertThat(preview.newIncomeCount).isEqualTo(0)
+        assertThat(preview.totalNewExpenseCents).isEqualTo(82007L) // 820,07 EUR
+        assertThat(preview.duplicateCount).isEqualTo(0)
+
+        val batch = repository.commitUniversal(preview)
+        assertThat(batch.newTransactionCount).isEqualTo(63)
+        assertThat(batch.totalExpenseCents).isEqualTo(82007L)
+
+        val stored = database.expenseDao().getAll()
+        assertThat(stored).hasSize(63)
+        assertThat(stored.sumOf { it.grossAmountCents }).isEqualTo(82007L)
+        assertThat(stored.all { it.businessUsePercent == 100 }).isTrue()
+
+        // Wiederholter Import derselben Datei darf keine Dubletten erzeugen (§6).
+        val secondPreview = repository.previewUniversal(uriForGenericFixture(filename), filename)
+        assertThat(secondPreview.newExpenseCount).isEqualTo(0)
+        assertThat(secondPreview.duplicateCount).isEqualTo(63)
     }
 }

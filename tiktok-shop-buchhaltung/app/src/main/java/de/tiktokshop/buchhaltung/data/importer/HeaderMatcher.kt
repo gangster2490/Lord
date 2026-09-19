@@ -12,6 +12,9 @@ enum class ColumnRole {
     CATEGORY,
     CURRENCY,
     TRANSACTION_ID,
+    BUSINESS_PERCENT,
+    STATUS,
+    SOURCE,
 }
 
 /**
@@ -52,6 +55,16 @@ object HeaderMatcher {
         ColumnRole.TRANSACTION_ID to listOf(
             "transaction id", "id", "external id", "belegnummer",
         ),
+        ColumnRole.BUSINESS_PERCENT to listOf(
+            "geschaftlich", "geschaftlich anteil", "geschaftlicher anteil", "business",
+            "business percentage", "business anteil",
+        ),
+        ColumnRole.STATUS to listOf(
+            "status",
+        ),
+        ColumnRole.SOURCE to listOf(
+            "quelle", "source",
+        ),
     )
 
     /** Normalisiert einen Kopfzeilentext für den toleranten Vergleich - siehe Klassenkommentar. */
@@ -83,6 +96,9 @@ object HeaderMatcher {
             ColumnRole.CURRENCY,
             ColumnRole.MERCHANT,
             ColumnRole.CATEGORY,
+            ColumnRole.BUSINESS_PERCENT,
+            ColumnRole.STATUS,
+            ColumnRole.SOURCE,
         )
         val takenColumns = mutableSetOf<Int>()
 

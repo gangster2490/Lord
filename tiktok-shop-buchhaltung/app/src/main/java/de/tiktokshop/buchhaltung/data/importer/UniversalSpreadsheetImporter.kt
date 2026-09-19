@@ -30,7 +30,11 @@ import java.time.format.DateTimeFormatter
  */
 object UniversalSpreadsheetImporter {
 
-    private const val HEADER_SEARCH_ROWS = 15
+    // Reale, "hübsch" formatierte Excel-Exporte (Titelzeile, Disclaimer, Legende, Leerzeilen vor
+    // der eigentlichen Tabelle) können die Kopfzeile deutlich nach unten schieben - 15 Zeilen
+    // waren dafür zu wenig und haben echte Nutzerdateien fälschlich als "keine Tabellendaten"
+    // abgelehnt, obwohl die Kopfzeile nur weiter unten stand.
+    private const val HEADER_SEARCH_ROWS = 60
     private val DATE_FORMATS = listOf(
         DateTimeFormatter.ISO_LOCAL_DATE,
         DateTimeFormatter.ofPattern("dd.MM.yyyy"),
@@ -109,6 +113,9 @@ object UniversalSpreadsheetImporter {
         val categoryCol = mapping[ColumnRole.CATEGORY]
         val currencyCol = mapping[ColumnRole.CURRENCY]
         val idCol = mapping[ColumnRole.TRANSACTION_ID]
+        val businessPercentCol = mapping[ColumnRole.BUSINESS_PERCENT]
+        val statusCol = mapping[ColumnRole.STATUS]
+        val sourceCol = mapping[ColumnRole.SOURCE]
 
         if (dateCol == null || (incomeCol == null && expenseCol == null && genericCol == null)) {
             return emptyList<ImportCandidateRow>() to emptyList()
@@ -137,17 +144,27 @@ object UniversalSpreadsheetImporter {
 
             // Explizite Income-/Expense-Spalten sind eindeutig. Eine generische "Betrag"-Spalte
             // (z. B. ein ganz normales Excel mit nur Datum+Betrag, egal ob Einnahmen oder
-            // Ausgaben) hat KEINEN verlässlichen Hinweis auf den Typ - ein negatives Vorzeichen
-            // bzw. eine Klammerschreibweise "(12,00)" gilt als Ausgabe, alles andere als
-            // Einnahme. Das ist nur eine Vermutung (isAmbiguousType = true), die der Nutzer im
-            // Import-Preview-Screen für die ganze Datei umschalten kann (§3).
+            // Ausgaben) hat keinen Spalten-Hinweis auf den Typ - zuerst zählt ein negatives
+            // Vorzeichen bzw. eine Klammerschreibweise "(12,00)" als Ausgabe; ist der Betrag
+            // positiv, hilft der Sheet-Name als zusätzliches Signal (ein Sheet/Reiter namens
+            // "Ausgaben_2026" ist eindeutig eine Ausgabenliste, auch ohne eigene Expense-
+            // Spalte). Ohne jeden Hinweis gilt "positiv = Einnahme". Das bleibt in jedem Fall
+            // nur eine Vermutung (isAmbiguousType = true), die der Nutzer im Import-Preview für
+            // die ganze Datei umschalten kann (§3).
             val (type, amountText, isAmbiguous) = when {
                 expenseText.isNotBlank() -> Triple(EntryType.EXPENSE, expenseText, false)
                 incomeText.isNotBlank() -> Triple(EntryType.INCOME, incomeText, false)
                 genericText.isNotBlank() -> {
                     val trimmed = genericText.trim()
                     val looksNegative = trimmed.startsWith("-") || (trimmed.startsWith("(") && trimmed.endsWith(")"))
-                    Triple(if (looksNegative) EntryType.EXPENSE else EntryType.INCOME, genericText, true)
+                    val normalizedSheetName = HeaderMatcher.normalize(sheetName)
+                    val guessedType = when {
+                        looksNegative -> EntryType.EXPENSE
+                        normalizedSheetName.contains("ausgabe") -> EntryType.EXPENSE
+                        normalizedSheetName.contains("einnahme") -> EntryType.INCOME
+                        else -> EntryType.INCOME
+                    }
+                    Triple(guessedType, genericText, true)
                 }
                 else -> Triple(null, "", false)
             }
@@ -164,6 +181,10 @@ object UniversalSpreadsheetImporter {
                 continue
             }
 
+            val businessPercentText = businessPercentCol?.let { row.getOrNull(it)?.trim() }
+            val businessPercent = businessPercentText?.ifBlank { null }
+                ?.replace("%", "")?.trim()?.replace(",", ".")?.toDoubleOrNull()?.toInt()
+
             rows += ImportCandidateRow(
                 type = type,
                 date = date,
@@ -175,6 +196,9 @@ object UniversalSpreadsheetImporter {
                 sourceSheet = sheetName,
                 sourceRowNumber = rowNumber,
                 isAmbiguousType = isAmbiguous,
+                businessPercent = businessPercent,
+                status = statusCol?.let { row.getOrNull(it)?.trim()?.ifBlank { null } },
+                source = sourceCol?.let { row.getOrNull(it)?.trim()?.ifBlank { null } },
             )
         }
 

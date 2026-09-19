@@ -32,6 +32,10 @@ data class ImportCandidateRow(
      * erkannten Typ anzeigen, Nutzer kann überschreiben").
      */
     val isAmbiguousType: Boolean = false,
+    /** Aus einer "Geschäftlich (%)"-Spalte, falls vorhanden - sonst 100% (voll geschäftlich). */
+    val businessPercent: Int? = null,
+    val status: String? = null,
+    val source: String? = null,
 )
 
 data class ImportRowError(val sourceSheet: String, val rowNumber: Int, val message: String)

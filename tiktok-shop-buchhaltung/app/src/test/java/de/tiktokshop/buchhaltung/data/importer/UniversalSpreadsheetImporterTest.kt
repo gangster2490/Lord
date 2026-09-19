@@ -125,18 +125,44 @@ class UniversalSpreadsheetImporterTest {
     }
 
     @Test
-    fun `a plain generic-amount xlsx with only expense rows still needs the sign override in practice`() {
-        // Ohne Vorzeichen (reine Ausgabenliste, alle Beträge positiv) erkennt die
-        // Vorzeichen-Heuristik die Datei zunächst als Einnahme - das ist erwartet und wird im
-        // Import-Preview über den Einnahmen/Ausgaben-Umschalter korrigiert (siehe
-        // UniversalImportRepositoryTest."setAmbiguousRowsType flips a plain positive-amount
-        // file from income to expense").
+    fun `a plain generic-amount xlsx without a sign is recognized as expense via the sheet name Ausgaben`() {
+        // Ohne Vorzeichen (reine Ausgabenliste, alle Beträge positiv) hilft der Sheet-Name als
+        // zusätzliches Signal: ein Sheet namens "Ausgaben" wird direkt als Ausgabe erkannt,
+        // ohne dass der Nutzer manuell umschalten muss. Bleibt trotzdem als Vermutung markiert
+        // (isAmbiguousType), damit der Umschalter im Preview weiterhin verfügbar ist.
         val bytes = genericResource("generic_ausgaben.xlsx").use { it.readBytes() }
         val result = UniversalSpreadsheetImporter.analyze(bytes, "generic_ausgaben.xlsx")
 
         assertThat(result.rows).hasSize(15)
+        assertThat(result.rows.all { it.type == EntryType.EXPENSE }).isTrue()
         assertThat(result.rows.sumOf { it.amountCents }).isEqualTo(82007L) // 820,07 EUR
         assertThat(result.rows.all { it.isAmbiguousType }).isTrue()
+    }
+
+    @Test
+    fun `Ausgaben_2026_APK_Import xlsx with header row pushed down by title rows imports correctly`() {
+        // Regressionstest für den gemeldeten Bug: das Sheet "Ausgaben_2026" hat 15 Titel-/
+        // Legenden-/Leerzeilen VOR der echten Kopfzeile (Datum, Händler / Dienst, Betrag (€),
+        // Währung, Kategorie, Geschäftlich (%), Status, Quelle, Beleg / Hinweis) - mit dem
+        // alten 15-Zeilen-Suchfenster wurde die Kopfzeile nie gefunden und die Datei
+        // fälschlich als "keine Tabellendaten" abgelehnt. Zusätzliches "Übersicht"-Sheet
+        // testet, dass die Suche über ALLE Sheets robust bleibt (§9).
+        //
+        // Fixture ist synthetisch (echte Nutzerdatei nicht im Repository, siehe Datenschutz-
+        // Hinweis in der README), aber strukturell identisch zur gemeldeten Datei nachgebaut:
+        // gleicher Sheet-Name, gleiche Spalten, 63 Zeilen, Summe exakt 820,07 EUR.
+        val bytes = genericResource("Ausgaben_2026_APK_Import.xlsx").use { it.readBytes() }
+        val result = UniversalSpreadsheetImporter.analyze(bytes, "Ausgaben_2026_APK_Import.xlsx")
+
+        val sheet = result.sheets.first { it.sheetName == "Ausgaben_2026" }
+        assertThat(sheet.isConfident).isTrue()
+        assertThat(sheet.headerRowIndex).isEqualTo(15)
+
+        assertThat(result.rows).hasSize(63)
+        assertThat(result.rows.all { it.type == EntryType.EXPENSE }).isTrue()
+        assertThat(result.rows.sumOf { it.amountCents }).isEqualTo(82007L) // 820,07 EUR
+        assertThat(result.rows.all { it.businessPercent == 100 }).isTrue()
+        assertThat(result.rows.all { it.status != null && it.source != null }).isTrue()
     }
 
     @Test

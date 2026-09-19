@@ -276,20 +276,24 @@ class ImportRepository(
                         sourceDocumentId = sourceDocument.id,
                     ),
                 )
-                EntryType.EXPENSE -> expenseDao.upsert(
-                    ExpenseEntry(
-                        date = row.date,
-                        merchant = row.merchant,
-                        category = resolveExpenseCategory(row),
-                        grossAmountCents = row.amountCents,
-                        currency = row.currency,
-                        businessAmountCents = row.amountCents,
-                        confirmed = true,
-                        note = "Import: ${preview.filename} (Zeile ${row.sourceRowNumber}, ${row.sourceSheet})",
-                        activityPhase = ActivityPhase.forDate(row.date),
-                        sourceDocumentId = sourceDocument.id,
-                    ),
-                )
+                EntryType.EXPENSE -> {
+                    val businessUsePercent = row.businessPercent?.coerceIn(0, 100) ?: 100
+                    expenseDao.upsert(
+                        ExpenseEntry(
+                            date = row.date,
+                            merchant = row.merchant,
+                            category = resolveExpenseCategory(row),
+                            grossAmountCents = row.amountCents,
+                            currency = row.currency,
+                            businessUsePercent = businessUsePercent,
+                            businessAmountCents = ExpenseEntry.computeBusinessAmountCents(row.amountCents, businessUsePercent),
+                            confirmed = true,
+                            note = buildExpenseImportNote(preview.filename, row),
+                            activityPhase = ActivityPhase.forDate(row.date),
+                            sourceDocumentId = sourceDocument.id,
+                        ),
+                    )
+                }
             }
         }
 
@@ -321,6 +325,16 @@ class ImportRepository(
 
     private fun resolveExpenseCategory(row: ImportCandidateRow): ExpenseCategory =
         CategorySuggester.suggest(row.merchant) ?: CategorySuggester.suggest(row.category) ?: ExpenseCategory.OTHER
+
+    /** Fasst Herkunft + optionale "Status"/"Quelle"-Spalten aus der Importdatei zusammen (§12). */
+    private fun buildExpenseImportNote(filename: String, row: ImportCandidateRow): String {
+        val base = "Import: $filename (Zeile ${row.sourceRowNumber}, ${row.sourceSheet})"
+        val extras = listOfNotNull(
+            row.status?.let { "Status: $it" },
+            row.source?.let { "Quelle: $it" },
+        )
+        return if (extras.isEmpty()) base else "$base - ${extras.joinToString(", ")}"
+    }
 
     private fun expenseDedupKey(date: LocalDate, merchant: String?, amountCents: Long, category: ExpenseCategory): String =
         "$date|${merchant?.trim()?.lowercase()}|$amountCents|${category.name}"
