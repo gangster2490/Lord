@@ -11,10 +11,11 @@ import java.time.format.DateTimeFormatter
 /**
  * Universeller Tabellen-Importer (§1,2,3,21 der Vereinfachungs-Vorgabe): akzeptiert .xlsx UND
  * .csv, verlangt KEINEN bestimmten Sheet-Namen, durchsucht ALLE Sheets nach einer verwertbaren
- * Kopfzeile und erkennt Einnahme/Ausgabe automatisch an der Spaltensignatur
- * (Income-Spalte -> Einnahme, Expense-Spalte -> Ausgabe, generische "Betrag"-Spalte -> Ausgabe,
- * da ohne Income/Expense-Unterscheidung importierte Tabellen in dieser App bislang immer
- * Ausgabenbelege waren).
+ * Kopfzeile und erkennt Einnahme/Ausgabe automatisch an der Spaltensignatur (Income-Spalte ->
+ * Einnahme, Expense-Spalte -> Ausgabe). Ein ganz normales Excel/CSV mit nur einer generischen
+ * "Betrag"-Spalte (kein Income/Expense-Split) wird per Vorzeichen eingeordnet (negativ =
+ * Ausgabe, sonst Einnahme) - das ist nur eine Vermutung, die der Nutzer im Import-Preview für
+ * die ganze Datei umschalten kann (siehe [ImportCandidateRow.isAmbiguousType]).
  *
  * TikTok-Earnings-Reports (Kopfzeile mit "Date (UTC+0)" + "Transaction ID" + "Type of
  * earnings") werden NICHT neu geparst, sondern an den bestehenden, bereits gegen echte Reports
@@ -134,11 +135,21 @@ object UniversalSpreadsheetImporter {
             val expenseText = expenseCol?.let { row.getOrNull(it)?.trim() }.orEmpty()
             val genericText = genericCol?.let { row.getOrNull(it)?.trim() }.orEmpty()
 
-            val (type, amountText) = when {
-                expenseText.isNotBlank() -> EntryType.EXPENSE to expenseText
-                incomeText.isNotBlank() -> EntryType.INCOME to incomeText
-                genericText.isNotBlank() -> EntryType.EXPENSE to genericText
-                else -> null to ""
+            // Explizite Income-/Expense-Spalten sind eindeutig. Eine generische "Betrag"-Spalte
+            // (z. B. ein ganz normales Excel mit nur Datum+Betrag, egal ob Einnahmen oder
+            // Ausgaben) hat KEINEN verlässlichen Hinweis auf den Typ - ein negatives Vorzeichen
+            // bzw. eine Klammerschreibweise "(12,00)" gilt als Ausgabe, alles andere als
+            // Einnahme. Das ist nur eine Vermutung (isAmbiguousType = true), die der Nutzer im
+            // Import-Preview-Screen für die ganze Datei umschalten kann (§3).
+            val (type, amountText, isAmbiguous) = when {
+                expenseText.isNotBlank() -> Triple(EntryType.EXPENSE, expenseText, false)
+                incomeText.isNotBlank() -> Triple(EntryType.INCOME, incomeText, false)
+                genericText.isNotBlank() -> {
+                    val trimmed = genericText.trim()
+                    val looksNegative = trimmed.startsWith("-") || (trimmed.startsWith("(") && trimmed.endsWith(")"))
+                    Triple(if (looksNegative) EntryType.EXPENSE else EntryType.INCOME, genericText, true)
+                }
+                else -> Triple(null, "", false)
             }
             if (type == null) {
                 if (incomeCol != null || expenseCol != null || genericCol != null) {
@@ -147,8 +158,8 @@ object UniversalSpreadsheetImporter {
                 continue
             }
 
-            val amountCents = runCatching { AmountParser.parseSingleAmountToCents(amountText) }.getOrNull()
-            if (amountCents == null) {
+            val parsedCents = runCatching { AmountParser.parseSingleAmountToCents(amountText.trim().removeSurrounding("(", ")")) }.getOrNull()
+            if (parsedCents == null) {
                 errors += ImportRowError(sheetName, rowNumber, "Ungültiger Betrag: '$amountText'")
                 continue
             }
@@ -156,13 +167,14 @@ object UniversalSpreadsheetImporter {
             rows += ImportCandidateRow(
                 type = type,
                 date = date,
-                amountCents = amountCents,
+                amountCents = kotlin.math.abs(parsedCents),
                 currency = currencyCol?.let { row.getOrNull(it)?.trim()?.ifBlank { null } } ?: "EUR",
                 merchant = merchantCol?.let { row.getOrNull(it)?.trim()?.ifBlank { null } },
                 category = categoryCol?.let { row.getOrNull(it)?.trim()?.ifBlank { null } },
                 externalTransactionId = idCol?.let { row.getOrNull(it)?.trim()?.ifBlank { null } },
                 sourceSheet = sheetName,
                 sourceRowNumber = rowNumber,
+                isAmbiguousType = isAmbiguous,
             )
         }
 

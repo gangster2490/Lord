@@ -198,6 +198,23 @@ class ImportRepository(
     }
 
     /**
+     * Überschreibt den erkannten Typ ALLER Zeilen, deren Typ nur aus dem Vorzeichen einer
+     * generischen "Betrag"-Spalte geraten wurde ([ImportCandidateRow.isAmbiguousType]) - für
+     * den Fall, dass der Nutzer ein ganz normales Excel/CSV ohne Income/Expense-Split
+     * importiert und die automatische Vorzeichen-Vermutung nicht passt (§3: "Nutzer kann
+     * überschreiben"). Eindeutige Zeilen (TikTok-Reports, explizite Income-/Expense-Spalten)
+     * bleiben unverändert. Die Dublettenprüfung wird für die betroffenen Zeilen neu berechnet,
+     * da sie vom Typ abhängt.
+     */
+    suspend fun setAmbiguousRowsType(preview: UniversalImportPreview, newType: EntryType): UniversalImportPreview =
+        withContext(Dispatchers.IO) {
+            fun flip(rows: List<ImportCandidateRow>) = rows.map { if (it.isAmbiguousType) it.copy(type = newType) else it }
+            val allRows = flip(preview.newRows) + flip(preview.duplicateRows)
+            val (duplicateRows, newRows) = partitionDuplicates(allRows)
+            preview.copy(newRows = newRows, duplicateRows = duplicateRows)
+        }
+
+    /**
      * Dublettenprüfung (§6): Zeilen MIT Transaction ID über den bestehenden DB-Unique-Index
      * (externalTransactionId + externalEarningType); Zeilen OHNE Transaction ID (generische
      * Ausgaben) über Datum+Händler+Betrag+Kategorie gegen bereits gespeicherte Ausgaben.

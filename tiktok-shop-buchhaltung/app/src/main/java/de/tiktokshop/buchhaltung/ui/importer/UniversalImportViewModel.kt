@@ -10,6 +10,7 @@ import de.tiktokshop.buchhaltung.data.importer.ImportCandidateRow
 import de.tiktokshop.buchhaltung.data.importer.ImportException
 import de.tiktokshop.buchhaltung.data.importer.UniversalImportPreview
 import de.tiktokshop.buchhaltung.data.model.Cents
+import de.tiktokshop.buchhaltung.data.model.EntryType
 import de.tiktokshop.buchhaltung.data.repository.ImportRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -72,6 +73,21 @@ class UniversalImportViewModel(private val repository: ImportRepository) : ViewM
                         preview = updated,
                     )
                 }
+                .onFailure { error -> _state.value = _state.value.copy(step = ImportStep.ERROR, error = errorMessage(error)) }
+        }
+    }
+
+    /**
+     * Flippt den Typ aller Zeilen, deren Einnahme/Ausgabe-Erkennung nur aus dem Vorzeichen
+     * einer generischen "Betrag"-Spalte geraten wurde (§3: Nutzer kann überschreiben) - z. B.
+     * wenn ein ganz normales Excel mit ausschließlich Einnahmen (alle Beträge positiv, kein
+     * Minuszeichen) fälschlich als Ausgaben erkannt wurde.
+     */
+    fun setAmbiguousRowsType(newType: EntryType) {
+        val preview = _state.value.preview ?: return
+        viewModelScope.launch {
+            runCatching { repository.setAmbiguousRowsType(preview, newType) }
+                .onSuccess { updated -> _state.value = _state.value.copy(preview = updated) }
                 .onFailure { error -> _state.value = _state.value.copy(step = ImportStep.ERROR, error = errorMessage(error)) }
         }
     }

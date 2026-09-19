@@ -90,6 +90,7 @@ fun UniversalImportScreen(onDone: () -> Unit, onCancel: () -> Unit) {
                             excludedRowKeys = state.excludedRowKeys,
                             isCommitting = state.isCommitting,
                             onToggleRow = viewModel::toggleRowExcluded,
+                            onSetAmbiguousType = viewModel::setAmbiguousRowsType,
                             onConfirm = viewModel::confirmImport,
                             onCancel = { viewModel.reset(); onCancel() },
                         )
@@ -141,11 +142,13 @@ private fun ImportPreviewContent(
     excludedRowKeys: Set<String>,
     isCommitting: Boolean,
     onToggleRow: (String) -> Unit,
+    onSetAmbiguousType: (EntryType) -> Unit,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
     var editSelection by remember { mutableStateOf(false) }
     val selectedCount = preview.newRows.size - excludedRowKeys.size
+    val hasAmbiguousRows = (preview.newRows + preview.duplicateRows).any { it.isAmbiguousType }
 
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Import prüfen", style = MaterialTheme.typography.titleLarge)
@@ -163,6 +166,25 @@ private fun ImportPreviewContent(
                 Text("$selectedCount von ${preview.newRows.size} neuen Einträgen ausgewählt")
                 if (preview.existingSourceDocument != null) {
                     Text("Hinweis: Diese Datei wurde bereits einmal importiert.")
+                }
+            }
+        }
+
+        if (hasAmbiguousRows) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Diese Datei hat keine eigene Einnahmen-/Ausgaben-Spalte - der Typ wurde " +
+                            "geraten. Falls falsch, hier für die ganze Datei umschalten:",
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = { onSetAmbiguousType(EntryType.INCOME) }, modifier = Modifier.weight(1f)) {
+                            Text("Als Einnahmen")
+                        }
+                        Button(onClick = { onSetAmbiguousType(EntryType.EXPENSE) }, modifier = Modifier.weight(1f)) {
+                            Text("Als Ausgaben")
+                        }
+                    }
                 }
             }
         }

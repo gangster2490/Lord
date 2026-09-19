@@ -25,6 +25,13 @@ data class ImportCandidateRow(
     val platformExpenseCents: Cents? = null,
     val sourceSheet: String,
     val sourceRowNumber: Int,
+    /**
+     * true, wenn [type] nur aus dem Vorzeichen einer generischen "Betrag"-Spalte geraten wurde
+     * (kein expliziter Income-/Expense-/Category-Hinweis in der Datei) - die UI zeigt dem
+     * Nutzer diese Zeilen mit einer Einnahme/Ausgabe-Umschaltmöglichkeit (§3: "immer den
+     * erkannten Typ anzeigen, Nutzer kann überschreiben").
+     */
+    val isAmbiguousType: Boolean = false,
 )
 
 data class ImportRowError(val sourceSheet: String, val rowNumber: Int, val message: String)
