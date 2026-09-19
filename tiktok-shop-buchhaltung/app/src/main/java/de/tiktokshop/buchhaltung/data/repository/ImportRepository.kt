@@ -332,6 +332,7 @@ class ImportRepository(
         val extras = listOfNotNull(
             row.status?.let { "Status: $it" },
             row.source?.let { "Quelle: $it" },
+            row.note,
         )
         return if (extras.isEmpty()) base else "$base - ${extras.joinToString(", ")}"
     }

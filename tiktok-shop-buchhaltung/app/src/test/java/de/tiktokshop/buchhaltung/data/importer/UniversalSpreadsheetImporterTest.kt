@@ -182,9 +182,25 @@ class UniversalSpreadsheetImporterTest {
     }
 
     @Test
-    fun `a file with no tabular data at all throws a clear error`() {
+    fun `a file with completely unrecognized headers still offers column mapping instead of failing`() {
+        // §1 der Bugmeldung: "Import fehlgeschlagen" darf NIE die erste Reaktion auf eine
+        // unbekannte Kopfzeile sein - selbst wenn nicht eine einzige Spalte automatisch erkannt
+        // wird, muss die Datei mit "Spalten zuordnen" (Rohkopf zur manuellen Zuordnung)
+        // beantwortet werden, nicht mit einem Fehler.
+        val result = UniversalSpreadsheetImporter.analyze("just,one\nline,here\n".toByteArray(), "kaumdaten.csv")
+
+        assertThat(result.rows).isEmpty()
+        assertThat(result.needsColumnMapping).isTrue()
+        val sheet = result.sheets.single()
+        assertThat(sheet.isConfident).isFalse()
+        assertThat(sheet.columnMapping).isEmpty()
+        assertThat(sheet.headers).containsExactly("just", "one")
+    }
+
+    @Test
+    fun `a file where every sheet is completely blank still throws a clear error`() {
         assertThrows(ImportException::class.java) {
-            UniversalSpreadsheetImporter.analyze("just,one\nline,here\n".toByteArray(), "kaumdaten.csv")
+            UniversalSpreadsheetImporter.analyze(",\n,\n\n".toByteArray(), "leerzeilen.csv")
         }
     }
 

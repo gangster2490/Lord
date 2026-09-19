@@ -36,6 +36,7 @@ data class ImportCandidateRow(
     val businessPercent: Int? = null,
     val status: String? = null,
     val source: String? = null,
+    val note: String? = null,
 )
 
 data class ImportRowError(val sourceSheet: String, val rowNumber: Int, val message: String)

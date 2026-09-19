@@ -39,6 +39,7 @@ private val ROLE_LABELS = mapOf(
     ColumnRole.BUSINESS_PERCENT to "Geschäftlich %",
     ColumnRole.STATUS to "Status",
     ColumnRole.SOURCE to "Quelle",
+    ColumnRole.NOTE to "Notiz",
 )
 
 /**

@@ -24,9 +24,12 @@ import java.time.format.DateTimeFormatter
  *
  * Wenn für ein Sheet weder Datum noch ein Betragsfeld sicher erkannt werden, wird das Sheet
  * NICHT stillschweigend übersprungen, sondern als nicht "confident" markiert - die UI zeigt
- * dann den "Spalten zuordnen"-Screen (§4) an, statt einen Fehler zu werfen. Ein echter Fehler
- * wird nur ausgelöst, wenn die Datei nach Durchsuchen ALLER Sheets wirklich keine
- * tabellarischen Daten enthält (§21).
+ * dann den "Spalten zuordnen"-Screen (§4) an, statt einen Fehler zu werfen. Das gilt auch dann,
+ * wenn ÜBERHAUPT KEINE Spalte automatisch erkannt wurde: solange irgendeine nicht-leere Zeile
+ * existiert, wird sie als Rohkopf für die manuelle Zuordnung angeboten (§1/§6 - "Import
+ * fehlgeschlagen" darf nicht die erste Reaktion auf eine unbekannte Kopfzeile sein). Ein
+ * echter Fehler wird nur ausgelöst, wenn die Datei nach Durchsuchen ALLER Sheets wirklich
+ * keine einzige nicht-leere Zeile enthält (§21).
  */
 object UniversalSpreadsheetImporter {
 
@@ -34,7 +37,7 @@ object UniversalSpreadsheetImporter {
     // der eigentlichen Tabelle) können die Kopfzeile deutlich nach unten schieben - 15 Zeilen
     // waren dafür zu wenig und haben echte Nutzerdateien fälschlich als "keine Tabellendaten"
     // abgelehnt, obwohl die Kopfzeile nur weiter unten stand.
-    private const val HEADER_SEARCH_ROWS = 60
+    private const val HEADER_SEARCH_ROWS = 100
     private val DATE_FORMATS = listOf(
         DateTimeFormatter.ISO_LOCAL_DATE,
         DateTimeFormatter.ofPattern("dd.MM.yyyy"),
@@ -85,9 +88,11 @@ object UniversalSpreadsheetImporter {
         }
 
         if (sheetAnalyses.isEmpty()) {
+            // Nur hier: nicht "Kopfzeile nicht erkannt" (dafür gibt es "Spalten zuordnen"),
+            // sondern wirklich JEDE Zeile in JEDEM Sheet ist leer.
             throw ImportException(
-                "„$filename“ enthält keine tabellarischen Daten mit erkennbarer Kopfzeile (Datum/Betrag). " +
-                    "Bitte als Excel/CSV mit Kopfzeile exportieren oder Beleg als Foto importieren.",
+                "„$filename“ enthält keine Daten (alle Sheets sind leer). " +
+                    "Bitte eine Datei mit mindestens einer ausgefüllten Zeile wählen.",
             )
         }
 
@@ -116,6 +121,7 @@ object UniversalSpreadsheetImporter {
         val businessPercentCol = mapping[ColumnRole.BUSINESS_PERCENT]
         val statusCol = mapping[ColumnRole.STATUS]
         val sourceCol = mapping[ColumnRole.SOURCE]
+        val noteCol = mapping[ColumnRole.NOTE]
 
         if (dateCol == null || (incomeCol == null && expenseCol == null && genericCol == null)) {
             return emptyList<ImportCandidateRow>() to emptyList()
@@ -199,6 +205,7 @@ object UniversalSpreadsheetImporter {
                 businessPercent = businessPercent,
                 status = statusCol?.let { row.getOrNull(it)?.trim()?.ifBlank { null } },
                 source = sourceCol?.let { row.getOrNull(it)?.trim()?.ifBlank { null } },
+                note = noteCol?.let { row.getOrNull(it)?.trim()?.ifBlank { null } },
             )
         }
 
@@ -215,10 +222,13 @@ object UniversalSpreadsheetImporter {
      */
     fun analyzeSheet(sheetName: String, rawRows: List<XlsxRow>): SheetAnalysis? {
         var bestPartialMatch: SheetAnalysis? = null
+        var firstNonBlankRow: Pair<Int, XlsxRow>? = null
 
         for (i in 0 until minOf(HEADER_SEARCH_ROWS, rawRows.size)) {
             val candidateHeader = rawRows[i]
             if (candidateHeader.all { it.isBlank() }) continue
+            if (firstNonBlankRow == null) firstNonBlankRow = i to candidateHeader
+
             val mapping = HeaderMatcher.matchColumns(candidateHeader)
             val hasDate = mapping.containsKey(ColumnRole.DATE)
             val hasAmount = mapping.containsKey(ColumnRole.AMOUNT_INCOME) ||
@@ -229,13 +239,22 @@ object UniversalSpreadsheetImporter {
             }
             if (bestPartialMatch == null && mapping.isNotEmpty()) {
                 // Mindestens eine Spalte erkannt (z. B. nur Betrag ohne Datum) - Kandidat für
-                // "Spalten zuordnen", aber bewusst NICHT automatisch extrahieren (§4). Eine
-                // Kopfzeile OHNE jede erkannte Spalte gilt dagegen nicht als Tabellendaten
-                // (§21: nur bei wirklich fehlenden Tabellendaten ein Fehler).
+                // "Spalten zuordnen", aber bewusst NICHT automatisch extrahieren (§4).
                 bestPartialMatch = SheetAnalysis(sheetName, i, candidateHeader, mapping, isConfident = false)
             }
         }
-        return bestPartialMatch
+        if (bestPartialMatch != null) return bestPartialMatch
+
+        // Selbst wenn KEINE einzige Spalte automatisch erkannt wurde, gilt das Sheet nicht als
+        // "keine Tabellendaten" - solange irgendeine nicht-leere Zeile existiert, wird sie als
+        // Rohkopf für "Spalten zuordnen" angeboten, damit der Nutzer die Spalten selbst
+        // zuordnen kann, statt eine Fehlermeldung zu sehen (§1: nie sofort scheitern lassen).
+        // Das Suchfenster für diesen Fallback ist bewusst unbegrenzt (nicht auf
+        // HEADER_SEARCH_ROWS beschränkt), damit auch ungewöhnlich viele Titel-/Leerzeilen vor
+        // der Tabelle nie zu einem Totalausfall führen.
+        val fallbackRow = firstNonBlankRow
+            ?: rawRows.withIndex().firstOrNull { (_, row) -> row.any { it.isNotBlank() } }?.let { it.index to it.value }
+        return fallbackRow?.let { (idx, header) -> SheetAnalysis(sheetName, idx, header, emptyMap(), isConfident = false) }
     }
 
     private fun isTikTokEarningsSheet(headers: List<String>): Boolean {
