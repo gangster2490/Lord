@@ -166,6 +166,38 @@ class UniversalSpreadsheetImporterTest {
     }
 
     @Test
+    fun `a completely unrecognized xlsx header (no synonym match at all) still offers column mapping`() {
+        // Wie der CSV-Fall, aber für .xlsx - garantiert dieselbe Regel unabhängig vom
+        // Dateiformat: eine Kopfzeile, die keiner einzigen Rolle zugeordnet werden kann, führt
+        // NIE zu einem Fehler, sondern immer zu "Spalten zuordnen" (obligatorischer Fallback).
+        val bytes = genericResource("unbekanntes_format.xlsx").use { it.readBytes() }
+        val result = UniversalSpreadsheetImporter.analyze(bytes, "unbekanntes_format.xlsx")
+
+        assertThat(result.rows).isEmpty()
+        assertThat(result.needsColumnMapping).isTrue()
+        val sheet = result.sheets.single()
+        assertThat(sheet.isConfident).isFalse()
+        assertThat(sheet.columnMapping).isEmpty()
+        assertThat(sheet.headers).containsExactly("Spalte Alpha", "Spalte Beta", "Spalte Gamma")
+    }
+
+    @Test
+    fun `a header row far beyond the normal search window still falls back to column mapping, not an error`() {
+        // 150 Leerzeilen vor der (nicht erkennbaren) Kopfzeile - weit jenseits des 100-Zeilen-
+        // Suchfensters für automatische Erkennung. Der unbegrenzte Fallback-Scan muss trotzdem
+        // greifen, statt einen Fehler zu werfen.
+        val csv = buildString {
+            repeat(150) { append(",\n") }
+            append("Foo,Bar\n")
+            append("x,y\n")
+        }
+        val result = UniversalSpreadsheetImporter.analyze(csv.toByteArray(), "sehr_viele_leerzeilen.csv")
+
+        assertThat(result.needsColumnMapping).isTrue()
+        assertThat(result.sheets.single().headers).containsExactly("Foo", "Bar")
+    }
+
+    @Test
     fun `a sheet with only an amount column but no date needs column mapping instead of erroring`() {
         val csv = "Notiz,Betrag\nfoo,12.00\n"
         val result = UniversalSpreadsheetImporter.analyze(csv.toByteArray(), "unklar.csv")
