@@ -1,10 +1,12 @@
 package de.tiktokshop.buchhaltung.data.importer
 
 import de.tiktokshop.buchhaltung.data.model.EntryType
+import de.tiktokshop.buchhaltung.data.model.toCents
 import de.tiktokshop.buchhaltung.data.xlsx.XlsxParseException
 import de.tiktokshop.buchhaltung.data.xlsx.XlsxReader
 import de.tiktokshop.buchhaltung.data.xlsx.XlsxRow
 import de.tiktokshop.buchhaltung.ocr.AmountParser
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -181,7 +183,7 @@ object UniversalSpreadsheetImporter {
                 continue
             }
 
-            val parsedCents = runCatching { AmountParser.parseSingleAmountToCents(amountText.trim().removeSurrounding("(", ")")) }.getOrNull()
+            val parsedCents = parseAmountToCents(amountText.trim().removeSurrounding("(", ")"))
             if (parsedCents == null) {
                 errors += ImportRowError(sheetName, rowNumber, "Ungültiger Betrag: '$amountText'")
                 continue
@@ -294,10 +296,44 @@ object UniversalSpreadsheetImporter {
         return rows to errors
     }
 
+    /**
+     * XLSX-Zahlenzellen (Zelltyp `t="n"`, also auch ganz normale Beträge) enthalten IMMER
+     * kanonische Dezimalschreibweise (Punkt als Trennzeichen, keine Tausendergruppierung -
+     * das gibt die OOXML-Spezifikation so vor, unabhängig von der Anzeigeformatierung/Locale).
+     * Solche Rohwerte können durch Fließkomma-Rundung viele Nachkommastellen haben (z. B.
+     * "9.869999999999999" für einen eingetippten Betrag von 9,87 €). [AmountParser] ist für
+     * mehrdeutigen OCR-/Text-Input gebaut (z. B. "1.234" könnte deutsche Tausendergruppierung
+     * ODER ein Dezimalwert sein) und interpretiert "viele Nachkommastellen nach einem einzigen
+     * Punkt" fälschlich als Tausendertrennzeichen - das hat aus 9,87 € reale 9.869.999.999.999.999
+     * gemacht. Deshalb zuerst als eindeutige, direkte Dezimalzahl versuchen (funktioniert für
+     * alle XLSX-Zahlenzellen UND einfache Texte wie "12.00"); nur wenn das scheitert (z. B.
+     * "9,87" mit Komma aus einer CSV/Text-Zelle), auf die tolerante OCR-Heuristik zurückfallen.
+     */
+    private fun parseAmountToCents(text: String): Long? =
+        runCatching { BigDecimal(text).toCents() }
+            .recoverCatching { AmountParser.parseSingleAmountToCents(text) }
+            .getOrNull()
+
+    /**
+     * Excel speichert Datumszellen intern als reine Zahl (Tage seit dem Excel-Epoch, mit
+     * Zellformatierung "Datum" fürs Anzeigen) - NICHT als Text. Unser minimaler XLSX-Reader
+     * liest bei solchen Zellen nur den Rohwert (z. B. "46023" für 2026-01-01), da er keine
+     * Formatierungsinformationen aus styles.xml auswertet. Ein "ganz normales", in Excel
+     * erstelltes Datum landet deshalb hier IMMER als reine Zahl, nicht als "01.01.2026" -
+     * genau das war die eigentliche Ursache dafür, dass ein reales Ausgaben-Excel mit
+     * nativen Datumszellen komplett fehlschlug (jede Zeile "Ungültiges Datum"), obwohl die
+     * Kopfzeile korrekt erkannt wurde.
+     */
+    private val EXCEL_DATE_EPOCH = LocalDate.of(1899, 12, 30)
+
     private fun parseFlexibleDate(text: String): LocalDate? {
         for (format in DATE_FORMATS) {
             val parsed = runCatching { LocalDate.parse(text, format) }.getOrNull()
             if (parsed != null) return parsed
+        }
+        val serial = text.trim().toDoubleOrNull()
+        if (serial != null && serial in 1.0..2958465.0) { // gültiger Excel-Datumsbereich (Jahr 1900-9999)
+            return runCatching { EXCEL_DATE_EPOCH.plusDays(serial.toLong()) }.getOrNull()
         }
         return null
     }

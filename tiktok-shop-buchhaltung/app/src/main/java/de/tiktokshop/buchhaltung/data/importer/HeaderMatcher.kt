@@ -113,7 +113,7 @@ object HeaderMatcher {
                 idx !in takenColumns && header in synonyms
             }
             val match = exactMatch ?: normalizedHeaders.withIndex().firstOrNull { (idx, header) ->
-                idx !in takenColumns && header.isNotBlank() && synonyms.any { syn -> header.contains(syn) }
+                idx !in takenColumns && header.isNotBlank() && synonyms.any { syn -> containsWord(header, syn) }
             }
             if (match != null) {
                 result[role] = match.index
@@ -122,4 +122,14 @@ object HeaderMatcher {
         }
         return result
     }
+
+    /**
+     * Prüft, ob [synonym] als GANZES WORT in [header] vorkommt (durch Leerzeichen begrenzt),
+     * nicht als beliebige Teilzeichenkette. Ohne diese Grenze würde z. B. "Dateityp" (deutsch
+     * für "file type") fälschlich als DATE-Spalte erkannt, weil es die Zeichenkette "date"
+     * enthält - ein echter Fall aus einem gemeldeten Bug (ein Notiz-Sheet mit einer Spalte
+     * "Dateityp" wurde fälschlich als Tabellen-Kopfzeile interpretiert).
+     */
+    private fun containsWord(header: String, synonym: String): Boolean =
+        " $header ".contains(" $synonym ")
 }

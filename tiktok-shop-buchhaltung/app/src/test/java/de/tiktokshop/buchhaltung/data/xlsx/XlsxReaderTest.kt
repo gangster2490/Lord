@@ -56,6 +56,28 @@ class XlsxReaderTest {
         assertThat(rows[5][0]).isEqualTo("Date (UTC+0)")
     }
 
+    private fun genericResource(name: String) =
+        requireNotNull(javaClass.classLoader?.getResourceAsStream("generic_reports/$name")) {
+            "Test-Fixture $name nicht gefunden"
+        }
+
+    @Test
+    fun `reads sheets whose SpreadsheetML elements use a namespace prefix (x colon row etc)`() {
+        // Regressionstest für den eigentlichen Grund, warum ein reales Ausgaben-Excel des
+        // Nutzers komplett scheiterte: manche Erzeuger-Tools schreiben `<x:row>`/`<x:c>` mit
+        // explizitem Namespace-Präfix statt `<row>`/`<c>` über die Default-Namespace-
+        // Deklaration (wie openpyxl es tut). Mit reiner `getElementsByTagName("row")`-Suche
+        // (namespace-unaware) wurden solche Dateien als "keine Sheets" behandelt.
+        val sheetNames = genericResource("namespaced_prefix.xlsx").use { XlsxReader.listSheetNames(it) }
+        assertThat(sheetNames).containsExactly("Ausgaben_2026")
+
+        val rows = genericResource("namespaced_prefix.xlsx").use { XlsxReader.readSheet(it, "Ausgaben_2026") }
+        assertThat(rows).hasSize(3)
+        assertThat(rows[0]).containsExactly("Datum", "Betrag (€)").inOrder()
+        assertThat(rows[1]).containsExactly("46023", "5.28").inOrder()
+        assertThat(rows[2]).containsExactly("46024", "10.5").inOrder()
+    }
+
     @Test
     fun `column index parsing handles multi-letter references`() {
         assertThat(XlsxReader.columnIndexFromRef("A1")).isEqualTo(0)

@@ -26,8 +26,8 @@ object XlsxReader {
         val entries = readZipEntries(input)
         val workbookXml = entries["xl/workbook.xml"]
             ?: throw XlsxParseException("xl/workbook.xml fehlt - keine gültige XLSX-Datei.")
-        val sheets = parseXml(workbookXml).getElementsByTagName("sheet")
-        return (0 until sheets.length).map { i -> (sheets.item(i) as Element).getAttribute("name") }
+        val sheets = parseXml(workbookXml).elementsByLocalName("sheet")
+        return sheets.map { it.getAttribute("name") }
     }
 
     /**
@@ -66,9 +66,7 @@ object XlsxReader {
         val relsDoc = parseXml(relsXml)
         val sharedStrings = entries["xl/sharedStrings.xml"]?.let(::parseSharedStrings) ?: emptyList()
 
-        val sheetsNode = workbookDoc.getElementsByTagName("sheet")
-        val sheetNameToRelId = (0 until sheetsNode.length).mapNotNull { i ->
-            val el = sheetsNode.item(i) as Element
+        val sheetNameToRelId = workbookDoc.elementsByLocalName("sheet").mapNotNull { el ->
             val name = el.getAttribute("name")
             val relId = el.getAttribute("r:id").ifBlank { el.getAttribute("id") }
             if (name.isBlank() || relId.isBlank()) null else name to relId
@@ -113,9 +111,22 @@ object XlsxReader {
         return map
     }
 
+    /**
+     * Namespace-AWARE (wichtig!): OOXML-Dateien unterschiedlicher Erzeuger-Tools schreiben die
+     * SpreadsheetML-Elemente teils mit explizitem Namespace-Präfix (z. B. `<x:row>` mit
+     * `xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"`), teils ohne
+     * Präfix über die Default-Namespace-Deklaration (`<row xmlns="...">`, so wie es z. B.
+     * openpyxl erzeugt). Mit `isNamespaceAware = false` UND einem literalen Tag-Namen wie
+     * `getElementsByTagName("row")` werden präfixierte Elemente NIE gefunden, weil der
+     * Parser dann den Tag-Namen wörtlich inklusive Präfix vergleicht ("x:row" != "row") -
+     * das hat reale, korrekt formatierte Excel-Dateien mit Präfix komplett zum Scheitern
+     * gebracht ("keine Tabellendaten", obwohl die Datei eine normale Tabelle enthielt). Mit
+     * Namespace-Awareness + [elementsByLocalName] (Namespace-Wildcard `"*"`) funktionieren
+     * beide Schreibweisen gleichermaßen.
+     */
     private fun parseXml(bytes: ByteArray): Document {
         val factory = DocumentBuilderFactory.newInstance()
-        factory.isNamespaceAware = false
+        factory.isNamespaceAware = true
         return try {
             factory.newDocumentBuilder().parse(bytes.inputStream())
         } catch (e: Exception) {
@@ -123,13 +134,20 @@ object XlsxReader {
         }
     }
 
+    /** Findet Elemente anhand ihres lokalen Namens, unabhängig von einem eventuellen Namespace-Präfix. */
+    private fun Document.elementsByLocalName(localName: String): List<Element> {
+        val nodes = getElementsByTagNameNS("*", localName)
+        return (0 until nodes.length).map { nodes.item(it) as Element }
+    }
+
+    private fun Element.elementsByLocalName(localName: String): List<Element> {
+        val nodes = getElementsByTagNameNS("*", localName)
+        return (0 until nodes.length).map { nodes.item(it) as Element }
+    }
+
     private fun findRelationshipTarget(relsDoc: Document, relId: String): String? {
-        val rels = relsDoc.getElementsByTagName("Relationship")
-        for (i in 0 until rels.length) {
-            val el = rels.item(i) as Element
-            if (el.getAttribute("Id") == relId) return el.getAttribute("Target")
-        }
-        return null
+        val rels = relsDoc.elementsByLocalName("Relationship")
+        return rels.firstOrNull { it.getAttribute("Id") == relId }?.getAttribute("Target")
     }
 
     private fun normalizeTarget(target: String): String = when {
@@ -139,16 +157,13 @@ object XlsxReader {
     }
 
     private fun parseSharedStrings(bytes: ByteArray): List<String> {
-        val siNodes = parseXml(bytes).getElementsByTagName("si")
-        return (0 until siNodes.length).map { i -> extractText(siNodes.item(i) as Element) }
+        return parseXml(bytes).elementsByLocalName("si").map { extractText(it) }
     }
 
     /** `<si>` enthält entweder direkt `<t>` oder mehrere Rich-Text-Runs `<r><t>` - alles zusammenfassen. */
     private fun extractText(si: Element): String {
-        val tNodes = si.getElementsByTagName("t")
-        val sb = StringBuilder()
-        for (i in 0 until tNodes.length) sb.append(tNodes.item(i).textContent)
-        return sb.toString()
+        val tNodes = si.elementsByLocalName("t")
+        return tNodes.joinToString("") { it.textContent }
     }
 
     /**
@@ -159,20 +174,18 @@ object XlsxReader {
      * dieselbe Sparse-Logik wie bei Spalten (siehe `columnIndexFromRef`/`cellsByIndex`).
      */
     private fun parseSheetRows(sheetDoc: Document, sharedStrings: List<String>): List<XlsxRow> {
-        val rowNodes = sheetDoc.getElementsByTagName("row")
+        val rowNodes = sheetDoc.elementsByLocalName("row")
         val rowsByIndex = sortedMapOf<Int, XlsxRow>()
         var maxRowIndex = -1
 
-        for (i in 0 until rowNodes.length) {
-            val rowEl = rowNodes.item(i) as Element
+        for ((i, rowEl) in rowNodes.withIndex()) {
             val rowIndex = (rowEl.getAttribute("r").toIntOrNull() ?: (i + 1)) - 1
             if (rowIndex < 0) continue
 
-            val cellNodes = rowEl.getElementsByTagName("c")
+            val cellNodes = rowEl.elementsByLocalName("c")
             val cellsByIndex = sortedMapOf<Int, String>()
             var maxColIndex = -1
-            for (j in 0 until cellNodes.length) {
-                val cellEl = cellNodes.item(j) as Element
+            for (cellEl in cellNodes) {
                 val colIndex = columnIndexFromRef(cellEl.getAttribute("r"))
                 if (colIndex < 0) continue
                 cellsByIndex[colIndex] = extractCellValue(cellEl, sharedStrings)
@@ -191,16 +204,12 @@ object XlsxReader {
 
     private fun extractCellValue(cellEl: Element, sharedStrings: List<String>): String = when (cellEl.getAttribute("t")) {
         "s" -> childText(cellEl, "v")?.toIntOrNull()?.let { sharedStrings.getOrNull(it) } ?: ""
-        "inlineStr" -> cellEl.getElementsByTagName("is").let { nodes ->
-            if (nodes.length > 0) extractText(nodes.item(0) as Element) else ""
-        }
+        "inlineStr" -> cellEl.elementsByLocalName("is").firstOrNull()?.let { extractText(it) } ?: ""
         else -> childText(cellEl, "v") ?: ""
     }
 
-    private fun childText(parent: Element, tagName: String): String? {
-        val nodes = parent.getElementsByTagName(tagName)
-        return if (nodes.length > 0) nodes.item(0).textContent else null
-    }
+    private fun childText(parent: Element, tagName: String): String? =
+        parent.elementsByLocalName(tagName).firstOrNull()?.textContent
 
     /** "C7" -> Spaltenindex 2 (0-basiert). Unterstützt A-Z, AA-ZZ, ... */
     internal fun columnIndexFromRef(ref: String): Int {

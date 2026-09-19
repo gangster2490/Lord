@@ -140,29 +140,55 @@ class UniversalSpreadsheetImporterTest {
     }
 
     @Test
-    fun `Ausgaben_2026_APK_Import xlsx with header row pushed down by title rows imports correctly`() {
-        // Regressionstest für den gemeldeten Bug: das Sheet "Ausgaben_2026" hat 15 Titel-/
-        // Legenden-/Leerzeilen VOR der echten Kopfzeile (Datum, Händler / Dienst, Betrag (€),
-        // Währung, Kategorie, Geschäftlich (%), Status, Quelle, Beleg / Hinweis) - mit dem
-        // alten 15-Zeilen-Suchfenster wurde die Kopfzeile nie gefunden und die Datei
-        // fälschlich als "keine Tabellendaten" abgelehnt. Zusätzliches "Übersicht"-Sheet
-        // testet, dass die Suche über ALLE Sheets robust bleibt (§9).
-        //
-        // Fixture ist synthetisch (echte Nutzerdatei nicht im Repository, siehe Datenschutz-
-        // Hinweis in der README), aber strukturell identisch zur gemeldeten Datei nachgebaut:
-        // gleicher Sheet-Name, gleiche Spalten, 63 Zeilen, Summe exakt 820,07 EUR.
+    fun `Ausgaben_2026_APK_Import xlsx (anonymized reconstruction of the real reported file) imports correctly`() {
+        // Diese Fixture wurde aus der TATSÄCHLICH vom Nutzer hochgeladenen Datei erzeugt
+        // (Händler-/Belegtext anonymisiert, Datum/Betrag/Kategorie/Struktur unverändert
+        // übernommen - siehe Datenschutz-Hinweis in der README, echte Datei nicht im Repo).
+        // Der eigentliche Fehler war NICHT die Kopfzeilen-Position (die steht in Zeile 1, wie
+        // hier), sondern DREI tiefere Bugs, die erst beim Testen gegen die echte Datei auffielen:
+        // 1. Die Datumsspalte enthält ECHTE Excel-Datumszellen (numerischer Serial-Wert wie
+        //    "46023" für 2026-01-01, Zelltyp t="n"), keinen Datumstext - siehe
+        //    [UniversalSpreadsheetImporter.parseFlexibleDate] (Excel-Epoch-Fallback).
+        // 2. Die Datei nutzt für ALLE SpreadsheetML-Elemente ein Namespace-Präfix
+        //    (`<x:row>`/`<x:c>` statt `<row>`/`<c>`) - siehe
+        //    [de.tiktokshop.buchhaltung.data.xlsx.XlsxReaderTest] für den dedizierten Test
+        //    dieses Bugs im Reader selbst.
+        // 3. Ein per Hand eingetippter Betrag wird von Tabellenkalkulationen oft mit
+        //    Fließkomma-Rundungsfehlern gespeichert (z. B. "9.869999999999999" statt "9.87") -
+        //    die alte OCR-Heuristik in [de.tiktokshop.buchhaltung.ocr.AmountParser] hat das als
+        //    Tausendertrennzeichen fehlinterpretiert und daraus 9.869.999.999.999.999 gemacht.
+        //    Siehe [UniversalSpreadsheetImporter.parseAmountToCents].
         val bytes = genericResource("Ausgaben_2026_APK_Import.xlsx").use { it.readBytes() }
         val result = UniversalSpreadsheetImporter.analyze(bytes, "Ausgaben_2026_APK_Import.xlsx")
 
         val sheet = result.sheets.first { it.sheetName == "Ausgaben_2026" }
         assertThat(sheet.isConfident).isTrue()
-        assertThat(sheet.headerRowIndex).isEqualTo(15)
+        assertThat(sheet.headerRowIndex).isEqualTo(0)
 
         assertThat(result.rows).hasSize(63)
         assertThat(result.rows.all { it.type == EntryType.EXPENSE }).isTrue()
         assertThat(result.rows.sumOf { it.amountCents }).isEqualTo(82007L) // 820,07 EUR
-        assertThat(result.rows.all { it.businessPercent == 100 }).isTrue()
+        // Eine Zeile hat im Original bewusst ein leeres "Geschäftlich (%)"-Feld (Privatanteil
+        // muss noch geprüft werden) - das bleibt korrekt null, nicht 100.
+        assertThat(result.rows.count { it.businessPercent == 100 }).isEqualTo(62)
+        assertThat(result.rows.count { it.businessPercent == null }).isEqualTo(1)
         assertThat(result.rows.all { it.status != null && it.source != null }).isTrue()
+        assertThat(result.errors).isEmpty() // keine Fehlzündungen auf den Nebensheets (Übersicht/Import_Hinweis)
+    }
+
+    @Test
+    fun `Excel date serial numbers (native date cells, not text) are parsed correctly`() {
+        // Der eigentliche Kern-Bug: eine Datumszelle mit Zelltyp t="n" und Rohwert "46023"
+        // (Tage seit dem Excel-Epoch 1899-12-30) muss als 2026-01-01 erkannt werden, nicht als
+        // ungültiges Datum verworfen werden.
+        val bytes = genericResource("namespaced_prefix.xlsx").use { it.readBytes() }
+        val result = UniversalSpreadsheetImporter.analyze(bytes, "namespaced_prefix.xlsx")
+
+        assertThat(result.errors).isEmpty()
+        assertThat(result.rows).hasSize(2)
+        assertThat(result.rows[0].date).isEqualTo(LocalDate.of(2026, 1, 1))
+        assertThat(result.rows[1].date).isEqualTo(LocalDate.of(2026, 1, 2))
+        assertThat(result.rows.sumOf { it.amountCents }).isEqualTo(528L + 1050L)
     }
 
     @Test
