@@ -16,18 +16,21 @@ import java.time.temporal.TemporalAdjusters
 enum class PeriodFilter { MONTH, QUARTER, YEAR, CUSTOM }
 
 data class DashboardUiState(
-    val period: PeriodFilter = PeriodFilter.MONTH,
-    val from: LocalDate = LocalDate.now().withDayOfMonth(1),
-    val to: LocalDate = LocalDate.now().with(TemporalAdjusters.lastDayOfMonth()),
+    val period: PeriodFilter = PeriodFilter.YEAR,
+    val from: LocalDate = LocalDate.of(LocalDate.now().year, 1, 1),
+    val to: LocalDate = LocalDate.of(LocalDate.now().year, 12, 31),
     val summary: DashboardSummary = DashboardCalculator.calculate(emptyList(), emptyList(), LocalDate.now(), LocalDate.now()),
 )
 
 class DashboardViewModel(private val repository: LedgerRepository) : ViewModel() {
 
+    // Default-Zeitraum ist das laufende Jahr (§9: "Monat/Quartal/Jahr, Default: Jahr") - eine
+    // Provision, die im Januar erfasst wurde, soll nicht aus dem Dashboard "verschwinden", nur
+    // weil der Monat gewechselt hat.
     private val range = MutableStateFlow(
-        LocalDate.now().withDayOfMonth(1) to LocalDate.now().with(TemporalAdjusters.lastDayOfMonth()),
+        LocalDate.of(LocalDate.now().year, 1, 1) to LocalDate.of(LocalDate.now().year, 12, 31),
     )
-    private val period = MutableStateFlow(PeriodFilter.MONTH)
+    private val period = MutableStateFlow(PeriodFilter.YEAR)
 
     val uiState: StateFlow<DashboardUiState> = combine(
         repository.observeIncomes(),

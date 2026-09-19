@@ -20,7 +20,17 @@ data class DashboardSummary(
     val preliminaryResultCents: Cents,
     val receiptCount: Int,
     val missingOrUnconfirmedCount: Int,
-)
+) {
+    /**
+     * Vereinfachtes "Vorläufiges Ergebnis" für den großen Dashboard-Block (§9-14 der
+     * Vereinfachungs-Vorgabe): Einnahmen (angezeigt/erkannt) minus Ausgaben - bewusst NICHT
+     * dasselbe wie [preliminaryResultCents] (Auszahlungsbasis, TAX_LOGIC_DE.md), sondern die
+     * einfache, sofort verständliche Kopfzahl, die ausdrücklich als "kein endgültiges Ergebnis"
+     * gekennzeichnet wird (§19-Disclaimer). Die steuerlich korrekte Auszahlungsbasis bleibt in
+     * [preliminaryResultCents] für Steuer-Arbeitsstand/Export erhalten.
+     */
+    val earnedMinusExpensesCents: Cents get() = displayedTotalCents - expensesCents
+}
 
 object DashboardCalculator {
 

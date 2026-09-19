@@ -37,6 +37,25 @@ object XlsxReader {
      * Erklärungsseite statt der Datenzeilen einzulesen.
      */
     fun readSheet(input: InputStream, sheetName: String): List<XlsxRow> {
+        val workbook = openWorkbook(input)
+        val name = workbook.sheetNames.firstOrNull { it.equals(sheetName, ignoreCase = true) }
+            ?: workbook.sheetNames.firstOrNull { !it.contains("field", true) && !it.contains("explan", true) }
+            ?: workbook.sheetNames.firstOrNull()
+            ?: throw XlsxParseException("Kein verwendbares Sheet in der Datei gefunden.")
+        return workbook.readSheet(name)
+    }
+
+    /**
+     * Liest ALLE Sheets einer Arbeitsmappe in einem Durchgang (für den
+     * `UniversalSpreadsheetImporter`, der nicht auf einen bestimmten Sheet-Namen angewiesen
+     * ist, sondern jedes Sheet nach verwertbaren Kopfzeilen durchsucht, §2).
+     */
+    fun readAllSheets(input: InputStream): Map<String, List<XlsxRow>> {
+        val workbook = openWorkbook(input)
+        return workbook.sheetNames.associateWith { name -> workbook.readSheet(name) }
+    }
+
+    private fun openWorkbook(input: InputStream): OpenWorkbook {
         val entries = readZipEntries(input)
         val workbookXml = entries["xl/workbook.xml"]
             ?: throw XlsxParseException("xl/workbook.xml fehlt - keine gültige XLSX-Datei.")
@@ -44,20 +63,38 @@ object XlsxReader {
             ?: throw XlsxParseException("xl/_rels/workbook.xml.rels fehlt - keine gültige XLSX-Datei.")
 
         val workbookDoc = parseXml(workbookXml)
-        val relId = findSheetRelId(workbookDoc, sheetName)
-            ?: findFallbackSheetRelId(workbookDoc)
-            ?: throw XlsxParseException("Kein verwendbares Sheet in der Datei gefunden.")
-
         val relsDoc = parseXml(relsXml)
-        val target = findRelationshipTarget(relsDoc, relId)
-            ?: throw XlsxParseException("Relationship '$relId' nicht in workbook.xml.rels gefunden.")
-        val sheetPath = normalizeTarget(target)
-
-        val sheetXml = entries[sheetPath]
-            ?: throw XlsxParseException("Sheet-Datei '$sheetPath' fehlt im Archiv.")
         val sharedStrings = entries["xl/sharedStrings.xml"]?.let(::parseSharedStrings) ?: emptyList()
 
-        return parseSheetRows(parseXml(sheetXml), sharedStrings)
+        val sheetsNode = workbookDoc.getElementsByTagName("sheet")
+        val sheetNameToRelId = (0 until sheetsNode.length).mapNotNull { i ->
+            val el = sheetsNode.item(i) as Element
+            val name = el.getAttribute("name")
+            val relId = el.getAttribute("r:id").ifBlank { el.getAttribute("id") }
+            if (name.isBlank() || relId.isBlank()) null else name to relId
+        }
+
+        return OpenWorkbook(entries, relsDoc, sharedStrings, sheetNameToRelId)
+    }
+
+    private class OpenWorkbook(
+        private val entries: Map<String, ByteArray>,
+        private val relsDoc: Document,
+        private val sharedStrings: List<String>,
+        private val sheetNameToRelId: List<Pair<String, String>>,
+    ) {
+        val sheetNames: List<String> get() = sheetNameToRelId.map { it.first }
+
+        fun readSheet(name: String): List<XlsxRow> {
+            val relId = sheetNameToRelId.firstOrNull { it.first == name }?.second
+                ?: throw XlsxParseException("Sheet '$name' nicht gefunden.")
+            val target = findRelationshipTarget(relsDoc, relId)
+                ?: throw XlsxParseException("Relationship '$relId' nicht in workbook.xml.rels gefunden.")
+            val sheetPath = normalizeTarget(target)
+            val sheetXml = entries[sheetPath]
+                ?: throw XlsxParseException("Sheet-Datei '$sheetPath' fehlt im Archiv.")
+            return parseSheetRows(parseXml(sheetXml), sharedStrings)
+        }
     }
 
     private fun readZipEntries(input: InputStream): Map<String, ByteArray> {
@@ -84,30 +121,6 @@ object XlsxReader {
         } catch (e: Exception) {
             throw XlsxParseException("XML in der XLSX-Datei konnte nicht gelesen werden: ${e.message}", e)
         }
-    }
-
-    private fun findSheetRelId(workbookDoc: Document, sheetName: String): String? {
-        val sheets = workbookDoc.getElementsByTagName("sheet")
-        for (i in 0 until sheets.length) {
-            val el = sheets.item(i) as Element
-            if (el.getAttribute("name").equals(sheetName, ignoreCase = true)) {
-                return el.getAttribute("r:id").ifBlank { el.getAttribute("id") }.ifBlank { null }
-            }
-        }
-        return null
-    }
-
-    private fun findFallbackSheetRelId(workbookDoc: Document): String? {
-        val sheets = workbookDoc.getElementsByTagName("sheet")
-        for (i in 0 until sheets.length) {
-            val el = sheets.item(i) as Element
-            val name = el.getAttribute("name")
-            if (!name.contains("field", ignoreCase = true) && !name.contains("explan", ignoreCase = true)) {
-                return el.getAttribute("r:id").ifBlank { el.getAttribute("id") }.ifBlank { null }
-            }
-        }
-        if (sheets.length == 0) return null
-        return (sheets.item(0) as Element).getAttribute("r:id").ifBlank { null }
     }
 
     private fun findRelationshipTarget(relsDoc: Document, relId: String): String? {

@@ -23,4 +23,6 @@ data class ImportBatch(
     val duplicateCount: Int,
     val totalIncomeCents: Cents,
     val sourceHash: String,
+    /** Summe neuer Ausgaben aus diesem Import (§20) - 0 bei reinen TikTok-Earnings-Importen. */
+    val totalExpenseCents: Cents = 0L,
 )

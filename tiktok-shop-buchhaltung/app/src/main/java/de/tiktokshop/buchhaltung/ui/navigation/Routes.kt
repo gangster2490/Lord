@@ -7,8 +7,12 @@ object Routes {
     const val REVIEW = "review"
     const val EXPORT = "export"
     const val BACKUP = "backup"
+    const val IMPORT_ENTRY = "import_entry"
     const val IMPORT_EXCEL = "import_excel"
     const val IMPORT_HISTORY = "import_history"
+
+    const val BUCHUNGEN_PATTERN = "buchungen/{filter}"
+    fun buchungen(filter: String = "ALLE") = "buchungen/$filter"
 
     /** Nested Nav-Graph, damit Scan- und Review-Screen dieselbe ScanViewModel-Instanz teilen. */
     const val SCAN_GRAPH = "scan_graph"

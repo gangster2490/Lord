@@ -52,11 +52,22 @@ fun ImportHistoryScreen() {
             items(batches, key = { it.id }) { batch ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(batch.filename)
+                        val typeLabel = when {
+                            batch.totalIncomeCents > 0 && batch.totalExpenseCents > 0 -> "Einnahmen + Ausgaben"
+                            batch.totalIncomeCents > 0 -> "Einnahmen"
+                            batch.totalExpenseCents > 0 -> "Ausgaben"
+                            else -> "Import"
+                        }
+                        Text("${batch.filename}  ·  $typeLabel")
                         Text("Zeitraum: ${batch.month ?: "unbekannt"}")
                         Text("Importiert am: ${batch.importDate.atZone(ZoneId.systemDefault()).format(formatter)}")
                         Text("${batch.newTransactionCount} neu, ${batch.duplicateCount} bereits vorhanden (${batch.rowCount} gesamt)")
-                        Text("Gesamteinnahmen (neu): ${batch.totalIncomeCents.formatGerman()} €")
+                        if (batch.totalIncomeCents > 0) {
+                            Text("Gesamteinnahmen (neu): ${batch.totalIncomeCents.formatGerman()} €")
+                        }
+                        if (batch.totalExpenseCents > 0) {
+                            Text("Gesamtausgaben (neu): ${batch.totalExpenseCents.formatGerman()} €")
+                        }
                     }
                 }
             }

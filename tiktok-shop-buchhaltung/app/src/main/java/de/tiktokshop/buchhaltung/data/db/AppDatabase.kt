@@ -23,7 +23,7 @@ import de.tiktokshop.buchhaltung.data.model.StatusHistory
         SourceDocument::class,
         ImportBatch::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -127,13 +127,28 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Universeller Import (§1-6 der Vereinfachungs-Vorgabe): `import_batches` bekommt eine
+         * eigene Ausgaben-Summe, damit der Import-Verlauf auch generische Excel/CSV-
+         * Ausgabenimporte korrekt zusammenfasst (§20) - vorher gab es nur `totalIncomeCents`.
+         * Rein additiv (neue Spalte mit DEFAULT 0), keine bestehenden Daten werden verändert
+         * oder gelöscht.
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE import_batches ADD COLUMN totalExpenseCents INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "tiktok_buchhaltung.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
             }
     }
 }

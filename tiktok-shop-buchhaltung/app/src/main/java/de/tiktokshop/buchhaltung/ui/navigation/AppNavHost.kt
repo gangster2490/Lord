@@ -11,14 +11,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import de.tiktokshop.buchhaltung.ui.backup.BackupScreen
+import de.tiktokshop.buchhaltung.ui.buchungen.BuchungFilter
+import de.tiktokshop.buchhaltung.ui.buchungen.BuchungenScreen
 import de.tiktokshop.buchhaltung.ui.common.rememberApp
 import de.tiktokshop.buchhaltung.ui.dashboard.DashboardScreen
 import de.tiktokshop.buchhaltung.ui.detail.ExpenseDetailScreen
 import de.tiktokshop.buchhaltung.ui.detail.IncomeDetailScreen
 import de.tiktokshop.buchhaltung.ui.expense.ExpenseCaptureScreen
 import de.tiktokshop.buchhaltung.ui.export.ExportScreen
-import de.tiktokshop.buchhaltung.ui.importer.ImportExcelScreen
+import de.tiktokshop.buchhaltung.ui.importer.ImportEntryScreen
 import de.tiktokshop.buchhaltung.ui.importer.ImportHistoryScreen
+import de.tiktokshop.buchhaltung.ui.importer.UniversalImportScreen
 import de.tiktokshop.buchhaltung.ui.income.IncomeCaptureScreen
 import de.tiktokshop.buchhaltung.ui.review.ReviewScreen
 import de.tiktokshop.buchhaltung.ui.scan.ScanScreen
@@ -35,9 +38,19 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onBelegePruefen = { navController.navigate(Routes.REVIEW) },
                 onExport = { navController.navigate(Routes.EXPORT) },
                 onBackup = { navController.navigate(Routes.BACKUP) },
-                onScan = { navController.navigate(Routes.SCAN_GRAPH) },
-                onImportExcel = { navController.navigate(Routes.IMPORT_EXCEL) },
+                onImportEntry = { navController.navigate(Routes.IMPORT_ENTRY) },
                 onImportHistory = { navController.navigate(Routes.IMPORT_HISTORY) },
+                onBuchungen = { filter -> navController.navigate(Routes.buchungen(filter.name)) },
+            )
+        }
+        composable(Routes.IMPORT_ENTRY) {
+            ImportEntryScreen(
+                onExcelCsv = { navController.navigate(Routes.IMPORT_EXCEL) },
+                onFotoScreenshot = { navController.navigate(Routes.SCAN_GRAPH) },
+                onKamera = { navController.navigate(Routes.SCAN_GRAPH) },
+                onManuellEinnahme = { navController.navigate(Routes.INCOME_CAPTURE) },
+                onManuellAusgabe = { navController.navigate(Routes.EXPENSE_CAPTURE) },
+                onCancel = { navController.popBackStack() },
             )
         }
         composable(Routes.INCOME_CAPTURE) {
@@ -77,12 +90,22 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
         composable(Routes.EXPORT) { ExportScreen() }
         composable(Routes.BACKUP) { BackupScreen() }
         composable(Routes.IMPORT_EXCEL) {
-            ImportExcelScreen(
-                onDone = { navController.popBackStack() },
+            UniversalImportScreen(
+                onDone = { navController.popBackStack(Routes.DASHBOARD, inclusive = false) },
                 onCancel = { navController.popBackStack() },
             )
         }
         composable(Routes.IMPORT_HISTORY) { ImportHistoryScreen() }
+
+        composable(Routes.BUCHUNGEN_PATTERN) { backStackEntry ->
+            val filterName = backStackEntry.arguments?.getString("filter").orEmpty()
+            val filter = runCatching { BuchungFilter.valueOf(filterName) }.getOrDefault(BuchungFilter.ALLE)
+            BuchungenScreen(
+                initialFilter = filter,
+                onOpenIncome = { id -> navController.navigate(Routes.incomeDetail(id)) },
+                onOpenExpense = { id -> navController.navigate(Routes.expenseDetail(id)) },
+            )
+        }
 
         navigation(startDestination = Routes.SCAN, route = Routes.SCAN_GRAPH) {
             composable(Routes.SCAN) { backStackEntry ->
