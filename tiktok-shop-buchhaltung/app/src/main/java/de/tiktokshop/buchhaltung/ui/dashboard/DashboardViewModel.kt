@@ -2,6 +2,7 @@ package de.tiktokshop.buchhaltung.ui.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import de.tiktokshop.buchhaltung.data.model.Cents
 import de.tiktokshop.buchhaltung.data.repository.LedgerRepository
 import de.tiktokshop.buchhaltung.domain.DashboardCalculator
 import de.tiktokshop.buchhaltung.domain.DashboardSummary
@@ -24,6 +25,12 @@ data class DashboardUiState(
     val summary: DashboardSummary = DashboardCalculator.calculate(emptyList(), emptyList(), LocalDate.now(), LocalDate.now()),
     /** Eingefroren/Verfügbar/Ausgezahlt im Auszahlungsstatus-Block - siehe [FrozenBalanceCalculator]. */
     val frozenBalanceSummary: FrozenBalanceSummary = FrozenBalanceCalculator.calculate(emptyList()),
+    /**
+     * "Verfügbarer Überschuss" (earnedTotal - frozenAmount - expensesTotal) - eigener,
+     * zusätzlicher Kennwert neben [DashboardSummary.earnedMinusExpensesCents] ("Vorläufiges
+     * Ergebnis"), ersetzt diesen nicht.
+     */
+    val availableSurplusCents: Cents = FrozenBalanceCalculator.calculateAvailableSurplusCents(0L, 0L, 0L),
 )
 
 class DashboardViewModel(private val repository: LedgerRepository) : ViewModel() {
@@ -43,12 +50,19 @@ class DashboardViewModel(private val repository: LedgerRepository) : ViewModel()
         range,
         period,
     ) { incomes, expenses, frozenBalances, currentRange, currentPeriod ->
+        val summary = DashboardCalculator.calculate(incomes, expenses, currentRange.first, currentRange.second)
+        val frozenBalanceSummary = FrozenBalanceCalculator.calculate(frozenBalances)
         DashboardUiState(
             period = currentPeriod,
             from = currentRange.first,
             to = currentRange.second,
-            summary = DashboardCalculator.calculate(incomes, expenses, currentRange.first, currentRange.second),
-            frozenBalanceSummary = FrozenBalanceCalculator.calculate(frozenBalances),
+            summary = summary,
+            frozenBalanceSummary = frozenBalanceSummary,
+            availableSurplusCents = FrozenBalanceCalculator.calculateAvailableSurplusCents(
+                earnedTotalCents = summary.displayedTotalCents,
+                frozenCents = frozenBalanceSummary.frozenCents,
+                expensesCents = summary.expensesCents,
+            ),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())
 

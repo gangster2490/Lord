@@ -123,4 +123,35 @@ class FrozenBalanceCalculatorTest {
         assertThat(summary.availableCents).isEqualTo(0L)
         assertThat(summary.paidOutCents).isEqualTo(0L)
     }
+
+    @Test
+    fun `available surplus is earnedTotal minus frozenAmount minus expensesTotal`() {
+        // 1.976,97 - 702,61 - 820,07 = 454,29 EUR
+        val surplusCents = FrozenBalanceCalculator.calculateAvailableSurplusCents(
+            earnedTotalCents = 197697L,
+            frozenCents = 70261L,
+            expensesCents = 82007L,
+        )
+
+        assertThat(surplusCents).isEqualTo(45429L)
+    }
+
+    @Test
+    fun `available surplus does not replace the interim result - both are independent`() {
+        val incomes = listOf(income(197697L))
+        val expenses = listOf(expense(82007L))
+        val summary = DashboardCalculator.calculate(incomes, expenses, from, to)
+        val frozenSummary = FrozenBalanceCalculator.calculate(listOf(frozenEntry(FrozenBalanceStatus.FROZEN)))
+
+        val surplusCents = FrozenBalanceCalculator.calculateAvailableSurplusCents(
+            earnedTotalCents = summary.displayedTotalCents,
+            frozenCents = frozenSummary.frozenCents,
+            expensesCents = summary.expensesCents,
+        )
+
+        // Vorläufiges Ergebnis bleibt unverändert 1.156,90 EUR (earnedTotal - expensesTotal)...
+        assertThat(summary.earnedMinusExpensesCents).isEqualTo(115690L)
+        // ...während der Verfügbare Überschuss zusätzlich den Frozen-Betrag abzieht: 454,29 EUR.
+        assertThat(surplusCents).isEqualTo(45429L)
+    }
 }

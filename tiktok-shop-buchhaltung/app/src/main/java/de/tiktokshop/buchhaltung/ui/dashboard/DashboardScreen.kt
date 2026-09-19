@@ -88,6 +88,8 @@ fun DashboardScreen(
                 onAusgaben = { onBuchungen(BuchungFilter.AUSGABEN) },
             )
 
+            AvailableSurplusBlock(valueCents = state.availableSurplusCents)
+
             PayoutStatusBlock(
                 earnedCents = state.summary.displayedTotalCents,
                 frozenCents = state.frozenBalanceSummary.frozenCents,
@@ -208,6 +210,41 @@ private fun AutoSizeEuroText(text: String, maxFontSize: TextUnit, modifier: Modi
 }
 
 private const val MIN_EURO_FONT_SIZE_VALUE = 14f
+
+/**
+ * "Verfügbarer Überschuss" (earnedTotal - frozenAmount - expensesTotal): eigener, visuell
+ * abgesetzter Kennwert (andere Kartenfarbe) neben dem "Vorläufigen Ergebnis" - ersetzt es nicht,
+ * zeigt nur zusätzlich, was nach Abzug des aktuell eingefrorenen Betrags übrig bliebe.
+ */
+@Composable
+private fun AvailableSurplusBlock(valueCents: Long) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    "VERFÜGBARER ÜBERSCHUSS",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
+                )
+                AutoSizeEuroText(
+                    text = valueCents.asEuro(),
+                    maxFontSize = 28.sp,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
+            Text(
+                "nach eingefrorenem Betrag und Ausgaben",
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+    }
+}
 
 /** Separater Auszahlungsstatus-Block - wird NIE mit Einnahmen/Ausgaben vermischt (§13: Frozen != Ausgezahlt). */
 @Composable

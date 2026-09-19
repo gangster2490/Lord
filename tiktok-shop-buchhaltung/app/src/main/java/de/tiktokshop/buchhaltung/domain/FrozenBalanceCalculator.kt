@@ -29,4 +29,14 @@ object FrozenBalanceCalculator {
             paidOutCents = sumFor(FrozenBalanceStatus.PAID_OUT),
         )
     }
+
+    /**
+     * "Verfügbarer Überschuss": earnedTotal - frozenAmount - expensesTotal. Eigener, zusätzlicher
+     * Kennwert neben dem "Vorläufigen Ergebnis" (earnedTotal - expensesTotal) - zeigt, was nach
+     * Abzug sowohl der Ausgaben als auch des aktuell eingefrorenen Betrags tatsächlich verfügbar
+     * wäre. Ersetzt das Vorläufige Ergebnis nicht, ist nur ein zusätzlicher Blick auf dieselben
+     * Zahlen.
+     */
+    fun calculateAvailableSurplusCents(earnedTotalCents: Cents, frozenCents: Cents, expensesCents: Cents): Cents =
+        earnedTotalCents - frozenCents - expensesCents
 }
