@@ -20,6 +20,9 @@ object StatusClassifier {
     private val REVERSED_KEYWORDS = listOf(
         "storniert", "zurückgebucht", "reversed", "cancelled commission", "canceled commission",
     )
+    private val REFUNDED_KEYWORDS = listOf(
+        "rückerstattet", "erstattet", "refunded", "refund issued", "erstattung",
+    )
     private val FROZEN_KEYWORDS = listOf(
         "eingefroren", "abheben nicht möglich", "withdrawal unavailable", "frozen",
     )
@@ -35,6 +38,9 @@ object StatusClassifier {
 
         findFirstMatch(normalized, REVERSED_KEYWORDS)?.let {
             return StatusClassification(IncomeStatus.REVERSED, 0.9f, it)
+        }
+        findFirstMatch(normalized, REFUNDED_KEYWORDS)?.let {
+            return StatusClassification(IncomeStatus.REFUNDED, 0.9f, it)
         }
         findFirstMatch(normalized, FROZEN_KEYWORDS)?.let {
             return StatusClassification(IncomeStatus.FROZEN, 0.9f, it)

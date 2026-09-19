@@ -101,6 +101,15 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
     implementation("androidx.biometric:biometric:1.1.0")
 
+    // AI Vision fallback: Android app -> eigener Backend Proxy -> AI Vision API.
+    // Kein API-Key im APK - nur die Backend-URL (+ optionales Bearer-Token) werden
+    // konfiguriert und verschlüsselt lokal gespeichert (siehe ai/BackendConfigStore).
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:1.0.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 

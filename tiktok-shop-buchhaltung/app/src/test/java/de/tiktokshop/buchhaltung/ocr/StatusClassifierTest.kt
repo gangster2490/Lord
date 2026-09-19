@@ -46,4 +46,16 @@ class StatusClassifierTest {
         assertThat(result.status).isEqualTo(IncomeStatus.ACCRUED)
         assertThat(result.confidence).isLessThan(0.75f)
     }
+
+    @Test
+    fun `refunded is classified as REFUNDED`() {
+        val result = StatusClassifier.classify("Provision wurde rückerstattet")
+        assertThat(result.status).isEqualTo(IncomeStatus.REFUNDED)
+    }
+
+    @Test
+    fun `english refunded keyword is classified as REFUNDED`() {
+        val result = StatusClassifier.classify("Your commission was refunded")
+        assertThat(result.status).isEqualTo(IncomeStatus.REFUNDED)
+    }
 }

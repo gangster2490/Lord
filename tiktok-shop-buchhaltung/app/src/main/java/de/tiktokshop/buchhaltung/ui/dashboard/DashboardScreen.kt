@@ -35,6 +35,7 @@ fun DashboardScreen(
     onBelegePruefen: () -> Unit,
     onExport: () -> Unit,
     onBackup: () -> Unit,
+    onScan: () -> Unit,
 ) {
     val app = rememberApp()
     val viewModel: DashboardViewModel = viewModel(
@@ -76,11 +77,14 @@ fun DashboardScreen(
                 }
             }
 
+            Button(onClick = onScan, modifier = Modifier.fillMaxWidth()) {
+                Text("Beleg / Screenshot scannen (mehrere Transaktionen)")
+            }
             Button(onClick = onEinnahmeErfassen, modifier = Modifier.fillMaxWidth()) {
-                Text("Einnahme erfassen")
+                Text("Einnahme manuell erfassen")
             }
             Button(onClick = onAusgabeErfassen, modifier = Modifier.fillMaxWidth()) {
-                Text("Ausgabe erfassen")
+                Text("Ausgabe manuell erfassen")
             }
             Button(onClick = onBelegePruefen, modifier = Modifier.fillMaxWidth()) {
                 Text("Belege prüfen")

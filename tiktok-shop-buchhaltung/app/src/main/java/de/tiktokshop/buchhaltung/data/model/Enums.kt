@@ -17,10 +17,12 @@ enum class IncomeStatus(val label: String) {
     AVAILABLE("Verfügbar"),
     PAID_OUT("Ausgezahlt"),
     REVERSED("Storniert"),
+    REFUNDED("Rückerstattet"),
 }
 
 enum class ExpenseCategory(val label: String) {
     VIDEO_PRODUCTS("Produkte für Videos"),
+    VIDEO_EDITING_SOFTWARE("Video-Software"),
     SHIPPING("Versandkosten"),
     SOFTWARE_SUBSCRIPTIONS("Software / Abos"),
     AI_SERVICES("AI-Dienste"),

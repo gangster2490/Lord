@@ -17,4 +17,24 @@ class TextRecognizerEngine(private val context: Context) {
         val result = recognizer.process(image).await()
         return result.text
     }
+
+    /**
+     * Wie [recognize], liefert aber zusätzlich jede erkannte Zeile mit ihrer vertikalen
+     * Position im Bild - Grundlage für die Gruppierung mehrerer Transaktionen pro
+     * Screenshot (siehe [TransactionGrouper]).
+     */
+    suspend fun recognizeStructured(imageUri: Uri): RecognizedDocument {
+        val image = InputImage.fromFilePath(context, imageUri)
+        val result = recognizer.process(image).await()
+
+        val lines = result.textBlocks
+            .flatMap { it.lines }
+            .mapNotNull { line ->
+                val box = line.boundingBox ?: return@mapNotNull null
+                RecognizedLine(text = line.text, top = box.top, bottom = box.bottom, left = box.left)
+            }
+            .sortedBy { it.top }
+
+        return RecognizedDocument(lines = lines, rawText = result.text)
+    }
 }

@@ -8,6 +8,11 @@ object Routes {
     const val EXPORT = "export"
     const val BACKUP = "backup"
 
+    /** Nested Nav-Graph, damit Scan- und Review-Screen dieselbe ScanViewModel-Instanz teilen. */
+    const val SCAN_GRAPH = "scan_graph"
+    const val SCAN = "scan"
+    const val SCAN_REVIEW = "scan_review"
+
     const val INCOME_DETAIL_PATTERN = "income_detail/{id}"
     fun incomeDetail(id: String) = "income_detail/$id"
 

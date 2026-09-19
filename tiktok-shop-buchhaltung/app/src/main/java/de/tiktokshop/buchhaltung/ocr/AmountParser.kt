@@ -17,6 +17,12 @@ object AmountParser {
     private val NUMBER_PATTERN = Regex("""[€]?\s?(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)\s?€?""")
     private val TOTAL_KEYWORDS = Regex("""(gesamt|total|summe|betrag|verfügbare auszahlung|amount)""", RegexOption.IGNORE_CASE)
 
+    // Datumsangaben (TT.MM.JJJJ / JJJJ-MM-TT) stehen in Transaktionslisten oft auf derselben
+    // Zeile wie der Betrag (z. B. "03.07.2026 10,99 €"). Ohne diesen Strip hält die Suche das
+    // Datum für einen zweiten, widersprüchlichen Betragskandidaten und gibt (korrekt, aber
+    // unnötig) null zurück, statt den eindeutigen Betrag zu erkennen.
+    private val DATE_LIKE = Regex("""\b\d{1,2}\.\d{1,2}\.\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b""")
+
     /** Parst genau eine bekannte Zahl-Zeichenkette (ohne Mehrdeutigkeits-Suche). Wirft bei unparsbarem Text. */
     fun parseSingleAmountToCents(raw: String): Cents {
         val cleaned = raw.trim().removePrefix("€").removeSuffix("€").trim()
@@ -31,7 +37,7 @@ object AmountParser {
      * Andernfalls null, damit die App nichts erfindet.
      */
     fun extractAmount(text: String): AmountCandidate? {
-        val lines = text.lines()
+        val lines = text.replace(DATE_LIKE, " ").lines()
         val candidates = mutableListOf<Pair<String, String>>() // raw match, containing line
 
         for (line in lines) {
