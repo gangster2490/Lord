@@ -3,6 +3,7 @@ package de.tiktokshop.buchhaltung.data.db
 import androidx.room.TypeConverter
 import de.tiktokshop.buchhaltung.data.model.ActivityPhase
 import de.tiktokshop.buchhaltung.data.model.ExpenseCategory
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceStatus
 import de.tiktokshop.buchhaltung.data.model.IncomeStatus
 import de.tiktokshop.buchhaltung.data.model.SourceDocumentType
 import java.time.Instant
@@ -44,6 +45,12 @@ class Converters {
 
     @TypeConverter
     fun toSourceDocumentType(value: String?): SourceDocumentType? = value?.let(SourceDocumentType::valueOf)
+
+    @TypeConverter
+    fun fromFrozenBalanceStatus(value: FrozenBalanceStatus?): String? = value?.name
+
+    @TypeConverter
+    fun toFrozenBalanceStatus(value: String?): FrozenBalanceStatus? = value?.let(FrozenBalanceStatus::valueOf)
 
     /** Belegpfade werden als einfache, mit '|' getrennte Liste gespeichert (keine '|' in Pfaden). */
     @TypeConverter

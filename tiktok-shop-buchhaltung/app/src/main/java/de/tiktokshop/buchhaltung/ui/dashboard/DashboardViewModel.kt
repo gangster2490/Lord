@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import de.tiktokshop.buchhaltung.data.repository.LedgerRepository
 import de.tiktokshop.buchhaltung.domain.DashboardCalculator
 import de.tiktokshop.buchhaltung.domain.DashboardSummary
+import de.tiktokshop.buchhaltung.domain.FrozenBalanceCalculator
+import de.tiktokshop.buchhaltung.domain.FrozenBalanceSummary
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,8 @@ data class DashboardUiState(
     val from: LocalDate = LocalDate.of(LocalDate.now().year, 1, 1),
     val to: LocalDate = LocalDate.of(LocalDate.now().year, 12, 31),
     val summary: DashboardSummary = DashboardCalculator.calculate(emptyList(), emptyList(), LocalDate.now(), LocalDate.now()),
+    /** Eingefroren/Verfügbar/Ausgezahlt im Auszahlungsstatus-Block - siehe [FrozenBalanceCalculator]. */
+    val frozenBalanceSummary: FrozenBalanceSummary = FrozenBalanceCalculator.calculate(emptyList()),
 )
 
 class DashboardViewModel(private val repository: LedgerRepository) : ViewModel() {
@@ -35,14 +39,16 @@ class DashboardViewModel(private val repository: LedgerRepository) : ViewModel()
     val uiState: StateFlow<DashboardUiState> = combine(
         repository.observeIncomes(),
         repository.observeExpenses(),
+        repository.observeFrozenBalances(),
         range,
         period,
-    ) { incomes, expenses, currentRange, currentPeriod ->
+    ) { incomes, expenses, frozenBalances, currentRange, currentPeriod ->
         DashboardUiState(
             period = currentPeriod,
             from = currentRange.first,
             to = currentRange.second,
             summary = DashboardCalculator.calculate(incomes, expenses, currentRange.first, currentRange.second),
+            frozenBalanceSummary = FrozenBalanceCalculator.calculate(frozenBalances),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardUiState())
 

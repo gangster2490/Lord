@@ -24,4 +24,12 @@ object Routes {
 
     const val EXPENSE_DETAIL_PATTERN = "expense_detail/{id}"
     fun expenseDetail(id: String) = "expense_detail/$id"
+
+    const val FROZEN_BALANCE_CAPTURE = "frozen_balance_capture"
+
+    const val FROZEN_BALANCE_LIST_PATTERN = "frozen_balance_list/{status}"
+    fun frozenBalanceList(status: String = "ALL") = "frozen_balance_list/$status"
+
+    const val FROZEN_BALANCE_DETAIL_PATTERN = "frozen_balance_detail/{id}"
+    fun frozenBalanceDetail(id: String) = "frozen_balance_detail/$id"
 }

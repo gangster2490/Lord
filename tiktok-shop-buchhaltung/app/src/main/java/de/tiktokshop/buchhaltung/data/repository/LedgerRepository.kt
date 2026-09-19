@@ -2,6 +2,8 @@ package de.tiktokshop.buchhaltung.data.repository
 
 import de.tiktokshop.buchhaltung.data.db.AppDatabase
 import de.tiktokshop.buchhaltung.data.model.ExpenseEntry
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceEntry
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceStatusHistory
 import de.tiktokshop.buchhaltung.data.model.IncomeEntry
 import de.tiktokshop.buchhaltung.data.model.StatusHistory
 import kotlinx.coroutines.flow.Flow
@@ -82,4 +84,53 @@ class LedgerRepository(private val db: AppDatabase) {
     suspend fun restoreExpense(entry: ExpenseEntry) = db.expenseDao().upsert(entry)
 
     suspend fun restoreStatusHistory(history: StatusHistory) = db.statusHistoryDao().upsert(history)
+
+    // --- Eingefrorene Auszahlungsbeträge (separat von Einnahmen, siehe FrozenBalanceEntry-Kommentar) ---
+
+    fun observeFrozenBalances(): Flow<List<FrozenBalanceEntry>> = db.frozenBalanceDao().observeAll()
+    fun observeFrozenBalanceHistory(frozenBalanceEntryId: String): Flow<List<FrozenBalanceStatusHistory>> =
+        db.frozenBalanceStatusHistoryDao().observeForEntry(frozenBalanceEntryId)
+
+    suspend fun getAllFrozenBalances(): List<FrozenBalanceEntry> = db.frozenBalanceDao().getAll()
+    suspend fun getAllFrozenBalanceHistory(): List<FrozenBalanceStatusHistory> = db.frozenBalanceStatusHistoryDao().getAll()
+
+    /** Legt einen neuen Frozen-Balance-Eintrag an und protokolliert den initialen Status. */
+    suspend fun saveNewFrozenBalance(entry: FrozenBalanceEntry) {
+        db.frozenBalanceDao().upsert(entry)
+        db.frozenBalanceStatusHistoryDao().insert(
+            FrozenBalanceStatusHistory(
+                frozenBalanceEntryId = entry.id,
+                oldStatus = null,
+                newStatus = entry.status,
+                changedAt = entry.createdAt,
+                note = "Erfassung",
+            ),
+        )
+    }
+
+    /**
+     * Aktualisiert einen bestehenden Frozen-Balance-Eintrag (z. B. FROZEN -> AVAILABLE). Der
+     * Eintrag bleibt derselbe Datensatz (keine Duplizierung des ursprünglichen Earned-Betrags);
+     * bei einer Statusänderung wird die Historie ergänzt.
+     */
+    suspend fun updateFrozenBalance(previous: FrozenBalanceEntry, updated: FrozenBalanceEntry) {
+        db.frozenBalanceDao().update(updated.copy(updatedAt = Instant.now()))
+        if (previous.status != updated.status) {
+            db.frozenBalanceStatusHistoryDao().insert(
+                FrozenBalanceStatusHistory(
+                    frozenBalanceEntryId = updated.id,
+                    oldStatus = previous.status,
+                    newStatus = updated.status,
+                    note = "Statusänderung",
+                ),
+            )
+        }
+    }
+
+    suspend fun deleteFrozenBalance(entry: FrozenBalanceEntry) = db.frozenBalanceDao().delete(entry)
+
+    suspend fun restoreFrozenBalance(entry: FrozenBalanceEntry) = db.frozenBalanceDao().upsert(entry)
+
+    suspend fun restoreFrozenBalanceHistory(history: FrozenBalanceStatusHistory) =
+        db.frozenBalanceStatusHistoryDao().upsert(history)
 }

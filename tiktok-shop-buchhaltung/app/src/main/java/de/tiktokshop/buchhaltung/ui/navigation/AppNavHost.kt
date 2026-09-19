@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceStatus
 import de.tiktokshop.buchhaltung.ui.backup.BackupScreen
 import de.tiktokshop.buchhaltung.ui.buchungen.BuchungFilter
 import de.tiktokshop.buchhaltung.ui.buchungen.BuchungenScreen
@@ -19,6 +20,9 @@ import de.tiktokshop.buchhaltung.ui.detail.ExpenseDetailScreen
 import de.tiktokshop.buchhaltung.ui.detail.IncomeDetailScreen
 import de.tiktokshop.buchhaltung.ui.expense.ExpenseCaptureScreen
 import de.tiktokshop.buchhaltung.ui.export.ExportScreen
+import de.tiktokshop.buchhaltung.ui.frozen.FrozenBalanceCaptureScreen
+import de.tiktokshop.buchhaltung.ui.frozen.FrozenBalanceDetailScreen
+import de.tiktokshop.buchhaltung.ui.frozen.FrozenBalanceListScreen
 import de.tiktokshop.buchhaltung.ui.importer.ImportEntryScreen
 import de.tiktokshop.buchhaltung.ui.importer.ImportHistoryScreen
 import de.tiktokshop.buchhaltung.ui.importer.UniversalImportScreen
@@ -41,6 +45,8 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
                 onImportEntry = { navController.navigate(Routes.IMPORT_ENTRY) },
                 onImportHistory = { navController.navigate(Routes.IMPORT_HISTORY) },
                 onBuchungen = { filter -> navController.navigate(Routes.buchungen(filter.name)) },
+                onFrozenBalanceErfassen = { navController.navigate(Routes.FROZEN_BALANCE_CAPTURE) },
+                onFrozenBalanceList = { status -> navController.navigate(Routes.frozenBalanceList(status.name)) },
             )
         }
         composable(Routes.IMPORT_ENTRY) {
@@ -96,6 +102,30 @@ fun AppNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
         composable(Routes.IMPORT_HISTORY) { ImportHistoryScreen() }
+
+        composable(Routes.FROZEN_BALANCE_CAPTURE) {
+            FrozenBalanceCaptureScreen(
+                onSaved = { navController.popBackStack() },
+                onCancel = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.FROZEN_BALANCE_LIST_PATTERN) { backStackEntry ->
+            val statusName = backStackEntry.arguments?.getString("status").orEmpty()
+            val status = runCatching { FrozenBalanceStatus.valueOf(statusName) }.getOrNull()
+            FrozenBalanceListScreen(
+                initialStatus = status,
+                onOpenEntry = { id -> navController.navigate(Routes.frozenBalanceDetail(id)) },
+                onCapture = { navController.navigate(Routes.FROZEN_BALANCE_CAPTURE) },
+            )
+        }
+        composable(Routes.FROZEN_BALANCE_DETAIL_PATTERN) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id").orEmpty()
+            FrozenBalanceDetailScreen(
+                entryId = id,
+                onDeleted = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
+            )
+        }
 
         composable(Routes.BUCHUNGEN_PATTERN) { backStackEntry ->
             val filterName = backStackEntry.arguments?.getString("filter").orEmpty()

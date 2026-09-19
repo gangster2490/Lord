@@ -3,6 +3,9 @@ package de.tiktokshop.buchhaltung.export
 import android.content.Context
 import android.net.Uri
 import de.tiktokshop.buchhaltung.data.model.ExpenseEntry
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceEntry
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceStatus
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceStatusHistory
 import de.tiktokshop.buchhaltung.data.model.IncomeEntry
 import de.tiktokshop.buchhaltung.data.model.StatusHistory
 import de.tiktokshop.buchhaltung.data.repository.LedgerRepository
@@ -23,6 +26,8 @@ private data class BackupEnvelope(
     val incomes: List<BackupIncome>,
     val expenses: List<BackupExpense>,
     val statusHistory: List<BackupStatusHistory>,
+    val frozenBalances: List<BackupFrozenBalance> = emptyList(),
+    val frozenBalanceHistory: List<BackupFrozenBalanceStatusHistory> = emptyList(),
 )
 
 @Serializable
@@ -90,6 +95,32 @@ private data class BackupStatusHistory(
     val receiptFileName: String?,
 )
 
+@Serializable
+private data class BackupFrozenBalance(
+    val id: String,
+    val date: String,
+    val amountCents: Long,
+    val currency: String,
+    val platform: String,
+    val status: String,
+    val note: String?,
+    val receiptFileNames: List<String>,
+    val sourceDocumentId: String?,
+    val periodReference: String?,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long,
+)
+
+@Serializable
+private data class BackupFrozenBalanceStatusHistory(
+    val id: String,
+    val frozenBalanceEntryId: String,
+    val oldStatus: String?,
+    val newStatus: String,
+    val changedAtEpochMillis: Long,
+    val note: String?,
+)
+
 class BackupRestoreException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /** Backup/Restore als ZIP (JSON-Manifest + Belegkopien), siehe TC08. */
@@ -104,6 +135,8 @@ class BackupManager(private val context: Context, private val repository: Ledger
         val incomes = repository.getAllIncomes()
         val expenses = repository.getAllExpenses()
         val history = repository.getAllStatusHistory()
+        val frozenBalances = repository.getAllFrozenBalances()
+        val frozenBalanceHistory = repository.getAllFrozenBalanceHistory()
 
         val envelope = BackupEnvelope(
             createdAtEpochMillis = Instant.now().toEpochMilli(),
@@ -172,9 +205,39 @@ class BackupManager(private val context: Context, private val repository: Ledger
                     receiptFileName = it.receiptUri?.let { path -> File(path).name },
                 )
             },
+            frozenBalances = frozenBalances.map {
+                BackupFrozenBalance(
+                    id = it.id,
+                    date = it.date.toString(),
+                    amountCents = it.amountCents,
+                    currency = it.currency,
+                    platform = it.platform,
+                    status = it.status.name,
+                    note = it.note,
+                    receiptFileNames = it.receiptUris.map { path -> File(path).name },
+                    sourceDocumentId = it.sourceDocumentId,
+                    periodReference = it.periodReference,
+                    createdAtEpochMillis = it.createdAt.toEpochMilli(),
+                    updatedAtEpochMillis = it.updatedAt.toEpochMilli(),
+                )
+            },
+            frozenBalanceHistory = frozenBalanceHistory.map {
+                BackupFrozenBalanceStatusHistory(
+                    id = it.id,
+                    frozenBalanceEntryId = it.frozenBalanceEntryId,
+                    oldStatus = it.oldStatus?.name,
+                    newStatus = it.newStatus.name,
+                    changedAtEpochMillis = it.changedAt.toEpochMilli(),
+                    note = it.note,
+                )
+            },
         )
 
-        val allReceiptPaths = (incomes.flatMap { it.receiptUris } + expenses.flatMap { it.receiptUris }).distinct()
+        val allReceiptPaths = (
+            incomes.flatMap { it.receiptUris } +
+                expenses.flatMap { it.receiptUris } +
+                frozenBalances.flatMap { it.receiptUris }
+            ).distinct()
         val backupFile = File(backupDir, "backup_${Instant.now().toEpochMilli()}.zip")
         ZipOutputStream(backupFile.outputStream()).use { zip ->
             zip.putNextEntry(ZipEntry("manifest.json"))
@@ -289,6 +352,38 @@ class BackupManager(private val context: Context, private val repository: Ledger
                     changedAt = Instant.ofEpochMilli(backup.changedAtEpochMillis),
                     note = backup.note,
                     receiptUri = backup.receiptFileName?.let { fileName -> File(receiptsDir, fileName).absolutePath },
+                ),
+            )
+        }
+
+        envelope.frozenBalances.forEach { backup ->
+            repository.restoreFrozenBalance(
+                FrozenBalanceEntry(
+                    id = backup.id,
+                    date = LocalDate.parse(backup.date),
+                    amountCents = backup.amountCents,
+                    currency = backup.currency,
+                    platform = backup.platform,
+                    status = FrozenBalanceStatus.valueOf(backup.status),
+                    note = backup.note,
+                    receiptUris = backup.receiptFileNames.map(::restoreReceipt),
+                    sourceDocumentId = backup.sourceDocumentId,
+                    periodReference = backup.periodReference,
+                    createdAt = Instant.ofEpochMilli(backup.createdAtEpochMillis),
+                    updatedAt = Instant.ofEpochMilli(backup.updatedAtEpochMillis),
+                ),
+            )
+        }
+
+        envelope.frozenBalanceHistory.forEach { backup ->
+            repository.restoreFrozenBalanceHistory(
+                FrozenBalanceStatusHistory(
+                    id = backup.id,
+                    frozenBalanceEntryId = backup.frozenBalanceEntryId,
+                    oldStatus = backup.oldStatus?.let { FrozenBalanceStatus.valueOf(it) },
+                    newStatus = FrozenBalanceStatus.valueOf(backup.newStatus),
+                    changedAt = Instant.ofEpochMilli(backup.changedAtEpochMillis),
+                    note = backup.note,
                 ),
             )
         }

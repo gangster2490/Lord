@@ -8,6 +8,8 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import de.tiktokshop.buchhaltung.data.model.ExpenseEntry
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceEntry
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceStatusHistory
 import de.tiktokshop.buchhaltung.data.model.ImportBatch
 import de.tiktokshop.buchhaltung.data.model.IncomeEntry
 import de.tiktokshop.buchhaltung.data.model.MerchantRule
@@ -22,8 +24,10 @@ import de.tiktokshop.buchhaltung.data.model.StatusHistory
         MerchantRule::class,
         SourceDocument::class,
         ImportBatch::class,
+        FrozenBalanceEntry::class,
+        FrozenBalanceStatusHistory::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -34,6 +38,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun merchantRuleDao(): MerchantRuleDao
     abstract fun sourceDocumentDao(): SourceDocumentDao
     abstract fun importBatchDao(): ImportBatchDao
+    abstract fun frozenBalanceDao(): FrozenBalanceDao
+    abstract fun frozenBalanceStatusHistoryDao(): FrozenBalanceStatusHistoryDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
@@ -142,13 +148,57 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Separate Auszahlungsstatus-Erfassung für eingefrorene TikTok-Beträge (§ "Eingefrorenen
+         * Betrag erfassen"): rein additive neue Tabellen, verändert keine bestehenden Daten.
+         * Eine FrozenBalanceEntry ist bewusst NICHT Teil von income_entries - sie klassifiziert
+         * nur nachträglich einen bereits erfassten Earned-Betrag, erzeugt aber nie eine neue
+         * Einnahme (siehe [de.tiktokshop.buchhaltung.data.model.FrozenBalanceEntry]-Kommentar).
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `frozen_balance_entries` (
+                        `id` TEXT NOT NULL,
+                        `date` TEXT NOT NULL,
+                        `amountCents` INTEGER NOT NULL,
+                        `currency` TEXT NOT NULL,
+                        `platform` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `note` TEXT,
+                        `receiptUris` TEXT NOT NULL,
+                        `sourceDocumentId` TEXT,
+                        `periodReference` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `frozen_balance_status_history` (
+                        `id` TEXT NOT NULL,
+                        `frozenBalanceEntryId` TEXT NOT NULL,
+                        `oldStatus` TEXT,
+                        `newStatus` TEXT NOT NULL,
+                        `changedAt` INTEGER NOT NULL,
+                        `note` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "tiktok_buchhaltung.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
             }
     }
 }

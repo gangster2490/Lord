@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import de.tiktokshop.buchhaltung.data.model.FrozenBalanceStatus
 import de.tiktokshop.buchhaltung.ui.buchungen.BuchungFilter
 import de.tiktokshop.buchhaltung.ui.common.asEuro
 import de.tiktokshop.buchhaltung.ui.common.rememberApp
@@ -57,6 +58,8 @@ fun DashboardScreen(
     onImportEntry: () -> Unit,
     onImportHistory: () -> Unit,
     onBuchungen: (BuchungFilter) -> Unit,
+    onFrozenBalanceErfassen: () -> Unit,
+    onFrozenBalanceList: (FrozenBalanceStatus) -> Unit,
 ) {
     val app = rememberApp()
     val viewModel: DashboardViewModel = viewModel(
@@ -87,19 +90,20 @@ fun DashboardScreen(
 
             PayoutStatusBlock(
                 earnedCents = state.summary.displayedTotalCents,
-                frozenCents = state.summary.frozenCents,
-                availableCents = state.summary.availableCents,
-                paidOutCents = state.summary.paidOutCents,
+                frozenCents = state.frozenBalanceSummary.frozenCents,
+                availableCents = state.frozenBalanceSummary.availableCents,
+                paidOutCents = state.frozenBalanceSummary.paidOutCents,
                 onEarnedClick = { onBuchungen(BuchungFilter.EINNAHMEN) },
-                onFrozenClick = { onBuchungen(BuchungFilter.FROZEN) },
-                onAvailableClick = { onBuchungen(BuchungFilter.AVAILABLE) },
-                onPaidOutClick = { onBuchungen(BuchungFilter.PAID_OUT) },
+                onFrozenClick = { onFrozenBalanceList(FrozenBalanceStatus.FROZEN) },
+                onAvailableClick = { onFrozenBalanceList(FrozenBalanceStatus.AVAILABLE) },
+                onPaidOutClick = { onFrozenBalanceList(FrozenBalanceStatus.PAID_OUT) },
             )
 
             ActionMenu(
                 onImportEntry = onImportEntry,
                 onEinnahmeErfassen = onEinnahmeErfassen,
                 onAusgabeErfassen = onAusgabeErfassen,
+                onFrozenBalanceErfassen = onFrozenBalanceErfassen,
                 onBuchungen = { onBuchungen(BuchungFilter.ALLE) },
                 onBelegePruefen = onBelegePruefen,
                 onImportHistory = onImportHistory,
@@ -245,6 +249,7 @@ private fun ActionMenu(
     onImportEntry: () -> Unit,
     onEinnahmeErfassen: () -> Unit,
     onAusgabeErfassen: () -> Unit,
+    onFrozenBalanceErfassen: () -> Unit,
     onBuchungen: () -> Unit,
     onBelegePruefen: () -> Unit,
     onImportHistory: () -> Unit,
@@ -258,6 +263,9 @@ private fun ActionMenu(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(onClick = onEinnahmeErfassen, modifier = Modifier.weight(1f)) { Text("+ Einnahme") }
             OutlinedButton(onClick = onAusgabeErfassen, modifier = Modifier.weight(1f)) { Text("+ Ausgabe") }
+        }
+        OutlinedButton(onClick = onFrozenBalanceErfassen, modifier = Modifier.fillMaxWidth()) {
+            Text("Eingefrorenen Betrag erfassen")
         }
 
         Card(modifier = Modifier.fillMaxWidth()) {
