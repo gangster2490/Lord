@@ -64,6 +64,45 @@ class UniversalSpreadsheetImporterTest {
     }
 
     @Test
+    fun `a mixed-sign generic amount column splits income and expense rows in the same file`() {
+        // Realistischer Fall: ein Kontoauszug-artiges Excel mit nur EINER Betrag-Spalte, in der
+        // Auszahlungen positiv und Gebühren/Abbuchungen negativ stehen - beide Typen müssen aus
+        // derselben Datei korrekt getrennt werden, nichts darf verloren gehen (§3).
+        val csv = """
+            Datum;Beschreibung;Betrag
+            01.01.2026;TikTok Auszahlung;150,00
+            02.01.2026;CapCut Abo;-9,99
+            03.01.2026;Bonuszahlung;25,50
+            04.01.2026;PayPal Gebühr;-2,10
+        """.trimIndent()
+
+        val result = UniversalSpreadsheetImporter.analyze(csv.toByteArray(), "kontoauszug.csv")
+
+        assertThat(result.rows).hasSize(4)
+        val income = result.rows.filter { it.type == EntryType.INCOME }
+        val expense = result.rows.filter { it.type == EntryType.EXPENSE }
+        assertThat(income.map { it.amountCents }).containsExactly(15000L, 2550L)
+        assertThat(expense.map { it.amountCents }).containsExactly(999L, 210L)
+        assertThat(result.rows.all { it.isAmbiguousType }).isTrue()
+    }
+
+    @Test
+    fun `a plain expense list with German dates and no sign is parsed correctly (type guessed as income until overridden)`() {
+        val csv = """
+            Datum;Händler;Betrag
+            15.03.2026;Deutsche Bahn;45,90
+            22.04.2026;Rossmann;12,30
+        """.trimIndent()
+
+        val result = UniversalSpreadsheetImporter.analyze(csv.toByteArray(), "reisekosten.csv")
+
+        assertThat(result.rows).hasSize(2)
+        assertThat(result.rows[0].date).isEqualTo(LocalDate.of(2026, 3, 15))
+        assertThat(result.rows[1].date).isEqualTo(LocalDate.of(2026, 4, 22))
+        assertThat(result.rows.sumOf { it.amountCents }).isEqualTo(4590L + 1230L)
+    }
+
+    @Test
     fun `an explicit Expense column is unambiguous regardless of sign`() {
         val csv = "Date,Merchant,Income,Expense\n2026-03-01,Canva,,12.00\n"
         val result = UniversalSpreadsheetImporter.analyze(csv.toByteArray(), "expenses.csv")
