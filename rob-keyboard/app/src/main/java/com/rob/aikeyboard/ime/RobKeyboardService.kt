@@ -530,7 +530,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     private fun learn(word: String) {
         if (!learningAllowed || word.isEmpty()) return
         val before = currentInputConnection?.getTextBeforeCursor(64, 0)?.toString().orEmpty()
-        val previous = previousWord(before.removeSuffix(word))
+        // A picked suggestion is committed with a trailing space; strip it before cutting off the word.
+        val previous = previousWord(before.trimEnd().removeSuffix(word))
         app.userModel.model.learn(previous, word)
     }
 

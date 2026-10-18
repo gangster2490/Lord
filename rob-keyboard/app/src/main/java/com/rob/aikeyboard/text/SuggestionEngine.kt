@@ -112,7 +112,10 @@ class SuggestionEngine(
         }
         val learned = user.nextWords(previousWord, limit)
         val base = languages.flatMap { bigrams(it)?.next(previousWord).orEmpty() }
-        return (learned + base).distinctBy { it.lowercase(Locale.ROOT) }.take(limit)
+        return (learned + base)
+            .filter { !it.equals(previousWord, ignoreCase = true) }
+            .distinctBy { it.lowercase(Locale.ROOT) }
+            .take(limit)
     }
 
     private fun maxDistanceFor(word: String): Double = when {

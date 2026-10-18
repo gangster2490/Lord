@@ -71,6 +71,14 @@ class SuggestionEngineTest {
         assertEquals(listOf("Robbi"), e.predictNext("Hallo", listOf(Language.DE)))
     }
 
+    @Test fun predictionsNeverRepeatThePreviousWord() {
+        val m = UserModel()
+        val e = SuggestionEngine({ TestDicts.get(it) }, m)
+        m.learn("уже", "уже")
+        val next = e.predictNext("уже", listOf(Language.RU))
+        assertTrue(next.toString(), next.none { it == "уже" })
+    }
+
     @Test fun editDistanceWeights() {
         assertTrue(EditDistance.weighted("ghbdtn", "ghbdtn") == 0.0)
         assertTrue(EditDistance.weighted("teh", "the") < 1.0)
