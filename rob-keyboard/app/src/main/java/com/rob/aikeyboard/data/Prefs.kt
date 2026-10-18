@@ -45,6 +45,7 @@ class Prefs(context: Context) {
     var voicePreferOffline by BoolPref("voice_prefer_offline", false)
     var translateWifiOnly by BoolPref("translate_wifi_only", true)
     var quickFixWithAi by BoolPref("quick_fix_ai", false)
+    var autoComma by BoolPref("auto_comma", true)
 
     var keyHeightScale: Float
         get() = raw.getFloat("key_height_scale", 1f)

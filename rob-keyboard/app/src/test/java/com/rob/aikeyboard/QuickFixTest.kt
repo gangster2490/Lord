@@ -37,3 +37,26 @@ class QuickFixTest {
         assertEquals("Всё хорошо, спасибо!", ru("Всё хорошо, спасибо!"))
     }
 }
+
+class LiveCommaTest {
+    private val fix = QuickFix(SuggestionEngine({ TestDicts.get(it) }, UserModel()), LanguageDetector { TestDicts.get(it) })
+
+    private fun live(before: String, lang: Language = Language.RU): String? =
+        fix.liveComma(before, lang)?.let { before.substring(0, it) + "," + before.substring(it) }
+
+    @org.junit.Test fun insertsCommaAfterConjunction() {
+        assertEquals("я думаю, что", live("я думаю что"))
+        assertEquals("хотел, но", live("хотел но"))
+        assertEquals("не пришёл, потому что", live("не пришёл потому что"))
+        assertEquals("ich glaube, dass", live("ich glaube dass", Language.DE))
+    }
+
+    @org.junit.Test fun leavesSafeCasesAlone() {
+        assertEquals(null, live("ты что"))
+        assertEquals(null, live("а что"))
+        assertEquals(null, live("что"))
+        assertEquals(null, live("я думаю, что"))
+        assertEquals(null, live("не пришёл потому"))
+        assertEquals(null, live("ничего"))
+    }
+}

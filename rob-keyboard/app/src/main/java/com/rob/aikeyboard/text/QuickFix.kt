@@ -58,6 +58,24 @@ class QuickFix(private val engine: SuggestionEngine, private val detector: Langu
         return t
     }
 
+    /**
+     * Comma to add while typing, right after a word is finished. Uses a narrower, safer word list
+     * than [fix] because it acts without a button press.
+     * @param before text up to and including the word that was just finished.
+     * @return index in [before] of the space that should become ", ", or null.
+     */
+    fun liveComma(before: String, language: Language): Int? {
+        val rules = LIVE_COMMA_BEFORE[language] ?: return null
+        for (rule in rules) {
+            val m = Regex("(?<=\\p{L}) (${Regex.escape(rule)})$", RegexOption.IGNORE_CASE).find(before) ?: continue
+            val prefix = before.substring(0, m.range.first)
+            val prev = prefix.substringAfterLast(' ').lowercase(Locale.ROOT)
+            if (prev in NO_COMMA_AFTER || prev in LIVE_NO_COMMA_AFTER) return null
+            return m.range.first
+        }
+        return null
+    }
+
     internal fun capitals(text: String): String {
         val sb = StringBuilder(text)
         var capitalizeNext = true
@@ -98,6 +116,21 @@ class QuickFix(private val engine: SuggestionEngine, private val detector: Langu
             ),
             Language.DE to listOf("dass", "weil", "aber", "obwohl", "sondern", "damit", "ob", "wenn", "als ob"),
             Language.EN to listOf("but"),
+        )
+
+        /** Multi-word rules first, so "потому что" puts the comma before "потому". */
+        private val LIVE_COMMA_BEFORE = mapOf(
+            Language.RU to listOf(
+                "потому что", "так как", "так что", "но", "чтобы", "что", "который", "которая", "которое", "которые",
+                "которого", "которой", "которому", "которым", "которых", "хотя", "зато", "однако",
+            ),
+            Language.DE to listOf("dass", "weil", "aber", "obwohl", "sondern"),
+            Language.EN to listOf("but"),
+        )
+
+        /** "ты что", "а что", "вот что" are not subordinate clauses. */
+        private val LIVE_NO_COMMA_AFTER = setOf(
+            "а", "но", "вот", "ну", "это", "чем", "я", "ты", "вы", "он", "она", "оно", "мы", "они", "ещё", "еще", "уж", "ведь", "же",
         )
 
         /** Words after which no comma goes before the conjunction ("потому что", "не то что"). */

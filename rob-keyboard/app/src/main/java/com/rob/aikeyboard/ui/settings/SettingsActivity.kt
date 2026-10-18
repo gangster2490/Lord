@@ -159,7 +159,8 @@ private fun SettingsScreen() {
             Section("Ввод текста") {
                 Toggle("Подсказки слов", prefs.showSuggestions) { update { prefs.showSuggestions = it } }
                 Toggle("Автокоррекция", prefs.autoCorrect) { update { prefs.autoCorrect = it } }
-                Toggle("Автоматические заглавные", prefs.autoCapitalize) { update { prefs.autoCapitalize = it } }
+                Toggle("Заглавная в начале предложения (во всех чатах)", prefs.autoCapitalize) { update { prefs.autoCapitalize = it } }
+                Toggle("Автозапятые при наборе (что, но, чтобы, который…)", prefs.autoComma) { update { prefs.autoComma = it } }
                 Toggle("Двойной пробел → точка", prefs.doubleSpacePeriod) { update { prefs.doubleSpacePeriod = it } }
                 Toggle("Цифры на верхнем ряду (долгое нажатие)", prefs.numberHints) { update { prefs.numberHints = it } }
                 PrefSlider("Высота клавиш", prefs.keyHeightScale, 0.75f..1.4f) { v -> update { prefs.keyHeightScale = v } }

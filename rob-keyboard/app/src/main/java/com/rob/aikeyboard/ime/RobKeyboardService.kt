@@ -87,6 +87,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     private sealed class Undo {
         data class AutoCorrect(val original: String, val corrected: String, val separator: String) : Undo()
         data class AutoEmoji(val inserted: String, val separator: String) : Undo()
+        /** ", word" was written in place of " word" (cursor right after the word). */
+        data class AutoComma(val tail: String) : Undo()
     }
 
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> applyPrefs() }
@@ -364,6 +366,18 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                 ic.endBatchEdit()
                 return true
             }
+            // The separator after the word is already typed; drop only the comma.
+            is Undo.AutoComma -> {
+                val idx = before.lastIndexOf(", ${u.tail}")
+                if (idx >= 0 && before.length - idx - 2 - u.tail.length <= 1) {
+                    val after = before.substring(idx + 1) // " word" plus the separator typed after it
+                    ic.beginBatchEdit()
+                    ic.deleteSurroundingText(before.length - idx, 0)
+                    ic.commitText(after, 1)
+                    ic.endBatchEdit()
+                    return true
+                }
+            }
             is Undo.AutoCorrect -> if (before.endsWith(u.corrected + u.separator)) {
                 ic.beginBatchEdit()
                 ic.deleteSurroundingText(u.corrected.length + u.separator.length, 0)
@@ -434,6 +448,16 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
             composing.clear()
             if (correction != null && correction != word) undo = Undo.AutoCorrect(word, correction, separator)
             learn(finalWord)
+            if (prefs.autoComma && autoCorrectAllowed) {
+                val before = ic.getTextBeforeCursor(80, 0)?.toString().orEmpty()
+                val language = detectLanguage(before) ?: state.language
+                app.quickFix.liveComma(before, language)?.let { space ->
+                    val tail = before.substring(space + 1)
+                    ic.deleteSurroundingText(before.length - space, 0)
+                    ic.commitText(", $tail", 1)
+                    undo = Undo.AutoComma(tail)
+                }
+            }
         }
 
         val emoji = if (state.autoEmoji && suggestionsAllowed && !technicalField && finalWord.isNotEmpty()) {
@@ -512,16 +536,18 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         if (info.inputType and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT) return false
         val ic = currentInputConnection ?: return false
         if (ic.getCursorCapsMode(info.inputType) != 0) return true
-        // Also capitalise after "? 😊 " which the platform check does not recognise.
-        val wantsSentences = info.inputType and (InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_CAP_WORDS) != 0
-        if (!wantsSentences) return false
+        // Also capitalise after "? 😊 " which the platform check does not recognise. Many chat fields (TikTok, some messengers) never ask for capitals; we capitalise sentences
+        // anyway, except in search/URL/e-mail fields.
+        if (technicalField) return false
         val before = ic.getTextBeforeCursor(24, 0)?.toString() ?: return false
-        if (before.isEmpty() || !before.last().isWhitespace()) return false
+        if (before.isEmpty()) return true
+        if (!before.last().isWhitespace()) return false
         var i = before.length - 1
         while (i >= 0) {
             val cp = Character.codePointBefore(before, i + 1)
             val c = before[i]
             when {
+                c == '\n' -> return true
                 c.isWhitespace() || AutoEmoji.isEmojiCodePoint(cp) || c == '️' || c == '‍' ->
                     i -= Character.charCount(cp)
                 else -> return c in ".!?…"
