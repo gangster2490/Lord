@@ -187,12 +187,14 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
             (cls == InputType.TYPE_CLASS_NUMBER && variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD)
         val noSuggestionsFlag = info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS != 0
         val technical = cls == InputType.TYPE_CLASS_TEXT && variation in TECHNICAL_VARIATIONS
-        suggestionsAllowed = cls == InputType.TYPE_CLASS_TEXT && !isPassword && prefs.showSuggestions && !noSuggestionsFlag
-        autoCorrectAllowed = suggestionsAllowed && !technical && prefs.autoCorrect
+        // Search boxes (Google, browsers) set NO_SUGGESTIONS because they list their own results.
+        // Like the Samsung keyboard we still show the strip there, but never replace words on our own.
+        suggestionsAllowed = cls == InputType.TYPE_CLASS_TEXT && !isPassword && prefs.showSuggestions
+        autoCorrectAllowed = suggestionsAllowed && !technical && !noSuggestionsFlag && prefs.autoCorrect
         learningAllowed = !isPassword && prefs.personalization &&
             info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING == 0
         autoCapsAllowed = prefs.autoCapitalize && !isPassword && !technical
-        technicalField = technical
+        technicalField = technical || noSuggestionsFlag
         state.sensitiveField = isPassword
 
         val layout: KeyboardLayout = when (cls) {
