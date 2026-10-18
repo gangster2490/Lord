@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.rob.aikeyboard.ui.settings.SettingsActivity"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype
+        android:imeSubtypeLocale="ru_RU"
+        android:imeSubtypeMode="keyboard"
+        android:label="@string/subtype_ru" />
+    <subtype
+        android:imeSubtypeLocale="de_DE"
+        android:imeSubtypeMode="keyboard"
+        android:label="@string/subtype_de" />
+    <subtype
+        android:imeSubtypeLocale="en_US"
+        android:imeSubtypeMode="keyboard"
+        android:label="@string/subtype_en" />
+</input-method>
