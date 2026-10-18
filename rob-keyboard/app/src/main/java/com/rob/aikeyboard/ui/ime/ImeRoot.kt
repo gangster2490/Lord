@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -90,6 +91,14 @@ fun ImeRoot(service: RobKeyboardService) {
         if (state.showAppsRow) AppsRow(service)
         when {
             state.missingApp != null -> MissingAppBar(service, state.missingApp!!)
+            state.quickFixUndo != null -> StripRow {
+                Text(
+                    "✓ Текст исправлен", color = ImeColors.cyan, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f).padding(start = 10.dp),
+                )
+                SmallButton("Отменить") { service.undoQuickFix() }
+                SmallButton("OK", primary = true) { state.quickFixUndo = null }
+            }
             state.message != null -> MessageBar(state.message!!)
             state.panel == Panel.KEYBOARD || state.panel == Panel.VOICE -> SuggestionStrip(service)
         }
@@ -262,6 +271,7 @@ private fun StripRow(content: @Composable RowScope.() -> Unit) {
     )
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun SuggestionStrip(service: RobKeyboardService) {
     val state = service.state
@@ -313,15 +323,21 @@ private fun SuggestionStrip(service: RobKeyboardService) {
             }
         }
         Spacer(Modifier.width(4.dp))
+        // Tap: fix the whole message at once. Long press: full AI Writing panel.
         Box(
             Modifier
                 .size(38.dp)
                 .clip(CircleShape)
-                .background(ImeColors.chip)
-                .clickable(onClickLabel = "AI Writing") { service.togglePanel(Panel.AI) },
+                .background(if (state.quickFixBusy) ImeColors.cyanDim else ImeColors.chip)
+                .combinedClickable(
+                    onClickLabel = "Исправить текст",
+                    onLongClickLabel = "AI Writing",
+                    onClick = { service.quickFix() },
+                    onLongClick = { service.togglePanel(Panel.AI) },
+                ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Outlined.EditNote, "AI Writing", tint = ImeColors.cyan)
+            Icon(Icons.Outlined.EditNote, "Исправить текст", tint = ImeColors.cyan)
         }
     }
 }

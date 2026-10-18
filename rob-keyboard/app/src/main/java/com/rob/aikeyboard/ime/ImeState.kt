@@ -14,6 +14,9 @@ class InternalField(val hint: String) {
     var text by mutableStateOf("")
 }
 
+/** Lets the user take back a one-tap correction. */
+data class QuickFixUndo(val original: String, val fixed: String)
+
 class VoiceState {
     var listening by mutableStateOf(false)
     var partial by mutableStateOf("")
@@ -39,5 +42,7 @@ class ImeState {
     /** True in password and other sensitive fields: no AI, no history, no suggestions. */
     var sensitiveField by mutableStateOf(false)
     var showAppsRow by mutableStateOf(false)
+    var quickFixUndo by mutableStateOf<QuickFixUndo?>(null)
+    var quickFixBusy by mutableStateOf(false)
     val voice = VoiceState()
 }

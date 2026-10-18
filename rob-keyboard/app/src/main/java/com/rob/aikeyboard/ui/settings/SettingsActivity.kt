@@ -186,6 +186,10 @@ private fun SettingsScreen() {
                     "Для AI Writing и облачного перевода нужен собственный API-ключ OpenAI или Anthropic. Подписка ChatGPT Plus / Claude Pro его не заменяет. " +
                         "Ключ хранится зашифрованным (Android Keystore) только на этом устройстве. Текст отправляется только после нажатия «Отправить».",
                 )
+                Toggle("Кнопка ✎ исправляет через AI (точнее запятые; текст уходит в выбранный AI)", prefs.quickFixWithAi) {
+                    update { prefs.quickFixWithAi = it }
+                }
+                Hint("Без этого ✎ исправляет офлайн и бесплатно: опечатки, заглавные, пробелы, частые запятые, точку в конце.")
                 Label("Провайдер по умолчанию")
                 FlowRow { AiProvider.entries.forEach { p -> Choice(p.label, prefs.aiProvider == p) { update { prefs.aiProvider = p } } } }
                 ApiKeyField("OpenAI API-ключ", SecureStore.OPENAI_KEY) { tick++ }

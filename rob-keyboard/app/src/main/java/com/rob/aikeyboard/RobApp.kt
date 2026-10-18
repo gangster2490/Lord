@@ -14,6 +14,7 @@ import com.rob.aikeyboard.text.BigramModel
 import com.rob.aikeyboard.text.Dictionary
 import com.rob.aikeyboard.text.Language
 import com.rob.aikeyboard.text.LanguageDetector
+import com.rob.aikeyboard.text.QuickFix
 import com.rob.aikeyboard.text.SuggestionEngine
 import com.rob.aikeyboard.translate.TranslatorService
 import java.util.concurrent.ConcurrentHashMap
@@ -37,6 +38,7 @@ class RobApp : Application() {
     lateinit var translator: TranslatorService
         private set
     val autoEmoji = AutoEmoji()
+    val quickFix by lazy { QuickFix(engine, detector) }
     val io = Executors.newSingleThreadExecutor()
 
     private val dictionaries = ConcurrentHashMap<Language, Dictionary>()

@@ -145,6 +145,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         autoSpaceInserted = false
         state.message = null
         state.missingApp = null
+        state.quickFixUndo = null
         configureForEditor(info)
         if (!restarting) {
             state.panel = Panel.KEYBOARD
@@ -241,6 +242,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
             return
         }
         val ic = currentInputConnection ?: return
+        state.quickFixUndo = null
         val ch = text.singleOrNull()
         when {
             ch != null && (ch.isLetter() || (ch == '\'' && composing.isNotEmpty())) && suggestionsAllowed -> {
@@ -325,6 +327,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
             return
         }
         val ic = currentInputConnection ?: return
+        state.quickFixUndo = null
         autoSpaceInserted = false
         if (performUndo(ic)) return
         if (composing.isNotEmpty()) {
@@ -708,6 +711,55 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
             }
         }
         ic.endBatchEdit()
+        updateShift(auto = true)
+    }
+
+    // ---- One-tap correction (✎ in the suggestion strip) ----
+
+    fun quickFix() {
+        if (state.quickFixBusy) return
+        if (state.sensitiveField) { state.message = "Исправление недоступно в полях пароля"; return }
+        val source = sourceText() ?: run { state.message = "Сначала напишите текст"; return }
+        val provider = prefs.aiProvider
+        if (prefs.quickFixWithAi && app.ai.isConfigured(provider)) {
+            state.quickFixBusy = true
+            state.message = "Исправляю через ${provider.label}…"
+            lifecycleScope.launch {
+                try {
+                    val (system, user) = com.rob.aikeyboard.ai.AiPrompts.build(com.rob.aikeyboard.ai.AiAction.Correct, source.text)
+                    val fixed = com.rob.aikeyboard.ai.AiPrompts.parseVariants(app.ai.complete(provider, system, user)).first()
+                    applyQuickFix(source, fixed)
+                } catch (e: Exception) {
+                    state.message = e.message ?: "Ошибка AI"
+                } finally {
+                    state.quickFixBusy = false
+                }
+            }
+        } else {
+            applyQuickFix(source, app.quickFix.fix(source.text, state.language))
+        }
+    }
+
+    private fun applyQuickFix(source: SourceText, fixed: String) {
+        if (fixed.isBlank() || fixed == source.text) {
+            state.message = "Ошибок не найдено ✓"
+            return
+        }
+        applyResult(source, fixed, append = false)
+        state.message = null
+        state.quickFixUndo = QuickFixUndo(source.text, fixed)
+    }
+
+    fun undoQuickFix() {
+        val u = state.quickFixUndo ?: return
+        state.quickFixUndo = null
+        val ic = currentInputConnection ?: return
+        if (ic.getTextBeforeCursor(u.fixed.length, 0)?.toString() == u.fixed) {
+            ic.beginBatchEdit()
+            ic.deleteSurroundingText(u.fixed.length, 0)
+            ic.commitText(u.original, 1)
+            ic.endBatchEdit()
+        }
         updateShift(auto = true)
     }
 
