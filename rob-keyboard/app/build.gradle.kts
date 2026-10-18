@@ -16,7 +16,7 @@ android {
         versionName = "1.0.0"
 
         // Samsung Galaxy S24 Ultra / Tab S8+ and virtually all current phones are ARM.
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        if (!project.hasProperty("allAbis")) ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     buildTypes {

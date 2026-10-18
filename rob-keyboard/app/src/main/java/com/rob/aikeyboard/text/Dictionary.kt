@@ -40,14 +40,8 @@ class Dictionary private constructor(
     fun completions(prefix: String, limit: Int): List<Candidate> {
         val p = normalize(prefix)
         if (p.isEmpty()) return emptyList()
-        var lo = 0
-        var hi = keys.size
-        while (lo < hi) {
-            val mid = (lo + hi) ushr 1
-            if (keys[mid] < p) lo = mid + 1 else hi = mid
-        }
         val out = ArrayList<Candidate>()
-        var i = lo
+        var i = lowerBound(p)
         while (i < keys.size && keys[i].startsWith(p)) {
             out += Candidate(words[i], weight(i), 0.0, language)
             i++
@@ -60,19 +54,33 @@ class Dictionary private constructor(
     fun corrections(typed: String, maxDistance: Double, limit: Int): List<Candidate> {
         val t = normalize(typed)
         if (t.length < 2) return emptyList()
-        val first = t[0]
+        // A wrong first letter is rare; only scan words starting with it, a neighbour or a diacritic twin.
+        // Keys are sorted, so each first letter is one contiguous range.
+        val firsts = Diacritics.variants(t[0]) + KeyProximity.neighboursOf(t[0])
         val out = ArrayList<Candidate>()
-        for (i in keys.indices) {
-            val k = keys[i]
-            if (kotlin.math.abs(k.length - t.length) > 2) continue
-            // A wrong first letter is rare; allow only neighbours and diacritic twins.
-            val f = k[0]
-            if (f != first && !KeyProximity.areNeighbours(f, first) && !Diacritics.equivalent(f, first)) continue
-            val d = EditDistance.weighted(t, k, maxDistance)
-            if (d <= maxDistance) out += Candidate(words[i], weight(i), d, language)
+        for (f in firsts) {
+            var i = lowerBound(f.toString())
+            while (i < keys.size && keys[i][0] == f) {
+                val k = keys[i]
+                if (kotlin.math.abs(k.length - t.length) <= 2) {
+                    val d = EditDistance.weighted(t, k, maxDistance)
+                    if (d <= maxDistance) out += Candidate(words[i], weight(i), d, language)
+                }
+                i++
+            }
         }
         out.sortByDescending { it.score }
         return out.take(limit)
+    }
+
+    private fun lowerBound(prefix: String): Int {
+        var lo = 0
+        var hi = keys.size
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (keys[mid] < prefix) lo = mid + 1 else hi = mid
+        }
+        return lo
     }
 
     companion object {

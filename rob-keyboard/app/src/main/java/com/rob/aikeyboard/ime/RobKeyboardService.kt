@@ -79,6 +79,11 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     private var ignoreNextClip = false
     private var undo: Undo? = null
 
+    // Suggestions are computed off the main thread; a newer request makes older results stale.
+    private val suggestExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private var suggestGeneration = 0
+    private var lastResult: com.rob.aikeyboard.text.SuggestResult? = null
+
     private sealed class Undo {
         data class AutoCorrect(val original: String, val corrected: String, val separator: String) : Undo()
         data class AutoEmoji(val inserted: String, val separator: String) : Undo()
@@ -115,6 +120,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         prefs.raw.unregisterOnSharedPreferenceChangeListener(prefListener)
         app.clipboard.removeListener(clipChanged)
         voice.stop()
+        suggestExecutor.shutdownNow()
         app.io.execute { app.userModel.saveIfDirty() }
         owner.onDestroy()
         super.onDestroy()
@@ -414,7 +420,9 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         var finalWord = word
         undo = null
         if (word.isNotEmpty()) {
-            val result = app.engine.suggest(word, suggestionLanguages(), autoCorrectAllowed)
+            suggestGeneration++
+            val result = lastResult?.takeIf { it.typed == word }
+                ?: app.engine.suggest(word, suggestionLanguages(), autoCorrectAllowed)
             val correction = if (autoCorrectAllowed && sep != '\'') result.autoCorrection else null
             finalWord = correction ?: word
             ic.commitText(finalWord, 1)
@@ -556,15 +564,28 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     private fun updateSuggestions() {
         if (!suggestionsAllowed) { state.suggestions = emptyList(); return }
         if (composing.isEmpty()) { showPredictions(); return }
-        val r = app.engine.suggest(composing.toString(), suggestionLanguages(), autoCorrectAllowed)
-        state.suggestions = r.suggestions
-        state.autoCorrectIndex = if (r.autoCorrection != null) r.suggestions.indexOf(r.autoCorrection) else -1
+        val typed = composing.toString()
+        val languages = suggestionLanguages()
+        val autoCorrect = autoCorrectAllowed
+        val generation = ++suggestGeneration
+        suggestExecutor.execute {
+            val r = app.engine.suggest(typed, languages, autoCorrect)
+            keyboardView.post {
+                if (generation != suggestGeneration) return@post
+                lastResult = r
+                state.suggestions = r.suggestions
+                state.autoCorrectIndex = if (r.autoCorrection != null) r.suggestions.indexOf(r.autoCorrection) else -1
+            }
+        }
     }
 
     private fun showPredictions() {
+        suggestGeneration++
         if (!suggestionsAllowed || state.sensitiveField) { state.suggestions = emptyList(); return }
         val before = currentInputConnection?.getTextBeforeCursor(64, 0)?.toString().orEmpty()
-        val prev = if (before.isEmpty() || before.trimEnd().lastOrNull() in listOf('.', '!', '?')) null else previousWord(before)
+        // Ignore emoji after the last word, so "дела. 😊 " still counts as a sentence end.
+        val tail = before.trimEnd { it.isWhitespace() || it.isSurrogate() || it == '\uFE0F' || it == '\u200D' }
+        val prev = if (tail.isEmpty() || tail.last() in ".!?") null else previousWord(tail)
         val list = app.engine.predictNext(prev, suggestionLanguages())
         state.suggestions = list.map { if (shift != ShiftState.OFF) it.replaceFirstChar(Char::uppercaseChar) else it }
         state.autoCorrectIndex = -1

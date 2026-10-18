@@ -13,6 +13,12 @@ object Diacritics {
     fun base(c: Char): Char = pairs[c] ?: c
 
     fun equivalent(a: Char, b: Char): Boolean = a != b && base(a) == base(b)
+
+    /** [c] and every letter that differs from it only by a diacritic. */
+    fun variants(c: Char): Set<Char> {
+        val b = base(c)
+        return setOf(c, b) + pairs.filterValues { it == b }.keys
+    }
 }
 
 /** Physical key adjacency on the three supported layouts, for typo-aware distances. */
@@ -38,6 +44,8 @@ object KeyProximity {
     }
 
     fun areNeighbours(a: Char, b: Char): Boolean = neighbours[a]?.contains(b) == true
+
+    fun neighboursOf(c: Char): Set<Char> = neighbours[c].orEmpty()
 }
 
 object EditDistance {

@@ -153,7 +153,9 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
     // ---- Drawing ----
 
     override fun onDraw(canvas: Canvas) {
-        canvas.drawColor(KeyboardTheme.background)
+        // Not drawColor(): inside Compose the canvas is not clipped to this view and would paint over the toolbar.
+        fill.color = KeyboardTheme.background
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fill)
         val radius = dp(KeyboardTheme.KEY_RADIUS_DP)
         for (kr in keys) drawKey(canvas, kr, radius)
         popup?.let { drawPopup(canvas, it, radius) }
