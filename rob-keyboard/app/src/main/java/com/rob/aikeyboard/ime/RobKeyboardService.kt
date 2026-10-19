@@ -938,7 +938,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     private fun translateDictation(text: String) {
         val target = state.voice.output ?: return
-        val source = state.voice.language
+        // Go by what was actually said, not by the chip: "Hi how are you" with RU selected is English.
+        val source = com.rob.aikeyboard.translate.Translate.detect(text, state.voice.language)
         if (target == source) return
         state.voice.translating = true
         lifecycleScope.launch {
@@ -946,6 +947,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                 replaceVoice(com.rob.aikeyboard.translate.Translate.run(text, source, target, com.rob.aikeyboard.data.TranslateEngine.OFFLINE))
             } catch (e: com.rob.aikeyboard.translate.MissingModelsException) {
                 state.voice.missingModels = e.languages
+                state.message = "Для перевода голоса скачайте модели: 🎤 → «Скачать модели перевода»"
                 state.voice.error = "Для перевода ${source.code.uppercase()}→${target.code.uppercase()} один раз скачайте модели (бесплатно, ≈30 МБ каждая)."
             } catch (e: Exception) {
                 state.voice.error = "Перевод не удался: ${e.message}"
@@ -959,6 +961,10 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         state.voice.error = null
         state.voice.offerFallback = false
         state.voice.partial = ""
+        if (prefs.voiceUseGoogleWindow) {
+            startFallbackVoice()
+            return
+        }
         if (!voice.hasPermission()) {
             state.voice.error = "Нужно разрешение на микрофон"
             startActivity(
@@ -988,6 +994,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     override fun onResult(text: String) {
         state.voice.listening = false
         state.voice.partial = ""
+        state.voice.error = null
+        state.voice.offerFallback = false
         val ic = currentInputConnection ?: return
         commitComposing()
         val before = ic.getTextBeforeCursor(2, 0)?.toString().orEmpty()
@@ -1002,8 +1010,15 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     override fun onError(message: String, recognizerProblem: Boolean) {
         state.voice.listening = false
+        if (recognizerProblem) {
+            // The phone's built-in recogniser cannot do this language: use Google's window now and from now on.
+            prefs.voiceUseGoogleWindow = true
+            state.voice.error = null
+            state.message = "🎤 Открываю голосовой ввод Google"
+            startFallbackVoice()
+            return
+        }
         state.voice.error = message
-        state.voice.offerFallback = recognizerProblem
     }
 
     /** Removes the last dictated text if it is still right before the cursor. */

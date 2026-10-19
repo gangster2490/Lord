@@ -47,6 +47,8 @@ class Prefs(context: Context) {
     var quickFixWithAi by BoolPref("quick_fix_ai", false)
     var autoComma by BoolPref("auto_comma", true)
     var autoScreenshots by BoolPref("auto_screenshots", false)
+    /** Set automatically once the built-in recogniser refuses a language; voice then opens Google's window. */
+    var voiceUseGoogleWindow by BoolPref("voice_google_window", false)
 
     /** Language the user speaks for voice input. */
     var voiceLanguage: Language
