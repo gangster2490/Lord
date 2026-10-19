@@ -95,6 +95,13 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     private val clipListener = ClipboardManager.OnPrimaryClipChangedListener { captureClipboard() }
 
+    private val screenshots by lazy {
+        com.rob.aikeyboard.clipboard.ScreenshotWatcher(this, app.clipboard, app.io) { item ->
+            state.newScreenshot = item
+            keyboardView.postDelayed({ if (state.newScreenshot == item) state.newScreenshot = null }, 5 * 60_000L)
+        }
+    }
+
     // ---- Lifecycle ----
 
     override fun onCreate() {
@@ -123,6 +130,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         prefs.raw.unregisterOnSharedPreferenceChangeListener(prefListener)
         app.clipboard.removeListener(clipChanged)
         voice.stop()
+        screenshots.stop()
         suggestExecutor.shutdownNow()
         app.io.execute { app.userModel.saveIfDirty() }
         owner.onDestroy()
@@ -142,6 +150,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // The permission may have been granted in settings after the keyboard started.
+        if (prefs.autoScreenshots && !screenshots.isRunning) screenshots.start()
         owner.onResume()
         composing.clear()
         undo = null
@@ -236,6 +246,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     private fun applyPrefs() {
         state.autoEmoji = prefs.autoEmoji
+        if (prefs.autoScreenshots) screenshots.start() else screenshots.stop()
         keyboardView.heightScale = prefs.keyHeightScale
         keyboardView.showHints = prefs.numberHints
         keyboardView.spaceSwipeMovesCursor = prefs.spaceSwipe == SpaceSwipe.CURSOR
@@ -824,6 +835,12 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                 if (text.isNotBlank()) app.io.execute { app.clipboard.addText(text.take(MAX_CLIP_CHARS)) }
             }
         }
+    }
+
+    fun insertNewScreenshot() {
+        val item = state.newScreenshot ?: return
+        state.newScreenshot = null
+        pasteClip(item)
     }
 
     fun pasteClip(item: ClipItem) {

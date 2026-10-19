@@ -53,10 +53,11 @@ class ClipboardStore(context: Context, private val secure: SecureStore) {
 
     fun addText(text: String) = changed(history.add(ClipItem.Kind.TEXT, text, System.currentTimeMillis()))
 
-    fun addImage(bytes: ByteArray, mimeType: String) {
+    fun addImage(bytes: ByteArray, mimeType: String): ClipItem {
         val name = UUID.randomUUID().toString() + ".bin"
         secure.writeFile(File(imageDir, name), bytes)
         changed(history.add(ClipItem.Kind.IMAGE, name, System.currentTimeMillis(), mimeType))
+        return history.all(ClipItem.Kind.IMAGE).first { it.value == name }
     }
 
     fun imageBytes(item: ClipItem): ByteArray? = secure.readFile(File(imageDir, item.value))

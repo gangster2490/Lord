@@ -50,5 +50,7 @@ class ImeState {
     var showAppsRow by mutableStateOf(false)
     var quickFixUndo by mutableStateOf<QuickFixUndo?>(null)
     var quickFixBusy by mutableStateOf(false)
+    /** Screenshot just taken, offered for one-tap insertion. */
+    var newScreenshot by mutableStateOf<com.rob.aikeyboard.clipboard.ClipItem?>(null)
     val voice = VoiceState()
 }

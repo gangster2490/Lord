@@ -235,6 +235,20 @@ private fun SettingsScreen() {
 
             Section("Буфер обмена") {
                 Toggle("История буфера обмена", prefs.clipboardHistory) { update { prefs.clipboardHistory = it } }
+                val screenshotPermission = androidx.activity.compose.rememberLauncherForActivityResult(
+                    androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+                ) { granted ->
+                    update { prefs.autoScreenshots = granted }
+                    if (!granted) Toast.makeText(context, "Без доступа к фото новые скриншоты не видны клавиатуре", Toast.LENGTH_LONG).show()
+                }
+                Toggle("Сразу добавлять новые скриншоты", prefs.autoScreenshots) { on ->
+                    when {
+                        !on -> update { prefs.autoScreenshots = false }
+                        com.rob.aikeyboard.clipboard.ScreenshotWatcher.hasPermission(context) -> update { prefs.autoScreenshots = true }
+                        else -> screenshotPermission.launch(com.rob.aikeyboard.clipboard.ScreenshotWatcher.permission())
+                    }
+                }
+                Hint("Сделал скриншот — он сразу появляется в клавиатуре («📷 Новый скриншот → Вставить») и во вкладке «Картинки». Копия хранится зашифрованной; оригинал в «Фото» Android сохраняет сам. Нужен доступ к фото: клавиатура смотрит только новые скриншоты.")
                 Hint("10 последних элементов + закреплённые. Записывается только пока ROB — активная клавиатура. Содержимое из полей паролей и помеченное как конфиденциальное не сохраняется.")
                 OutlinedButton(onClick = { app.io.execute { app.clipboard.clearAll() }; Toast.makeText(context, "История буфера удалена", Toast.LENGTH_SHORT).show() }) {
                     Text("Удалить всю историю (вкл. закреплённые)")

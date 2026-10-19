@@ -8,6 +8,11 @@
     <!-- Requested at runtime, only when the microphone button is first used. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Only if "add new screenshots automatically" is switched on in settings. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <queries>
         <package android:name="com.openai.chatgpt" />

@@ -91,6 +91,14 @@ fun ImeRoot(service: RobKeyboardService) {
         if (state.showAppsRow) AppsRow(service)
         when {
             state.missingApp != null -> MissingAppBar(service, state.missingApp!!)
+            state.newScreenshot != null && state.panel == Panel.KEYBOARD -> StripRow {
+                Text(
+                    "📷 Новый скриншот", color = ImeColors.cyan, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f).padding(start = 10.dp),
+                )
+                SmallButton("Вставить", primary = true) { service.insertNewScreenshot() }
+                SmallButton("✕") { state.newScreenshot = null }
+            }
             state.quickFixUndo != null -> StripRow {
                 Text(
                     "✓ Текст исправлен", color = ImeColors.cyan, fontSize = 14.sp, fontWeight = FontWeight.Medium,
