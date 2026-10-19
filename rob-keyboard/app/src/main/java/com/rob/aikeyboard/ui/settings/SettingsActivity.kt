@@ -230,8 +230,6 @@ private fun SettingsScreen() {
 
             Section("Голосовой ввод") {
                 Toggle("Предпочитать офлайн-распознавание", prefs.voicePreferOffline) { update { prefs.voicePreferOffline = it } }
-                Toggle("Сразу открывать голосовой ввод Google", prefs.voiceUseGoogleWindow) { update { prefs.voiceUseGoogleWindow = it } }
-                Hint("Включается само, если встроенное распознавание телефона не понимает выбранный язык.")
                 Hint("Используется системный распознаватель речи Android. Офлайн-режим работает, если на устройстве установлены языковые пакеты.")
             }
 

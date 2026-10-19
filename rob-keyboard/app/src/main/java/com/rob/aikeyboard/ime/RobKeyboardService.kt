@@ -952,8 +952,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     fun setVoiceLanguage(language: Language) {
         state.voice.language = language
         prefs.voiceLanguage = language
-        // In Google-window mode the window opened before a language could be picked: reopen it.
-        if (voice.isListening || prefs.voiceUseGoogleWindow) startVoice()
+        if (voice.isListening) startVoice()
     }
 
     fun setVoiceOutput(language: Language?) {
@@ -1015,10 +1014,6 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         state.voice.error = null
         state.voice.offerFallback = false
         state.voice.partial = ""
-        if (prefs.voiceUseGoogleWindow) {
-            startFallbackVoice()
-            return
-        }
         if (!voice.hasPermission()) {
             state.voice.error = "Нужно разрешение на микрофон"
             startActivity(
@@ -1064,15 +1059,9 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     override fun onError(message: String, recognizerProblem: Boolean) {
         state.voice.listening = false
-        if (recognizerProblem) {
-            // The phone's built-in recogniser cannot do this language: use Google's window now and from now on.
-            prefs.voiceUseGoogleWindow = true
-            state.voice.error = null
-            state.message = "🎤 Открываю голосовой ввод Google"
-            startFallbackVoice()
-            return
-        }
-        state.voice.error = message
+        // The panel stays open so the language can still be changed; the Google window is one tap away.
+        state.voice.error = if (recognizerProblem) "Встроенное распознавание не поддерживает этот язык — нажмите «Голосовой ввод Google»" else message
+        state.voice.offerFallback = recognizerProblem
     }
 
     /** Removes the last dictated text if it is still right before the cursor. */
