@@ -1,11 +1,13 @@
 package com.rob.aikeyboard.voice
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.RecognitionListener
+import android.speech.RecognitionService
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.content.ContextCompat
@@ -30,36 +32,81 @@ class VoiceInput(private val context: Context, private val callback: Callback) {
     fun hasPermission(): Boolean =
         ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    fun isAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
+    fun isAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context) || services().isNotEmpty()
+
+    /**
+     * Installed recognition services, Google's first: the Samsung default often understands only
+     * the phone's system language, while Google's handles Russian, German and English.
+     * A null entry stands for the system default service.
+     */
+    private fun services(): List<ComponentName?> {
+        val found = context.packageManager
+            .queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
+            .map { ComponentName(it.serviceInfo.packageName, it.serviceInfo.name) }
+        val ranked = found.sortedBy { c ->
+            PREFERRED.indexOf(c.packageName).let { if (it < 0) PREFERRED.size else it }
+        }
+        return (ranked + listOf<ComponentName?>(null)).distinct()
+    }
 
     fun start(language: Language, preferOffline: Boolean) {
         stop()
-        val r = SpeechRecognizer.createSpeechRecognizer(context)
+        startWith(services(), 0, language, preferOffline)
+    }
+
+    private fun startWith(candidates: List<ComponentName?>, index: Int, language: Language, preferOffline: Boolean) {
+        val component = candidates[index]
+        val r = runCatching {
+            if (component != null) SpeechRecognizer.createSpeechRecognizer(context, component)
+            else SpeechRecognizer.createSpeechRecognizer(context)
+        }.getOrNull()
+        if (r == null) {
+            if (index + 1 < candidates.size) startWith(candidates, index + 1, language, preferOffline)
+            else callback.onError("Распознавание речи недоступно", true)
+            return
+        }
         recognizer = r
+        var finished = false
         r.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) { isListening = true; callback.onListening() }
+            // Events from a recogniser we already replaced, or after it reported an error, are ignored.
+            private fun current() = recognizer === r && !finished
+
+            override fun onReadyForSpeech(params: Bundle?) {
+                if (!current()) return
+                isListening = true
+                callback.onListening()
+            }
             override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) = callback.onLevel(rmsdB)
+            override fun onRmsChanged(rmsdB: Float) { if (current()) callback.onLevel(rmsdB) }
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
 
             override fun onPartialResults(partialResults: Bundle?) {
+                if (!current()) return
                 partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let(callback::onPartial)
             }
 
             override fun onResults(results: Bundle?) {
+                if (!current()) return
+                finished = true
                 isListening = false
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
                 if (text.isBlank()) callback.onError("Речь не распознана", false) else callback.onResult(text)
             }
 
             override fun onError(error: Int) {
+                if (!current()) return
+                finished = true
                 isListening = false
-                val serviceProblem = error in setOf(
-                    SpeechRecognizer.ERROR_CLIENT, SpeechRecognizer.ERROR_SERVER, SpeechRecognizer.ERROR_NETWORK,
-                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT, 11, 12, 13, // SERVER_DISCONNECTED, LANGUAGE_NOT_SUPPORTED/UNAVAILABLE
-                )
+                val serviceProblem = error in SERVICE_ERRORS
+                // This service cannot handle the language (or broke): quietly try the next one.
+                if (serviceProblem && index + 1 < candidates.size) {
+                    r.destroy()
+                    recognizer = null
+                    startWith(candidates, index + 1, language, preferOffline)
+                    return
+                }
                 callback.onError(errorText(error), serviceProblem)
             }
         })
@@ -88,6 +135,18 @@ class VoiceInput(private val context: Context, private val callback: Callback) {
         recognizer = null
     }
 
+    companion object {
+        private val PREFERRED = listOf(
+            "com.google.android.googlequicksearchbox", // Google app
+            "com.google.android.tts", // Speech Services by Google (on-device)
+            "com.google.android.as",
+        )
+        private val SERVICE_ERRORS = setOf(
+            SpeechRecognizer.ERROR_CLIENT, SpeechRecognizer.ERROR_SERVER,
+            11, 12, 13, // SERVER_DISCONNECTED, LANGUAGE_NOT_SUPPORTED, LANGUAGE_UNAVAILABLE
+        )
+    }
+
     private fun errorText(code: Int) = when (code) {
         SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Речь не распознана"
         SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
@@ -95,7 +154,7 @@ class VoiceInput(private val context: Context, private val callback: Callback) {
         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Нет разрешения на микрофон"
         SpeechRecognizer.ERROR_AUDIO -> "Ошибка записи звука"
         SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Распознаватель занят, попробуйте ещё раз"
-        12, 13 -> "Язык не поддерживается распознавателем на этом устройстве" // ERROR_LANGUAGE_NOT_SUPPORTED / _UNAVAILABLE
+        12, 13 -> "Этот язык не поддерживается распознаванием речи на телефоне — попробуйте «Голосовой ввод Google»"
         else -> "Ошибка распознавания ($code)"
     }
 }

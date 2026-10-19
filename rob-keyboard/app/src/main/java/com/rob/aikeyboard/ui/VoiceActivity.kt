@@ -35,8 +35,11 @@ class VoiceActivity : ComponentActivity() {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, language)
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Говорите…")
         }
+        // Prefer Google's window: it understands Russian, German and English regardless of the phone language.
+        val google = Intent(intent).setPackage("com.google.android.googlequicksearchbox")
+        val target = if (google.resolveActivity(packageManager) != null) google else intent
         try {
-            recognize.launch(intent)
+            recognize.launch(target)
         } catch (e: ActivityNotFoundException) {
             Toast.makeText(this, "На телефоне нет сервиса голосового ввода Google", Toast.LENGTH_LONG).show()
             finish()
