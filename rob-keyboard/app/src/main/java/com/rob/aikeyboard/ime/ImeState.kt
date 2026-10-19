@@ -24,6 +24,12 @@ class VoiceState {
     var error by mutableStateOf<String?>(null)
     var lastInserted by mutableStateOf<String?>(null)
     var language by mutableStateOf(Language.RU)
+    /** Write the dictation in this language (translated offline); null = as spoken. */
+    var output by mutableStateOf<Language?>(null)
+    var translating by mutableStateOf(false)
+    var missingModels by mutableStateOf<Set<Language>>(emptySet())
+    /** The built-in recogniser failed; offer Google's voice input window instead. */
+    var offerFallback by mutableStateOf(false)
 }
 
 /** Observable UI state of the keyboard window, owned by [RobKeyboardService]. */

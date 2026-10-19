@@ -111,7 +111,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
             if (v.height > 0 && v.height != state.keyboardHeightPx) state.keyboardHeightPx = v.height
         }
         state.language = prefs.currentLanguage
-        state.voice.language = state.language
+        state.voice.language = prefs.voiceLanguage
+        state.voice.output = prefs.voiceOutput
         applyPrefs()
     }
 
@@ -155,6 +156,12 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         }
         updateShift(auto = true)
         showPredictions()
+        // Text dictated in Google's voice window arrives while our field is restarting.
+        pendingVoiceText?.let { text ->
+            pendingVoiceText = null
+            onResult(text)
+            state.message = "🎤 Вставлено голосом"
+        }
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -648,7 +655,6 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     fun setLanguage(language: Language) {
         commitComposing()
         state.language = language
-        state.voice.language = language
         prefs.currentLanguage = language
         keyboardView.spaceLabel = language.displayName
         if (alphaLayout || keyboardView.layout.id in Language.entries.map { it.code }) {
@@ -870,8 +876,68 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     // ---- Voice ----
 
+    fun setVoiceLanguage(language: Language) {
+        state.voice.language = language
+        prefs.voiceLanguage = language
+        if (voice.isListening) startVoice()
+    }
+
+    fun setVoiceOutput(language: Language?) {
+        state.voice.output = language
+        prefs.voiceOutput = language
+        state.voice.missingModels = emptySet()
+    }
+
+    /** Opens Google's own voice input window; the result is inserted when the keyboard returns. */
+    fun startFallbackVoice() {
+        stopVoice()
+        startActivity(
+            Intent(this, com.rob.aikeyboard.ui.VoiceActivity::class.java)
+                .putExtra(com.rob.aikeyboard.ui.VoiceActivity.EXTRA_LANGUAGE, state.voice.language.bcp47)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    fun downloadVoiceModels() {
+        val missing = state.voice.missingModels
+        if (missing.isEmpty()) return
+        state.voice.translating = true
+        lifecycleScope.launch {
+            try {
+                missing.forEach { app.translator.download(it, prefs.translateWifiOnly) }
+                state.voice.missingModels = emptySet()
+                state.voice.error = null
+                state.voice.lastInserted?.trim()?.let { translateDictation(it) }
+            } catch (e: Exception) {
+                state.voice.error = "Загрузка не удалась: ${e.message}" + if (prefs.translateWifiOnly) " (только по Wi-Fi)" else ""
+            } finally {
+                state.voice.translating = false
+            }
+        }
+    }
+
+    private fun translateDictation(text: String) {
+        val target = state.voice.output ?: return
+        val source = state.voice.language
+        if (target == source) return
+        state.voice.translating = true
+        lifecycleScope.launch {
+            try {
+                replaceVoice(com.rob.aikeyboard.translate.Translate.run(text, source, target, com.rob.aikeyboard.data.TranslateEngine.OFFLINE))
+            } catch (e: com.rob.aikeyboard.translate.MissingModelsException) {
+                state.voice.missingModels = e.languages
+                state.voice.error = "Для перевода ${source.code.uppercase()}→${target.code.uppercase()} один раз скачайте модели (бесплатно, ≈30 МБ каждая)."
+            } catch (e: Exception) {
+                state.voice.error = "Перевод не удался: ${e.message}"
+            } finally {
+                state.voice.translating = false
+            }
+        }
+    }
+
     fun startVoice() {
         state.voice.error = null
+        state.voice.offerFallback = false
         state.voice.partial = ""
         if (!voice.hasPermission()) {
             state.voice.error = "Нужно разрешение на микрофон"
@@ -883,7 +949,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
             return
         }
         if (!voice.isAvailable()) {
-            state.voice.error = "Распознавание речи недоступно. Установите/включите сервис распознавания (напр. Google) в настройках Android."
+            state.voice.error = "Встроенное распознавание речи недоступно на этом телефоне."
+            state.voice.offerFallback = true
             return
         }
         voice.start(state.voice.language, prefs.voicePreferOffline)
@@ -910,11 +977,13 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         ic.commitText(insert, 1)
         state.voice.lastInserted = insert
         updateShift(auto = true)
+        translateDictation(text)
     }
 
-    override fun onError(message: String) {
+    override fun onError(message: String, recognizerProblem: Boolean) {
         state.voice.listening = false
         state.voice.error = message
+        state.voice.offerFallback = recognizerProblem
     }
 
     /** Removes the last dictated text if it is still right before the cursor. */
@@ -962,6 +1031,10 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     }
 
     companion object {
+        /** Set by [com.rob.aikeyboard.ui.VoiceActivity]; inserted on the next onStartInputView. */
+        @Volatile
+        var pendingVoiceText: String? = null
+
         private const val WORD_SEPARATORS = " .,!?;:\n"
         private const val MAX_CLIP_CHARS = 20_000
         private const val MAX_IMAGE_BYTES = 15 * 1024 * 1024

@@ -17,6 +17,9 @@
             <action android:name="android.speech.RecognitionService" />
         </intent>
         <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
         </intent>
@@ -46,6 +49,12 @@
 
         <activity
             android:name=".ui.PermissionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.Rob.Transparent" />
+
+        <activity
+            android:name=".ui.VoiceActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:theme="@style/Theme.Rob.Transparent" />

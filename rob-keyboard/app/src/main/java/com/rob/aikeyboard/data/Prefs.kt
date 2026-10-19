@@ -47,6 +47,16 @@ class Prefs(context: Context) {
     var quickFixWithAi by BoolPref("quick_fix_ai", false)
     var autoComma by BoolPref("auto_comma", true)
 
+    /** Language the user speaks for voice input. */
+    var voiceLanguage: Language
+        get() = Language.fromCode(str("voice_language", "")) ?: currentLanguage
+        set(v) = setStr("voice_language", v.code)
+
+    /** Language the dictated text is written in; null = as spoken (no translation). */
+    var voiceOutput: Language?
+        get() = Language.fromCode(str("voice_output", ""))
+        set(v) = setStr("voice_output", v?.code ?: "")
+
     var keyHeightScale: Float
         get() = raw.getFloat("key_height_scale", 1f)
         set(v) = raw.edit().putFloat("key_height_scale", v.coerceIn(0.75f, 1.4f)).apply()

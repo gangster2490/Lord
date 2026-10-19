@@ -19,7 +19,8 @@ class VoiceInput(private val context: Context, private val callback: Callback) {
         fun onPartial(text: String)
         fun onLevel(rms: Float)
         fun onResult(text: String)
-        fun onError(message: String)
+        /** @param recognizerProblem the recognition service itself failed (not just silence). */
+        fun onError(message: String, recognizerProblem: Boolean)
     }
 
     private var recognizer: SpeechRecognizer? = null
@@ -50,12 +51,16 @@ class VoiceInput(private val context: Context, private val callback: Callback) {
             override fun onResults(results: Bundle?) {
                 isListening = false
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-                if (text.isBlank()) callback.onError("Речь не распознана") else callback.onResult(text)
+                if (text.isBlank()) callback.onError("Речь не распознана", false) else callback.onResult(text)
             }
 
             override fun onError(error: Int) {
                 isListening = false
-                callback.onError(errorText(error))
+                val serviceProblem = error in setOf(
+                    SpeechRecognizer.ERROR_CLIENT, SpeechRecognizer.ERROR_SERVER, SpeechRecognizer.ERROR_NETWORK,
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT, 11, 12, 13, // SERVER_DISCONNECTED, LANGUAGE_NOT_SUPPORTED/UNAVAILABLE
+                )
+                callback.onError(errorText(error), serviceProblem)
             }
         })
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
