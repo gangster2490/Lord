@@ -131,6 +131,14 @@ class AutoEmoji(private val rules: List<Rule> = DEFAULT_RULES) {
             "ого" to "😮" s 2, "устал*" to "😴" s 2, "болею" to "🤒" s 2, "выздоравлива*" to "💪" s 1,
             "праздник*" to "🎉" s 2, "новым годом" to "🎄" s 1, "рождеств*" to "🎄" s 2, "скучаю" to "🥺" s 1,
             "думаю" to "🤔" s 3, "счастлив*" to "😊" s 2, "рад" to "😊" s 2, "рада" to "😊" s 2, "огонь" to "🔥" s 2,
+            "вкусно" to "😋" s 2, "вкуснятина" to "😋" s 2, "красиво" to "😍" s 2, "красивая" to "😍" s 2,
+            "красавица" to "😍" s 2, "красавчик" to "😎" s 2, "обожаю" to "😍" s 1, "люблю тебя" to "❤️" s 1,
+            "жесть" to "😱" s 2, "ужас" to "😱" s 2, "блин" to "🤦" s 2, "респект" to "👏" s 1, "умница" to "👏" s 1,
+            "поддерживаю" to "💪" s 2, "держись" to "💪" s 1, "сил" to "💪" s 3, "добрый вечер" to "🌆" s 1,
+            "доброй ночи" to "🌙" s 1, "ахах*" to "😂" s 1, "лол" to "😂" s 1, "песня" to "🎶" s 3, "песню" to "🎶" s 3,
+            "танц*" to "💃" s 3, "подарок" to "🎁" s 2, "роза" to "🌹" s 2, "розы" to "🌹" s 2, "целую" to "😘" s 1,
+            "соскучил*" to "🥺" s 1, "согласен" to "👍" s 2, "согласна" to "👍" s 2, "конечно" to "👍" s 3,
+            "нет" to "🙅" s 3, "да" to "👍" s 3, "вау" to "😮" s 2, "интересно" to "🤔" s 3, "сладко" to "🍬" s 3,
         ) + rules(
             Language.DE,
             "hallo" to "👋" s 1, "hi" to "👋" s 1, "hey" to "👋" s 1, "tschüss" to "👋" s 1, "tschüs" to "👋" s 1,
@@ -150,6 +158,10 @@ class AutoEmoji(private val rules: List<Rule> = DEFAULT_RULES) {
             "bravo" to "👏" s 1, "wow" to "😮" s 2, "müde" to "😴" s 2, "krank" to "🤒" s 2,
             "gute besserung" to "💪" s 1, "frohe weihnachten" to "🎄" s 1, "frohes neues" to "🎆" s 1,
             "vermisse dich" to "🥺" s 1, "glücklich" to "😊" s 2, "freue mich" to "😊" s 2, "party" to "🎉" s 2,
+            "lecker" to "😋" s 2, "schön" to "😍" s 2, "wunderschön" to "😍" s 2, "hübsch" to "😍" s 2,
+            "krass" to "😱" s 2, "mist" to "🤦" s 2, "respekt" to "👏" s 1, "guten abend" to "🌆" s 1,
+            "geschafft" to "💪" s 2, "lied" to "🎶" s 3, "rose" to "🌹" s 2, "genau" to "👍" s 3, "ja" to "👍" s 3,
+            "nein" to "🙅" s 3,
         ) + rules(
             Language.EN,
             "hello" to "👋" s 1, "hi" to "👋" s 1, "hey" to "👋" s 1, "bye" to "👋" s 1, "goodbye" to "👋" s 1,
@@ -168,6 +180,9 @@ class AutoEmoji(private val rules: List<Rule> = DEFAULT_RULES) {
             "good luck" to "🍀" s 1, "well done" to "👏" s 1, "wow" to "😮" s 2, "tired" to "😴" s 2,
             "sick" to "🤒" s 2, "get well" to "💪" s 1, "merry christmas" to "🎄" s 1, "new year" to "🎆" s 1,
             "miss you" to "🥺" s 1, "happy" to "😊" s 2, "glad" to "😊" s 2, "party" to "🎉" s 2,
+            "yummy" to "😋" s 2, "delicious" to "😋" s 2, "beautiful" to "😍" s 2, "gorgeous" to "😍" s 2,
+            "omg" to "😱" s 2, "respect" to "👏" s 1, "good evening" to "🌆" s 1, "song" to "🎶" s 3,
+            "rose" to "🌹" s 2, "yes" to "👍" s 3, "no" to "🙅" s 3,
         )
     }
 }

@@ -200,11 +200,14 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         // Search boxes (Google, browsers) set NO_SUGGESTIONS because they list their own results.
         // Like the Samsung keyboard we still show the strip there, but never replace words on our own.
         suggestionsAllowed = cls == InputType.TYPE_CLASS_TEXT && !isPassword && prefs.showSuggestions
-        autoCorrectAllowed = suggestionsAllowed && !technical && !noSuggestionsFlag && prefs.autoCorrect
+        // NO_SUGGESTIONS only means "search box" when the field's action is search; TikTok and other
+        // chats set it on ordinary message fields, where autocorrect and Auto Emoji should still work.
+        val searchBox = noSuggestionsFlag && info.imeOptions and EditorInfo.IME_MASK_ACTION == EditorInfo.IME_ACTION_SEARCH
+        autoCorrectAllowed = suggestionsAllowed && !technical && !searchBox && prefs.autoCorrect
         learningAllowed = !isPassword && prefs.personalization &&
             info.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING == 0
         autoCapsAllowed = prefs.autoCapitalize && !isPassword && !technical
-        technicalField = technical || noSuggestionsFlag
+        technicalField = technical || searchBox
         state.sensitiveField = isPassword
 
         val layout: KeyboardLayout = when (cls) {

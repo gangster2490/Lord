@@ -75,3 +75,15 @@ class AutoEmojiTest {
         assertEquals(listOf("❤️"), r.favorites())
     }
 }
+
+class AutoEmojiChatWordsTest {
+    private val auto = AutoEmoji()
+
+    @org.junit.Test fun commonChatWords() {
+        assertEquals("😋", auto.onWordFinished("Как вкусно", '!', EmojiIntensity.NORMAL, Language.RU)?.emoji)
+        assertEquals("😍", auto.onWordFinished("ты красавица", ' ', EmojiIntensity.NORMAL, Language.RU)?.emoji)
+        assertEquals(null, auto.onWordFinished("Нет", ' ', EmojiIntensity.NORMAL, Language.RU))
+        assertEquals("🙅", auto.onWordFinished("Нет", ' ', EmojiIntensity.HIGH, Language.RU)?.emoji)
+        assertEquals("😋", auto.onWordFinished("Das ist lecker", ' ', EmojiIntensity.NORMAL, Language.DE)?.emoji)
+    }
+}
