@@ -33,6 +33,9 @@ class VoiceActivity : ComponentActivity() {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, language)
+            // Google otherwise tends to stick to its own default language.
+            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, true)
+            putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(language))
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Говорите…")
         }
         // Prefer Google's window: it understands Russian, German and English regardless of the phone language.

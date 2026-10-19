@@ -266,6 +266,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         }
         val ic = currentInputConnection ?: return
         state.quickFixUndo = null
+        state.showClearAll = false
+        state.clearedText = null
         val ch = text.singleOrNull()
         when {
             ch != null && (ch.isLetter() || (ch == '\'' && composing.isNotEmpty())) && suggestionsAllowed -> {
@@ -341,6 +343,38 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     }
 
     override fun onVoice() = togglePanel(Panel.VOICE)
+
+    private var clearAllToken = 0
+
+    override fun onDeleteHeld() {
+        if (state.internalField != null) return
+        state.clearedText = null
+        state.showClearAll = true
+        // Only the timer of the latest hold may hide the bar.
+        val token = ++clearAllToken
+        keyboardView.postDelayed({ if (token == clearAllToken) state.showClearAll = false }, 20_000)
+    }
+
+    /** Deletes the whole field at once; the text can be restored with [undoClearAll]. */
+    fun clearAll() {
+        state.showClearAll = false
+        val ic = currentInputConnection ?: return
+        commitComposing()
+        val (full, replaced) = replaceWholeField(ic, "") ?: return
+        if (full.isEmpty() || !replaced) return
+        undo = null
+        state.clearedText = full
+        keyboardView.postDelayed({ if (state.clearedText == full) state.clearedText = null }, 15_000)
+        updateShift(auto = true)
+        showPredictions()
+    }
+
+    fun undoClearAll() {
+        val text = state.clearedText ?: return
+        state.clearedText = null
+        currentInputConnection?.commitText(text, 1)
+        updateShift(auto = true)
+    }
 
     // ---- Text editing ----
 
@@ -729,10 +763,39 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         val ic = currentInputConnection ?: return null
         commitComposing()
         ic.getSelectedText(0)?.toString()?.takeIf { it.isNotBlank() }?.let { return SourceText(it, true) }
-        val extracted = ic.getExtractedText(ExtractedTextRequest().apply { hintMaxChars = 4000 }, 0)
-        val full = extracted?.text?.toString()
-            ?: ((ic.getTextBeforeCursor(2000, 0)?.toString().orEmpty()) + (ic.getTextAfterCursor(2000, 0)?.toString().orEmpty()))
+        val full = fieldText(ic)
         return full.takeIf { it.isNotBlank() }?.let { SourceText(it, false) }
+    }
+
+    /**
+     * Replaces everything in the field with [text]. Must ask for the text with a size hint:
+     * with the default request some apps report an empty field.
+     * @return the previous content and whether it was replaced, or null without a connection.
+     */
+    /** Whole field content; some apps return an empty or truncated extract, so compare with the cursor context. */
+    private fun fieldText(ic: InputConnection): String {
+        val before = ic.getTextBeforeCursor(MAX_FIELD, 0)?.toString().orEmpty()
+        val after = ic.getTextAfterCursor(MAX_FIELD, 0)?.toString().orEmpty()
+        val extracted = ic.getExtractedText(ExtractedTextRequest().apply { hintMaxChars = MAX_FIELD }, 0)?.text?.toString()
+        return if (extracted != null && extracted.length >= before.length + after.length) extracted else before + after
+    }
+
+    private fun replaceWholeField(ic: InputConnection, text: String): Pair<String, Boolean>? {
+        val before = ic.getTextBeforeCursor(MAX_FIELD, 0)?.toString().orEmpty()
+        val after = ic.getTextAfterCursor(MAX_FIELD, 0)?.toString().orEmpty()
+        val extracted = ic.getExtractedText(ExtractedTextRequest().apply { hintMaxChars = MAX_FIELD }, 0)?.text?.toString()
+        val full = fieldText(ic)
+        if (full.isEmpty()) return "" to false
+        ic.beginBatchEdit()
+        if (extracted != null && extracted == full) {
+            ic.setSelection(0, full.length)
+            ic.commitText(text, 1)
+        } else {
+            ic.deleteSurroundingText(before.length, after.length)
+            ic.commitText(text, 1)
+        }
+        ic.endBatchEdit()
+        return full to true
     }
 
     /** Replaces the selection (or whole field) with [text], or appends it at the cursor. */
@@ -744,17 +807,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         } else if (source.isSelection) {
             ic.commitText(text, 1)
         } else {
-            val extracted = ic.getExtractedText(ExtractedTextRequest(), 0)
-            val len = extracted?.text?.length
-            if (len != null) {
-                ic.setSelection(0, len)
-                ic.commitText(text, 1)
-            } else {
-                val before = ic.getTextBeforeCursor(4000, 0)?.length ?: 0
-                val after = ic.getTextAfterCursor(4000, 0)?.length ?: 0
-                ic.deleteSurroundingText(before, after)
-                ic.commitText(text, 1)
-            }
+            replaceWholeField(ic, text)
         }
         ic.endBatchEdit()
         updateShift(auto = true)
@@ -899,7 +952,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     fun setVoiceLanguage(language: Language) {
         state.voice.language = language
         prefs.voiceLanguage = language
-        if (voice.isListening) startVoice()
+        // In Google-window mode the window opened before a language could be picked: reopen it.
+        if (voice.isListening || prefs.voiceUseGoogleWindow) startVoice()
     }
 
     fun setVoiceOutput(language: Language?) {
@@ -1072,6 +1126,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
         private const val WORD_SEPARATORS = " .,!?;:\n"
         private const val MAX_CLIP_CHARS = 20_000
+        private const val MAX_FIELD = 10_000
         private const val MAX_IMAGE_BYTES = 15 * 1024 * 1024
         private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
 

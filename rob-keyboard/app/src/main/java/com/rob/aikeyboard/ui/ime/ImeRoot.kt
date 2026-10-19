@@ -91,6 +91,22 @@ fun ImeRoot(service: RobKeyboardService) {
         if (state.showAppsRow) AppsRow(service)
         when {
             state.missingApp != null -> MissingAppBar(service, state.missingApp!!)
+            state.clearedText != null -> StripRow {
+                Text(
+                    "Текст удалён", color = ImeColors.text, fontSize = 14.sp,
+                    modifier = Modifier.weight(1f).padding(start = 10.dp),
+                )
+                SmallButton("Отменить", primary = true) { service.undoClearAll() }
+                SmallButton("✕") { state.clearedText = null }
+            }
+            state.showClearAll -> StripRow {
+                Text(
+                    "Держите ⌫ — стирается по словам", color = ImeColors.textDim, fontSize = 13.sp,
+                    modifier = Modifier.weight(1f).padding(start = 10.dp),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                SmallButton("✕ Удалить всё", primary = true) { service.clearAll() }
+            }
             state.newScreenshot != null && state.panel == Panel.KEYBOARD -> StripRow {
                 Text(
                     "📷 Новый скриншот", color = ImeColors.cyan, fontSize = 14.sp, fontWeight = FontWeight.Medium,

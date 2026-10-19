@@ -35,6 +35,8 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
         fun onCursorMove(steps: Int)
         fun onDeleteWord()
         fun onVoice()
+        /** Backspace is being held: offer "delete everything". */
+        fun onDeleteHeld()
     }
 
     var layout: KeyboardLayout = Layouts.symbols
@@ -80,10 +82,12 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
         var stepAnchorX = downX
         var selected = 0
         val longPress = Runnable { onLongPress(this) }
+        var repeats = 0
         val repeat = object : Runnable {
             override fun run() {
-                listener.onFunction(KeyType.DELETE)
-                handler.postDelayed(this, REPEAT_INTERVAL)
+                // After about a second of holding, delete whole words instead of single letters.
+                if (repeats++ < WORD_REPEAT_AFTER) listener.onFunction(KeyType.DELETE) else listener.onDeleteWord()
+                handler.postDelayed(this, if (repeats > WORD_REPEAT_AFTER) WORD_REPEAT_INTERVAL else REPEAT_INTERVAL)
             }
         }
     }
@@ -463,7 +467,7 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
         if (t.mode != Mode.TAP) return
         val key = t.key.key
         when {
-            key.type == KeyType.DELETE -> { t.mode = Mode.REPEAT; handler.post(t.repeat) }
+            key.type == KeyType.DELETE -> { t.mode = Mode.REPEAT; listener.onDeleteHeld(); handler.post(t.repeat) }
             key.type == KeyType.SPACE -> { t.mode = Mode.CURSOR; t.stepAnchorX = t.lastX; performHapticFeedback(HAPTIC_LONG) }
             key.type == KeyType.SHIFT -> { t.mode = Mode.CONSUMED; listener.onShiftLock() }
             key.type == KeyType.COMMA -> { t.mode = Mode.CONSUMED; listener.onVoice() }
@@ -530,6 +534,8 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
     companion object {
         private const val LONG_PRESS = 350L
         private const val REPEAT_INTERVAL = 55L
+        private const val WORD_REPEAT_AFTER = 18
+        private const val WORD_REPEAT_INTERVAL = 160L
         private const val HAPTIC_LONG = android.view.HapticFeedbackConstants.LONG_PRESS
     }
 }

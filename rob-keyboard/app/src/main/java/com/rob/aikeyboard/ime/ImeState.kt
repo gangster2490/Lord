@@ -52,5 +52,9 @@ class ImeState {
     var quickFixBusy by mutableStateOf(false)
     /** Screenshot just taken, offered for one-tap insertion. */
     var newScreenshot by mutableStateOf<com.rob.aikeyboard.clipboard.ClipItem?>(null)
+    /** Backspace held: show "✕ Удалить всё". */
+    var showClearAll by mutableStateOf(false)
+    /** Text removed by "Удалить всё", for undo. */
+    var clearedText by mutableStateOf<String?>(null)
     val voice = VoiceState()
 }
