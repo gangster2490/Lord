@@ -182,7 +182,7 @@ private fun SettingsScreen() {
                 OutlinedButton(onClick = { update { app.emojiHistory.clear(); app.saveEmojiHistory() } }) { Text("Очистить недавние Emoji") }
             }
 
-            Section("AI (ChatGPT / Claude)") {
+            Section("AI (Gemini / ChatGPT / Claude)") {
                 Hint(
                     "Для AI Writing и облачного перевода нужен собственный API-ключ OpenAI или Anthropic. Подписка ChatGPT Plus / Claude Pro его не заменяет. " +
                         "Ключ хранится зашифрованным (Android Keystore) только на этом устройстве. Текст отправляется только после нажатия «Отправить».",
@@ -191,6 +191,18 @@ private fun SettingsScreen() {
                     update { prefs.quickFixWithAi = it }
                 }
                 Hint("Без этого ✎ исправляет офлайн и бесплатно: опечатки, заглавные, пробелы, частые запятые, точку в конце.")
+                Text("✨ AI-помощник при наборе", color = Cyan, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Hint(
+                    "Пока пишете, после паузы ~1,5 с над подсказками появляется исправленное сообщение и варианты продолжения — " +
+                        "одно нажатие, и готово. Бесплатно с ключом Google Gemini: aistudio.google.com → «Get API key» (нужен только Google-аккаунт).",
+                )
+                ApiKeyField("Gemini API-ключ (бесплатный)", SecureStore.GEMINI_KEY) { prefs.aiProvider = AiProvider.GEMINI; tick++ }
+                Toggle("Включить AI-помощника при наборе", prefs.aiAssistant) { update { prefs.aiAssistant = it } }
+                Hint(
+                    "Внимание: при включённом помощнике текст сообщения после паузы отправляется выбранному AI (не при каждой букве; " +
+                        "в полях паролей — никогда). При бесплатном ключе Gemini Google может использовать эти тексты для улучшения своих сервисов.",
+                )
+                ModelField("Модель Gemini", prefs.geminiModel) { update { prefs.geminiModel = it } }
                 Label("Провайдер по умолчанию")
                 FlowRow { AiProvider.entries.forEach { p -> Choice(p.label, prefs.aiProvider == p) { update { prefs.aiProvider = p } } } }
                 ApiKeyField("OpenAI API-ключ", SecureStore.OPENAI_KEY) { tick++ }

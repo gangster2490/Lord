@@ -77,5 +77,6 @@ class SecureStore(context: Context) {
 
         const val OPENAI_KEY = "openai_api_key"
         const val ANTHROPIC_KEY = "anthropic_api_key"
+        const val GEMINI_KEY = "gemini_api_key"
     }
 }

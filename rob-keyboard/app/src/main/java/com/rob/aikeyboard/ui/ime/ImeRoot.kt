@@ -89,6 +89,7 @@ fun ImeRoot(service: RobKeyboardService) {
     ) {
         Toolbar(service)
         if (state.showAppsRow) AppsRow(service)
+        if (state.assist != null && state.panel == Panel.KEYBOARD) AssistRow(service)
         when {
             state.missingApp != null -> MissingAppBar(service, state.missingApp!!)
             state.clearedText != null -> StripRow {
@@ -237,6 +238,42 @@ private fun AutoEmojiToggle(on: Boolean, onClick: () -> Unit) {
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
         )
+    }
+}
+
+/** "✨" row: AI-corrected message and continuations, each applied with one tap. */
+@Composable
+private fun AssistRow(service: RobKeyboardService) {
+    val assist = service.state.assist ?: return
+    Row(
+        Modifier.fillMaxWidth().background(ImeColors.bar).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("✨", fontSize = 16.sp, modifier = Modifier.padding(horizontal = 4.dp))
+        assist.fixed?.let { fixed ->
+            AssistChip("✓ ${fixed.take(60)}${if (fixed.length > 60) "…" else ""}", highlighted = true) { service.applyAssistFix() }
+        }
+        assist.next.forEach { n -> AssistChip("+ ${n.take(50)}", highlighted = false) { service.applyAssistNext(n) } }
+        Icon(
+            Icons.Outlined.Close, "Скрыть", tint = ImeColors.textDim,
+            modifier = Modifier.size(34.dp).clip(CircleShape).clickable { service.state.assist = null }.padding(7.dp),
+        )
+    }
+}
+
+@Composable
+private fun AssistChip(label: String, highlighted: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .padding(horizontal = 3.dp)
+            .height(34.dp)
+            .clip(RoundedCornerShape(17.dp))
+            .background(if (highlighted) ImeColors.cyan else ImeColors.chip)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = if (highlighted) ImeColors.key else ImeColors.text, fontSize = 14.sp, maxLines = 1)
     }
 }
 

@@ -9,7 +9,7 @@ enum class Vibration(val label: String, val millis: Long, val amplitude: Int) {
     OFF("Выкл.", 0, 0), LIGHT("Слабая", 12, 60), MEDIUM("Средняя", 18, 140), STRONG("Сильная", 28, 255)
 }
 
-enum class AiProvider(val label: String) { OPENAI("ChatGPT"), ANTHROPIC("Claude") }
+enum class AiProvider(val label: String) { GEMINI("Gemini"), OPENAI("ChatGPT"), ANTHROPIC("Claude") }
 
 enum class TranslateEngine(val label: String) { OFFLINE("На устройстве (ML Kit)"), AI("Облако (AI-провайдер)") }
 
@@ -90,6 +90,9 @@ class Prefs(context: Context) {
     var anthropicModel by StrPref("anthropic_model", DEFAULT_ANTHROPIC_MODEL)
     var openAiBaseUrl by StrPref("openai_base_url", "https://api.openai.com")
     var anthropicBaseUrl by StrPref("anthropic_base_url", "https://api.anthropic.com")
+    var geminiModel by StrPref("gemini_model", DEFAULT_GEMINI_MODEL)
+    /** Off by default: when on, the message is sent to the AI after a typing pause. */
+    var aiAssistant by BoolPref("ai_assistant", false)
 
     var emojiHistory: String?
         get() = raw.getString("emoji_history", null)
@@ -112,6 +115,7 @@ class Prefs(context: Context) {
 
     companion object {
         const val DEFAULT_OPENAI_MODEL = "gpt-5-mini"
+        const val DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
         const val DEFAULT_ANTHROPIC_MODEL = "claude-haiku-5-5"
     }
 }

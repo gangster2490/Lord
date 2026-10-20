@@ -179,6 +179,9 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         composing.clear()
         if (voice.isListening) voice.stop()
         state.voice.listening = false
+        assistJob?.cancel()
+        state.assist = null
+        lastAssisted = null
         owner.onPause()
         app.io.execute { app.userModel.saveIfDirty() }
         super.onFinishInputView(finishingInput)
@@ -268,6 +271,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         state.quickFixUndo = null
         state.showClearAll = false
         state.clearedText = null
+        scheduleAssist()
         val ch = text.singleOrNull()
         when {
             ch != null && (ch.isLetter() || (ch == '\'' && composing.isNotEmpty())) && suggestionsAllowed -> {
@@ -346,6 +350,59 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     private var clearAllToken = 0
 
+    // ---- AI assistant while typing (opt-in) ----
+
+    private var assistJob: kotlinx.coroutines.Job? = null
+    private var lastAssisted: String? = null
+
+    /** After a typing pause, asks the AI for a corrected message and continuations. Never per keystroke. */
+    private fun scheduleAssist() {
+        assistJob?.cancel()
+        state.assist = null
+        if (!prefs.aiAssistant || isPassword || !suggestionsAllowed || technicalField) return
+        val provider = app.ai.configuredProvider() ?: return
+        assistJob = lifecycleScope.launch {
+            kotlinx.coroutines.delay(ASSIST_PAUSE_MS)
+            val ic = currentInputConnection ?: return@launch
+            val text = fieldText(ic).trim()
+            if (text.length < 6 || text == lastAssisted) return@launch
+            lastAssisted = text
+            val (system, user) = com.rob.aikeyboard.ai.AiPrompts.assist(text)
+            val reply = try {
+                app.ai.complete(provider, system, user, 400)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                state.message = "AI-помощник: ${e.message}"
+                return@launch
+            }
+            // Drop the answer if the user kept typing meanwhile.
+            if (fieldText(currentInputConnection ?: return@launch).trim() != text) return@launch
+            val result = com.rob.aikeyboard.ai.AiPrompts.parseAssist(reply, text)
+            if (result.fixed != null || result.next.isNotEmpty()) state.assist = result
+        }
+    }
+
+    fun applyAssistFix() {
+        val fixed = state.assist?.fixed ?: return
+        val ic = currentInputConnection ?: return
+        commitComposing()
+        replaceWholeField(ic, fixed)
+        lastAssisted = fixed
+        state.assist = state.assist?.copy(fixed = null)?.takeIf { it.next.isNotEmpty() }
+        updateShift(auto = true)
+    }
+
+    fun applyAssistNext(continuation: String) {
+        val ic = currentInputConnection ?: return
+        commitComposing()
+        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
+        val glue = if (before.isNotEmpty() && !before.last().isWhitespace() && continuation.first().isLetterOrDigit()) " " else ""
+        ic.commitText(glue + continuation, 1)
+        state.assist = null
+        scheduleAssist()
+    }
+
     override fun onDeleteHeld() {
         if (state.internalField != null) return
         state.clearedText = null
@@ -385,6 +442,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         }
         val ic = currentInputConnection ?: return
         state.quickFixUndo = null
+        scheduleAssist()
         autoSpaceInserted = false
         if (performUndo(ic)) return
         if (composing.isNotEmpty()) {
@@ -696,6 +754,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         autoSpaceInserted = true
         updateShift(auto = true)
         showPredictions()
+        scheduleAssist()
     }
 
     // ---- Language & panels ----
@@ -1116,6 +1175,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         private const val WORD_SEPARATORS = " .,!?;:\n"
         private const val MAX_CLIP_CHARS = 20_000
         private const val MAX_FIELD = 10_000
+        private const val ASSIST_PAUSE_MS = 1500L
         private const val MAX_IMAGE_BYTES = 15 * 1024 * 1024
         private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
 

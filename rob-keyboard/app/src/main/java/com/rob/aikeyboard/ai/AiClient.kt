@@ -29,7 +29,12 @@ class AiClient(private val prefs: Prefs, private val secure: SecureStore) {
 
     fun isConfigured(provider: AiProvider): Boolean = secure.hasSecret(keyName(provider))
 
+    /** The chosen provider if it has a key, otherwise any provider that has one. */
+    fun configuredProvider(): AiProvider? =
+        prefs.aiProvider.takeIf(::isConfigured) ?: AiProvider.entries.firstOrNull(::isConfigured)
+
     private fun keyName(provider: AiProvider) = when (provider) {
+        AiProvider.GEMINI -> SecureStore.GEMINI_KEY
         AiProvider.OPENAI -> SecureStore.OPENAI_KEY
         AiProvider.ANTHROPIC -> SecureStore.ANTHROPIC_KEY
     }
@@ -39,10 +44,32 @@ class AiClient(private val prefs: Prefs, private val secure: SecureStore) {
             val key = secure.getSecret(keyName(provider))
                 ?: throw AiException("API-ключ для ${provider.label} не задан. Откройте настройки ROB Keyboard → AI.")
             when (provider) {
+                AiProvider.GEMINI -> gemini(key, system, user, maxTokens)
                 AiProvider.OPENAI -> openAi(key, system, user, maxTokens)
                 AiProvider.ANTHROPIC -> anthropic(key, system, user, maxTokens)
             }
         }
+
+    /** Google Gemini API (free tier available with a key from aistudio.google.com). */
+    private fun gemini(key: String, system: String, user: String, maxTokens: Int): String {
+        val body = JSONObject()
+            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
+            .put(
+                "contents",
+                JSONArray().put(JSONObject().put("role", "user").put("parts", JSONArray().put(JSONObject().put("text", user)))),
+            )
+            .put("generationConfig", JSONObject().put("maxOutputTokens", maxTokens * 4).put("responseMimeType", "application/json"))
+        val request = Request.Builder()
+            .url("https://generativelanguage.googleapis.com/v1beta/models/${prefs.geminiModel}:generateContent")
+            .header("x-goog-api-key", key)
+            .post(body.toString().toRequestBody(json))
+            .build()
+        val response = execute(request)
+        val parts = response.getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts")
+        return (0 until parts.length()).map { parts.getJSONObject(it) }
+            .filter { !it.optBoolean("thought") }
+            .joinToString("") { it.optString("text") }
+    }
 
     private fun openAi(key: String, system: String, user: String, maxTokens: Int): String {
         val body = JSONObject()

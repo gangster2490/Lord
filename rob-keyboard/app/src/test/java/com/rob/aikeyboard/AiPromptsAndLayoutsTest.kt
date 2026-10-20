@@ -49,3 +49,13 @@ class AiPromptsAndLayoutsTest {
         }
     }
 }
+
+class AssistParseTest {
+    @org.junit.Test fun parsesAssistReply() {
+        val a = AiPrompts.parseAssist("{\"fixed\":\"Привет, как дела?\",\"next\":[\" Давно не виделись!\",\"Что нового?\"]}", "привет как дела")
+        org.junit.Assert.assertEquals("Привет, как дела?", a.fixed)
+        org.junit.Assert.assertEquals(listOf("Давно не виделись!", "Что нового?"), a.next)
+        org.junit.Assert.assertEquals(null, AiPrompts.parseAssist("{\"fixed\":\"ok\",\"next\":[]}", "ok").fixed)
+        org.junit.Assert.assertEquals(null, AiPrompts.parseAssist("garbage", "x").fixed)
+    }
+}

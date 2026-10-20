@@ -56,5 +56,7 @@ class ImeState {
     var showClearAll by mutableStateOf(false)
     /** Text removed by "Удалить всё", for undo. */
     var clearedText by mutableStateOf<String?>(null)
+    /** AI assistant result for the current message. */
+    var assist by mutableStateOf<com.rob.aikeyboard.ai.AiPrompts.Assist?>(null)
     val voice = VoiceState()
 }
