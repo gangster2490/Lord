@@ -30,6 +30,10 @@ class VoiceState {
     var missingModels by mutableStateOf<Set<Language>>(emptySet())
     /** The built-in recogniser failed; offer Google's voice input window instead. */
     var offerFallback by mutableStateOf(false)
+    /** Recording finished, waiting for ChatGPT's transcription. */
+    var processing by mutableStateOf(false)
+    /** Speech goes to ChatGPT (OpenAI key set and option on) instead of the phone recogniser. */
+    var cloud by mutableStateOf(false)
 }
 
 /** Observable UI state of the keyboard window, owned by [RobKeyboardService]. */

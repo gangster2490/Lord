@@ -58,9 +58,11 @@ fun VoicePanel(service: RobKeyboardService) {
             }
             Text(
                 when {
+                    voice.processing -> "ChatGPT распознаёт…"
                     voice.translating -> "Перевожу…"
                     voice.error != null -> voice.error!!
                     voice.listening && voice.partial.isNotEmpty() -> voice.partial
+                    voice.listening && voice.cloud -> "Запись (${voice.language.displayName})… говорите, затем ■"
                     voice.listening -> "Говорите (${voice.language.displayName})… ■ — стоп"
                     voice.lastInserted != null -> "Вставлено: «${voice.lastInserted!!.trim()}» — можно поправить прямо в поле"
                     else -> "Нажмите 🎤 и говорите"
@@ -70,6 +72,13 @@ fun VoicePanel(service: RobKeyboardService) {
                 modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
             )
             SmallButton("✕") { service.togglePanel(Panel.VOICE) }
+        }
+        if (com.rob.aikeyboard.RobApp.instance.ai.isConfigured(com.rob.aikeyboard.data.AiProvider.OPENAI)) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                Label("Распознавание:")
+                Chip("ChatGPT", voice.cloud) { service.setVoiceCloud(true) }
+                Chip("Телефон", !voice.cloud) { service.setVoiceCloud(false) }
+            }
         }
         Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
             Label("Говорю:")

@@ -178,6 +178,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         currentInputConnection?.finishComposingText()
         composing.clear()
         if (voice.isListening) voice.stop()
+        if (recorder.isRecording) recorder.cancel()
         state.voice.listening = false
         assistJob?.cancel()
         state.assist = null
@@ -791,7 +792,12 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         commitComposing()
         state.internalField = null
         state.showAppsRow = false
-        if (state.panel == Panel.VOICE && panel != Panel.VOICE) stopVoice()
+        // Leaving the voice panel discards an unfinished recording instead of sending it.
+        if (state.panel == Panel.VOICE) {
+            if (recorder.isRecording) recorder.cancel()
+            voice.stop()
+            state.voice.listening = false
+        }
         state.panel = if (state.panel == panel) Panel.KEYBOARD else panel
         if (state.panel == Panel.VOICE) startVoice()
         if (state.panel == Panel.KEYBOARD) showPredictions()
@@ -1072,7 +1078,10 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         state.voice.translating = true
         lifecycleScope.launch {
             try {
-                replaceVoice(com.rob.aikeyboard.translate.Translate.run(text, source, target, com.rob.aikeyboard.data.TranslateEngine.OFFLINE))
+                // With an AI key the translation goes through it (better, no downloads); otherwise on-device.
+                val engine = if (app.ai.configuredProvider() != null) com.rob.aikeyboard.data.TranslateEngine.AI
+                else com.rob.aikeyboard.data.TranslateEngine.OFFLINE
+                replaceVoice(com.rob.aikeyboard.translate.Translate.run(text, source, target, engine))
             } catch (e: com.rob.aikeyboard.translate.MissingModelsException) {
                 state.voice.missingModels = e.languages
                 state.message = "Для перевода голоса скачайте модели: 🎤 → «Скачать модели перевода»"
@@ -1085,10 +1094,43 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         }
     }
 
+    private val recorder by lazy {
+        com.rob.aikeyboard.voice.AudioRecorder(
+            onLevel = { level -> keyboardView.post { state.voice.level = level } },
+            onLimit = { keyboardView.post { stopVoice() } },
+        )
+    }
+
+    private fun cloudVoiceAvailable() = prefs.voiceUseChatGpt && app.ai.isConfigured(com.rob.aikeyboard.data.AiProvider.OPENAI)
+
+    fun setVoiceCloud(on: Boolean) {
+        prefs.voiceUseChatGpt = on
+        state.voice.cloud = cloudVoiceAvailable()
+    }
+
+    /** Sends the finished recording to ChatGPT and inserts the text like any dictation. */
+    private fun finishCloudRecording() {
+        val wav = recorder.stop()
+        state.voice.listening = false
+        if (wav.size < com.rob.aikeyboard.voice.AudioRecorder.MIN_BYTES) { state.voice.error = "Слишком коротко — держите 🎤 и говорите"; return }
+        state.voice.processing = true
+        lifecycleScope.launch {
+            try {
+                val text = app.ai.transcribe(wav, state.voice.language.code)
+                if (text.isBlank()) state.voice.error = "Речь не распознана" else onResult(text)
+            } catch (e: Exception) {
+                state.voice.error = "ChatGPT: ${e.message}"
+            } finally {
+                state.voice.processing = false
+            }
+        }
+    }
+
     fun startVoice() {
         state.voice.error = null
         state.voice.offerFallback = false
         state.voice.partial = ""
+        state.voice.cloud = cloudVoiceAvailable()
         if (!voice.hasPermission()) {
             state.voice.error = "Нужно разрешение на микрофон"
             startActivity(
@@ -1096,6 +1138,11 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                     .putExtra(PermissionActivity.EXTRA_PERMISSION, android.Manifest.permission.RECORD_AUDIO)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
+            return
+        }
+        // ChatGPT mode only needs the microphone, not the phone's recogniser.
+        if (state.voice.cloud) {
+            if (recorder.start()) state.voice.listening = true else state.voice.error = "Микрофон занят другим приложением"
             return
         }
         if (!voice.isAvailable()) {
@@ -1107,6 +1154,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     }
 
     fun stopVoice() {
+        if (recorder.isRecording) { finishCloudRecording(); return }
         if (voice.isListening) voice.stopListening() else voice.stop()
         state.voice.listening = false
     }

@@ -114,6 +114,23 @@ class AiClient(private val prefs: Prefs, private val secure: SecureStore) {
             .joinToString("") { it.optString("text") }
     }
 
+    /** Speech to text with OpenAI (WAV in, text out). Only called after the user stops a recording. */
+    suspend fun transcribe(wav: ByteArray, languageCode: String): String = withContext(Dispatchers.IO) {
+        val key = secure.getSecret(SecureStore.OPENAI_KEY) ?: throw AiException("API-ключ OpenAI не задан.")
+        val body = okhttp3.MultipartBody.Builder().setType(okhttp3.MultipartBody.FORM)
+            .addFormDataPart("model", prefs.openAiTranscribeModel)
+            .addFormDataPart("language", languageCode)
+            .addFormDataPart("response_format", "json")
+            .addFormDataPart("file", "speech.wav", wav.toRequestBody("audio/wav".toMediaType()))
+            .build()
+        val request = Request.Builder()
+            .url(prefs.openAiBaseUrl.trimEnd('/') + "/v1/audio/transcriptions")
+            .header("Authorization", "Bearer $key")
+            .post(body)
+            .build()
+        execute(request).optString("text").trim()
+    }
+
     private fun execute(request: Request): JSONObject {
         if (!request.url.isHttps) throw AiException("Разрешены только HTTPS-адреса.")
         http.newCall(request).execute().use { r ->

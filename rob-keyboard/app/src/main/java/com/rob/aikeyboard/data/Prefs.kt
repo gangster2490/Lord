@@ -95,6 +95,9 @@ class Prefs(context: Context) {
     var aiAssistant by BoolPref("ai_assistant", false)
     /** With the assistant on: replace the message with the corrected one by itself (undo bar shown). */
     var aiAutoFix by BoolPref("ai_auto_fix", true)
+    /** Recognise speech with OpenAI (when its key is set) instead of the phone's recogniser. */
+    var voiceUseChatGpt by BoolPref("voice_chatgpt", true)
+    var openAiTranscribeModel by StrPref("openai_transcribe_model", "gpt-4o-mini-transcribe")
 
     var emojiHistory: String?
         get() = raw.getString("emoji_history", null)
