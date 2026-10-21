@@ -379,7 +379,21 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
             // Drop the answer if the user kept typing meanwhile.
             if (fieldText(currentInputConnection ?: return@launch).trim() != text) return@launch
             val result = com.rob.aikeyboard.ai.AiPrompts.parseAssist(reply, text)
-            if (result.fixed != null || result.next.isNotEmpty()) state.assist = result
+            val fixed = result.fixed
+            val ic2 = currentInputConnection
+            // Auto-fix only with the cursor at the end, so nothing moves under the user's fingers.
+            val cursorAtEnd = ic2 != null && ic2.getTextAfterCursor(1, 0).isNullOrEmpty() && ic2.getSelectedText(0).isNullOrEmpty()
+            if (fixed != null && prefs.aiAutoFix && cursorAtEnd && composing.isEmpty()) {
+                // Keep the trailing space the user typed, so the next word does not stick to the fix.
+                val trailing = fieldText(ic2!!).takeLastWhile { it == ' ' }
+                replaceWholeField(ic2, fixed + trailing)
+                lastAssisted = fixed
+                state.quickFixUndo = QuickFixUndo(text + trailing, fixed + trailing)
+                updateShift(auto = true)
+                state.assist = result.copy(fixed = null).takeIf { it.next.isNotEmpty() }
+            } else if (fixed != null || result.next.isNotEmpty()) {
+                state.assist = result
+            }
         }
     }
 
@@ -911,6 +925,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     fun undoQuickFix() {
         val u = state.quickFixUndo ?: return
         state.quickFixUndo = null
+        // Do not correct the same text again right after the user rejected the fix.
+        lastAssisted = u.original.trim()
         val ic = currentInputConnection ?: return
         if (ic.getTextBeforeCursor(u.fixed.length, 0)?.toString() == u.fixed) {
             ic.beginBatchEdit()

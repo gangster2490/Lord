@@ -93,6 +93,8 @@ class Prefs(context: Context) {
     var geminiModel by StrPref("gemini_model", DEFAULT_GEMINI_MODEL)
     /** Off by default: when on, the message is sent to the AI after a typing pause. */
     var aiAssistant by BoolPref("ai_assistant", false)
+    /** With the assistant on: replace the message with the corrected one by itself (undo bar shown). */
+    var aiAutoFix by BoolPref("ai_auto_fix", true)
 
     var emojiHistory: String?
         get() = raw.getString("emoji_history", null)

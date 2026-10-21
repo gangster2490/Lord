@@ -75,6 +75,11 @@ class AiClient(private val prefs: Prefs, private val secure: SecureStore) {
         val body = JSONObject()
             .put("model", prefs.openAiModel)
             .put("max_completion_tokens", maxTokens * 4) // reasoning models spend tokens before answering
+            .apply {
+                // Keyboard corrections must come back fast; reasoning models accept a minimal effort.
+                val m = prefs.openAiModel.lowercase()
+                if (m.startsWith("gpt-5")) put("reasoning_effort", "minimal")
+            }
             .put(
                 "messages",
                 JSONArray()

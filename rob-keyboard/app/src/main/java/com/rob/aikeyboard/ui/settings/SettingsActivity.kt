@@ -198,6 +198,8 @@ private fun SettingsScreen() {
                 )
                 ApiKeyField("Gemini API-ключ (бесплатный)", SecureStore.GEMINI_KEY) { prefs.aiProvider = AiProvider.GEMINI; tick++ }
                 Toggle("Включить AI-помощника при наборе", prefs.aiAssistant) { update { prefs.aiAssistant = it } }
+                Toggle("Исправлять автоматически, без нажатия", prefs.aiAutoFix) { update { prefs.aiAutoFix = it } }
+                Hint("Пауза ~1,5 с — и сообщение само исправляется (заглавные, точки, запятые, слова). «Отменить» вернёт как было. Пока печатаете, текст не трогается.")
                 Hint(
                     "Внимание: при включённом помощнике текст сообщения после паузы отправляется выбранному AI (не при каждой букве; " +
                         "в полях паролей — никогда). При бесплатном ключе Gemini Google может использовать эти тексты для улучшения своих сервисов.",
@@ -205,9 +207,9 @@ private fun SettingsScreen() {
                 ModelField("Модель Gemini", prefs.geminiModel) { update { prefs.geminiModel = it } }
                 Label("Провайдер по умолчанию")
                 FlowRow { AiProvider.entries.forEach { p -> Choice(p.label, prefs.aiProvider == p) { update { prefs.aiProvider = p } } } }
-                ApiKeyField("OpenAI API-ключ", SecureStore.OPENAI_KEY) { tick++ }
+                ApiKeyField("OpenAI API-ключ", SecureStore.OPENAI_KEY) { prefs.aiProvider = AiProvider.OPENAI; tick++ }
                 ModelField("Модель OpenAI", prefs.openAiModel) { update { prefs.openAiModel = it } }
-                ApiKeyField("Anthropic API-ключ", SecureStore.ANTHROPIC_KEY) { tick++ }
+                ApiKeyField("Anthropic API-ключ", SecureStore.ANTHROPIC_KEY) { prefs.aiProvider = AiProvider.ANTHROPIC; tick++ }
                 ModelField("Модель Anthropic", prefs.anthropicModel) { update { prefs.anthropicModel = it } }
                 ModelField("Адрес API OpenAI (или HTTPS-прокси)", prefs.openAiBaseUrl) { update { prefs.openAiBaseUrl = it } }
                 ModelField("Адрес API Anthropic (или HTTPS-прокси)", prefs.anthropicBaseUrl) { update { prefs.anthropicBaseUrl = it } }
