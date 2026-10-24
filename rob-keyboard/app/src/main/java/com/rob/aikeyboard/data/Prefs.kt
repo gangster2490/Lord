@@ -35,6 +35,8 @@ class Prefs(context: Context) {
     var autoDetectLanguage by BoolPref("auto_detect_language", true)
     var autoCorrect by BoolPref("auto_correct", true)
     var showSuggestions by BoolPref("show_suggestions", true)
+    /** With a physical keyboard connected, keep the ROB toolbar and suggestions on screen. */
+    var hardKeyboardBar by BoolPref("hard_keyboard_bar", true)
     var autoCapitalize by BoolPref("auto_capitalize", true)
     var doubleSpacePeriod by BoolPref("double_space_period", true)
     var numberHints by BoolPref("number_hints", true)

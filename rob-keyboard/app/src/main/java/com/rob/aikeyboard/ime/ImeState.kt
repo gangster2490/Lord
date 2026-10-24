@@ -62,5 +62,9 @@ class ImeState {
     var clearedText by mutableStateOf<String?>(null)
     /** AI assistant result for the current message. */
     var assist by mutableStateOf<com.rob.aikeyboard.ai.AiPrompts.Assist?>(null)
+    /** A physical keyboard (e.g. Bluetooth keyboard case) is connected: on-screen keys are hidden. */
+    var hardKeyboard by mutableStateOf(false)
+    /** The user asked for the on-screen keys anyway. */
+    var showSoftKeys by mutableStateOf(false)
     val voice = VoiceState()
 }

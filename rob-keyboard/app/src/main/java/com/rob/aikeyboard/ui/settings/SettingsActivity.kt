@@ -158,6 +158,8 @@ private fun SettingsScreen() {
 
             Section("Ввод текста") {
                 Toggle("Подсказки слов", prefs.showSuggestions) { update { prefs.showSuggestions = it } }
+                Toggle("Панель ROB при физической клавиатуре (DEXNOR и др.)", prefs.hardKeyboardBar) { update { prefs.hardKeyboardBar = it } }
+                Hint("С подключённой Bluetooth-клавиатурой вместо экранных клавиш остаётся тонкая панель ROB. Русский — по раскладке ЙЦУКЕН, смена языка: Strg+Пробел или Shift+Пробел. Strg+V после скриншота вставляет скриншот, Strg+Shift+V открывает буфер (тексты и картинки).")
                 Toggle("Автокоррекция", prefs.autoCorrect) { update { prefs.autoCorrect = it } }
                 Toggle("Заглавная в начале предложения (во всех чатах)", prefs.autoCapitalize) { update { prefs.autoCapitalize = it } }
                 Toggle("Автозапятые при наборе (что, но, чтобы, который…)", prefs.autoComma) { update { prefs.autoComma = it } }

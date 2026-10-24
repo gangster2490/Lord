@@ -128,7 +128,10 @@ fun ImeRoot(service: RobKeyboardService) {
             state.panel == Panel.KEYBOARD || state.panel == Panel.VOICE -> SuggestionStrip(service)
         }
         when (state.panel) {
-            Panel.KEYBOARD -> KeyboardHost(service)
+            Panel.KEYBOARD -> if (state.hardKeyboard && !state.showSoftKeys) HardKeyboardRow(service) else {
+                if (state.hardKeyboard) HardKeyboardRow(service)
+                KeyboardHost(service)
+            }
             Panel.VOICE -> {
                 VoicePanel(service)
                 KeyboardHost(service)
@@ -138,6 +141,20 @@ fun ImeRoot(service: RobKeyboardService) {
             Panel.AI -> AiWritingPanel(service, panelHeight)
             Panel.TRANSLATE -> TranslatePanel(service, panelHeight)
         }
+    }
+}
+
+/** Slim row shown instead of the keys while a physical keyboard is attached. */
+@Composable
+private fun HardKeyboardRow(service: RobKeyboardService) {
+    val state = service.state
+    StripRow {
+        Text(
+            "⌨ ${state.language.displayName} · Strg+Пробел — язык · Strg+Shift+V — буфер",
+            color = ImeColors.textDim, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(start = 10.dp).clickable { service.onSpaceSwipe(1) },
+        )
+        SmallButton(if (state.showSoftKeys) "Скрыть клавиши" else "⌨ Клавиши") { service.toggleSoftKeys() }
     }
 }
 

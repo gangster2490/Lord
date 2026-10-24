@@ -13,7 +13,9 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.text.InputType
+import android.view.KeyCharacterMap
 import android.view.KeyEvent
+import com.rob.aikeyboard.keyboard.HardwareKeys
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
@@ -148,8 +150,105 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     override fun onEvaluateFullscreenMode(): Boolean = false
 
+    // ---- Physical keyboard (Bluetooth keyboard case) ----
+
+    private fun hasHardKeyboard(config: android.content.res.Configuration = resources.configuration) =
+        config.keyboard == android.content.res.Configuration.KEYBOARD_QWERTY &&
+            config.hardKeyboardHidden == android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO
+
+    /** Android hides keyboards when a physical one is attached; keep the slim ROB bar instead. */
+    override fun onEvaluateInputViewShown(): Boolean {
+        val systemSays = super.onEvaluateInputViewShown()
+        return systemSays || (prefs.hardKeyboardBar && hasHardKeyboard())
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        state.hardKeyboard = hasHardKeyboard(newConfig)
+        if (!state.hardKeyboard) state.showSoftKeys = false
+        updateInputViewShown()
+    }
+
+    private val handledKeys = HashSet<Int>()
+
+    private fun isPhysical(event: KeyEvent): Boolean {
+        val device = event.device ?: return false
+        return !device.isVirtual && event.source and android.view.InputDevice.SOURCE_KEYBOARD == android.view.InputDevice.SOURCE_KEYBOARD
+    }
+
+    /** Routes physical typing through the same logic as on-screen keys (suggestions, autocorrect, Auto Emoji, AI). */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (!isPhysical(event) || currentInputConnection == null) {
+            return super.onKeyDown(keyCode, event)
+        }
+        val ctrl = event.isCtrlPressed
+        val shift = event.isShiftPressed
+        // Ctrl+Space / Shift+Space switch the language, as on Samsung keyboards.
+        if (keyCode == KeyEvent.KEYCODE_SPACE && (ctrl || shift) || keyCode == KeyEvent.KEYCODE_LANGUAGE_SWITCH) {
+            if (event.repeatCount == 0) {
+                onSpaceSwipe(1)
+                state.message = "⌨ ${state.language.displayName}"
+            }
+            return consume(keyCode)
+        }
+        if (ctrl && keyCode == KeyEvent.KEYCODE_V) {
+            // Strg+Shift+V: ROB clipboard with recent texts and pictures (like Win+V).
+            if (shift) {
+                if (event.repeatCount == 0) togglePanel(Panel.CLIPBOARD)
+                return consume(keyCode)
+            }
+            // Strg+V right after a screenshot pastes the screenshot; otherwise normal text paste.
+            if (state.newScreenshot != null) {
+                if (event.repeatCount == 0) insertNewScreenshot()
+                return consume(keyCode)
+            }
+        }
+        if (ctrl || event.isAltPressed && !event.isShiftPressed && keyCode != KeyEvent.KEYCODE_SPACE || event.isMetaPressed) {
+            commitComposing() // shortcuts (Ctrl+C, Ctrl+A…) go to the app
+            return super.onKeyDown(keyCode, event)
+        }
+        if (!suggestionsAllowed && state.language != Language.RU) return super.onKeyDown(keyCode, event)
+        when (keyCode) {
+            KeyEvent.KEYCODE_DEL -> { onDelete(); return consume(keyCode) }
+            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                if (shift) { commitComposing(); return super.onKeyDown(keyCode, event) } // Shift+Enter: new line in the app
+                onEnter(); return consume(keyCode)
+            }
+            KeyEvent.KEYCODE_SPACE -> { onText(" "); return consume(keyCode) }
+        }
+        val ch: Char? = if (state.language == Language.RU) HardwareKeys.russian(keyCode, shift) else null
+        val text = ch?.toString() ?: run {
+            val unicode = event.getUnicodeChar(event.metaState)
+            if (unicode == 0 || unicode and KeyCharacterMap.COMBINING_ACCENT != 0) null
+            else String(Character.toChars(unicode)).takeIf { s -> s.none { it.isISOControl() } }
+        }
+        if (text == null) {
+            commitComposing() // arrows, Tab, Esc, dead keys: let the app/system handle them
+            return super.onKeyDown(keyCode, event)
+        }
+        // Automatic capital at the start of a sentence, unless Shift/Caps already decided.
+        val withCaps = if (keyboardView.shiftState == ShiftState.ON && !shift && !event.isCapsLockOn && text.first().isLowerCase()) {
+            text.uppercase()
+        } else text
+        onText(withCaps)
+        return consume(keyCode)
+    }
+
+    private fun consume(keyCode: Int): Boolean {
+        handledKeys += keyCode
+        return true
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
+        if (handledKeys.remove(keyCode)) true else super.onKeyUp(keyCode, event)
+
+    fun toggleSoftKeys() {
+        state.showSoftKeys = !state.showSoftKeys
+    }
+
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        state.hardKeyboard = hasHardKeyboard()
         // The permission may have been granted in settings after the keyboard started.
         if (prefs.autoScreenshots && !screenshots.isRunning) screenshots.start()
         owner.onResume()
