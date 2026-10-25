@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">ROB Server</string>
+    <string name="server_label">Serveradresse (z. B. http://100.x.x.x oder https://rob.example.com)</string>
+    <string name="save">Speichern</string>
+    <string name="reload">Neu laden</string>
+    <string name="no_server">Bitte zuerst die Serveradresse in den Einstellungen eintragen.</string>
+    <string name="settings">Einstellungen</string>
+    <string name="language">Sprache</string>
+    <string name="ports_note">Ports der Dienste können angepasst werden, falls sie abweichen.</string>
+</resources>
