@@ -28,6 +28,7 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew assembleDebug       # app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Словари: русский ≈150 000 слов, немецкий ≈100 000, английский 40 000 (частотные списки FrequencyWords с отсечкой редких опечаток).
 Данные словарей и Emoji пересоздаются скриптом `tools/build_data.py` (источники описаны в его заголовке).
 
 ## Управление

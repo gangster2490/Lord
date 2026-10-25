@@ -2,7 +2,7 @@
 """Builds the keyboard's offline assets from public data sources.
 
 Inputs (download into one directory, pass it as argv[1]):
-  ru_50k.txt, de_50k.txt, en_50k.txt   hermitdave/FrequencyWords (OpenSubtitles 2018, CC BY-SA 4.0)
+  ru_full.txt, de_full.txt, en_50k.txt (ru/de_50k.txt as fallback)   hermitdave/FrequencyWords (OpenSubtitles 2018, CC BY-SA 4.0)
   de.dic                               LibreOffice de_DE_frami Hunspell dictionary (used only for noun casing)
   emoji-test.txt                       Unicode emoji-test.txt
   ann_{en,de,ru}.json, annd_*.json     Unicode CLDR annotations (keywords for emoji search)
@@ -64,7 +64,14 @@ LETTERS = {
     "en": re.compile(r"^[a-z]+('[a-z]+)?$"),
 }
 SINGLE_OK = {"ru": set("авиксоуя"), "de": set(), "en": {"a", "i"}}
-MAX_WORDS = 40000
+# ru/de use the full FrequencyWords lists (ru_full.txt, de_full.txt) cut at MIN_COUNT to drop subtitle typos.
+MAX_WORDS = {"ru": 150000, "de": 150000, "en": 40000}
+MIN_COUNT = {"ru": 20, "de": 20, "en": 0}
+
+
+def freq_file(lang):
+    full = os.path.join(src, f"{lang}_full.txt")
+    return full if lang != "en" and os.path.exists(full) else os.path.join(src, f"{lang}_50k.txt")
 
 
 def german_casing():
@@ -106,12 +113,14 @@ def de_case(word, cap, low):
 
 def build_dict(lang, cap=None, low=None, casing=None):
     rows = []
-    with open(os.path.join(src, f"{lang}_50k.txt"), encoding="utf-8") as f:
+    with open(freq_file(lang), encoding="utf-8") as f:
         for line in f:
             parts = line.split()
             if len(parts) != 2:
                 continue
             w, n = parts[0].lower(), int(parts[1])
+            if n < MIN_COUNT[lang]:
+                break
             if not LETTERS[lang].match(w):
                 continue
             if len(w) == 1 and w not in SINGLE_OK[lang]:
@@ -126,7 +135,7 @@ def build_dict(lang, cap=None, low=None, casing=None):
             if lang == "en" and w == "i":
                 w = "I"
             rows.append((w, n))
-            if len(rows) >= MAX_WORDS:
+            if len(rows) >= MAX_WORDS[lang]:
                 break
     with open(os.path.join(out, f"dict_{lang}.txt"), "w", encoding="utf-8") as f:
         for w, n in rows:

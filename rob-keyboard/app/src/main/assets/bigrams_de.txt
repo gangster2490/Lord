@@ -52,7 +52,7 @@ gut	für|an|aus|und
 auch	die|der|das|ein
 schon	wieder|jetzt|in|die
 als	im|die|das|eine
-sein	Leben|Gesicht|eigenes|Vater
+sein	Leben|Gesicht|eigenes|jähriges
 mal	wieder|ein|die|auf
 jetzt	ist|die|wird|sind
 ihn	nicht|die|in|zu
@@ -131,7 +131,7 @@ zeit	für|der|ist|des
 weil	er|sie|es|ich
 willst	du
 kommen	die|sie|wir|aus
-dein	Leben|Herz|Vater
+dein	Browser|Leben|Herz|Vater
 heute	ist|noch|sind|wird
 kommt	die|es|der|aus
 wollen	sie|wir|die|das
@@ -296,7 +296,7 @@ allein	die|der|das|im
 beim	Umsatz|lesen|Training|Eintreffen
 sprechen	von|sie|für|vom
 beide	Seiten|Teams|Mannschaften|sind
-gefunden	werden|worden|und
+gefunden	werden|worden|und|Yahoo
 hatten	die|sie|wir|sich
 sache	der|ist|nicht|mit
 hilfe	von|der|eines|für
@@ -318,7 +318,7 @@ seinen	Verletzungen|Rücktritt|Namen|ersten
 dazu	gehört|gibt|ist|kommen
 bruder	ist|des|hat
 daran	ist|sind|hat|mangelt
-ihrem	Leben|Mann|Vater|neuen
+ihrem	Leben|Mann|Browser|Vater
 denken	sie|die|wird|wir
 könnten	die|sie|wir|auch
 dank	für|an|der|einer
@@ -470,7 +470,7 @@ gefallen	mir
 spaß	beim|mit|und|auf
 niemals	die|in|aus|zu
 schuld	daran|ist|sind|an
-getötet	worden|werden
+getötet	worden|Yahoo|werden
 wollten	sie|die|wir|sich
 verlassen	sie|die|das|den
 zeigen	die|sich|Ihnen|das
@@ -527,7 +527,7 @@ tust	du
 trinken	ist|sie
 einige	Beispiele|Bilder|Zeit|Wochen
 dies	ist|sei|teilte|gilt
-unseren	Kunden|Seiten|eigenen|kostenlosen
+unseren	Kunden|Seiten|Internetseiten|eigenen
 kriegen	sie|wir
 blut	von
 eltern	sind|haben|wurde|und
@@ -633,7 +633,7 @@ könntest	du
 seht	ihr
 eigenen	Angaben|Reihen|Haus|Regeln
 richtige	Richtung|Antwort|Weg|Entscheidung
-unserem	Hause|Angebot|Programm|Haus
+unserem	Hause|Angebot|Programm|Gästebuch
 suche	nach|ich|ist|in
 zwar	ist|nicht|die|in
 groß	ist|und|geschrieben|sind
@@ -711,7 +711,7 @@ krankenhaus	gebracht|eingeliefert|behandelt|eingewiesen
 höre	ich
 millionen	Euro|Mark|Dollar|dm
 klasse	Seite|wird|des|der
-hart	und|gegen|aber
+hart	umkämpft|und|gegen|aber
 worden	sein
 sinn	des|der|machen|für
 außerdem	wird|ist|gibt|werden
@@ -748,7 +748,7 @@ sollst	du
 schlimm	genug|ist
 laden	sie|zum|zu|die
 führen	alles|die|zu|wir
-gestorben	sein
+gestorben	Yahoo|sein
 schauen	sie|wir|die|auf
 meinung	der|ist|zu|nach
 lesen	sie|und|von|wir
@@ -786,7 +786,7 @@ arbeite	ich
 plötzlich	ein|hörte|in|war
 lebens	ist
 tisch	gezogen|ist|legen|und
-michael	Jackson|ist|Müller|Sommer
+michael	Schumacher|Jackson|ist|Müller
 hörte	ich|er|der
 liegen	die|bei|in|zwischen
 verkaufen	sie|sich
@@ -858,7 +858,7 @@ finger	auf
 ehe	wurde|ist|und
 rolle	spielt|spielen|des|der
 ließ	sich|die|er|den
-gleiche	gilt|Schicksal|Problem|Richtung
+gleiche	gilt|gelte|Schicksal|Problem
 monat	der|in
 hochzeit	der
 führt	zu|die|durch|der
@@ -1002,7 +1002,7 @@ letztes	Jahr
 bekam	er|ich|eine|sie
 ruft	die|doch|der|uns
 professor	Dr|für|ernannt
-gericht	hat|die|nicht|eine
+gericht	hat|die|nicht|Yahoo
 nase	voll|zu
 singen	wir
 bank	ist|hat|in|hatte
@@ -1114,7 +1114,7 @@ glas	mit|ist
 falsche	Weg|Signal|Richtung|Adresse
 verantwortlich	für|gemacht|dafür|sind
 jesus	ist|hat
-london	ist
+london	ist|Yahoo
 gegessen	werden
 gesetz	ist|der|von|in
 gemeinsam	mit|sind|werden|in
@@ -1166,7 +1166,7 @@ kannte	ich|sie|er|sich
 stehe	noch|ich|die|auf
 maria	Elisabeth
 gruppe	der|ist|von|auf
-anna	Elisabeth
+anna	Elisabeth|Margaretha
 verhaftet	worden
 seines	Todes|Lebens|Vaters
 händen	der|des|von|und
@@ -1249,9 +1249,10 @@ beginnt	um|die|mit|der
 größte	Teil|Herausforderung|Problem|Gruppe
 energie	und|wird|der|ist
 fleisch	und|ist|wird
-besonderes	Interesse|Gewicht|Problem|Dankeschön
+besonderes	Augenmerk|Interesse|Gewicht|Problem
 besteht	aus|die|eine|in
 reichen	von|nicht|die|bis
+robert	Enke
 zeitung	in|vor|beruft|nicht
 worum	geht
 nachgedacht	werden
@@ -1365,17 +1366,17 @@ risiko	für|ist|eines|von
 entschuldigt	sich
 gilt	als|auch|für|die
 held	des
-daraus	ergibt|wurde|ist|wird
+daraus	ergibt|resultieren|wurde|ist
 erstes	Ziel|Opfer
 brauchte	er|ich|sie
 gewalt	ist|gegen|in|und
 nachdenken	über
-tor	in|des|zu|für
+tor	in|des|erzielte|zu
 erfahrung	mit|und|in|ist
 pläne	für|wurden|werden|der
 katze	aus|ist
 runde	der|war|Sache|ist
-deutsche	Bank|Börse|Wirtschaft|Bahn
+deutsche	Bank|Aktienmarkt|Börse|Wirtschaft
 schwanz	ist
 taten	sie|sich|gefolgt|sind
 dringend	notwendig|nötig|empfohlen|erforderlich
@@ -1488,7 +1489,7 @@ nette	Leute|Idee
 test	ergab|des|am|gegen
 dadurch	wird|werden|ist|wurde
 direktor	des|der
-wichtiger	Bestandteil|ist|als|Schritt
+wichtiger	Bestandteil|ist|als|Baustein
 karriere	des|in|als
 erinnerung	an
 lösen	sich|wir|sie
@@ -1500,7 +1501,7 @@ nerven	blank
 langer	Weg|Zeit|Abend
 entlassen	werden|worden
 zweimal	im|jährlich|wöchentlich|auf
-washington	mit|ist
+washington	mit|ist|Mutual
 kollegen	aus|haben
 szene	ist|der|des|gesetzt
 scheinen	die|das
@@ -1651,7 +1652,7 @@ präsidenten	des|ist
 trick	ist
 roten	Zahlen|Bereich
 überlegt	sein
-größten	Teil|Anteil|Erfolge|Feinde
+größten	Teil|Anteil|Verlierern|Erfolge
 sonntag	wird|in|ist|war
 zwölf	Prozent|Monate|Jahren|Millionen
 vorstellung	der|des|von|ist
@@ -1697,7 +1698,7 @@ machten	die|wir|sich|sie
 geduld	aufbringen|ist
 bühne	gehen|ist|aufgebaut|in
 reparieren	sie
-usa	sind|werden|haben
+usa	sind|werden|haben|Yahoo
 fälle	sind|von|ist|bekannt
 selten	auf|der|in|zu
 drücken	sie|sich|die
@@ -1747,7 +1748,7 @@ gebiet	der|des|ist|wird
 jedoch	nicht|die|nur|noch
 verbunden	werden|mit|sein
 sprachen	von|sich|übersetzt|mit
-wichtigste	ist
+wichtigste	ist|Einnahmequelle
 jacke	mit
 bestellt	werden|und
 nenne	ich
@@ -1903,7 +1904,7 @@ spüre	ich
 stammt	aus|von|die|der
 vorgestellt	werden
 welch	ein|eine
-wichtiges	Thema|Instrument|Signal|Spiel
+wichtiges	Thema|Instrument|Signal|Kriterium
 gehörte	auch|er|zu|zur
 glaubte	an
 virus	ist
@@ -1966,9 +1967,10 @@ gedanke	der
 tausende	von|Menschen|Flüchtlinge
 heutzutage	ist|die
 schnitt	mit|von|um
+real	Estate
 holz	und|der
 spielte	die|er|der|das
-begonnen	werden|hat|wurde
+begonnen	werden|hat|wurde|Yahoo
 beschlossen	werden|die|worden
 begeistert	von|gewesen|aufgenommen
 durchs	Leben
@@ -2040,6 +2042,7 @@ patient	sollte
 nahmen	die|an|den|sie
 zahlt	die|sich|der|dann
 informiert	über|worden|werden|sie
+einziges	Sorgenkind
 zucker	und
 standen	die|unter|auf|im
 besitzer	ist|von|des|war
@@ -2099,6 +2102,7 @@ mordes	angeklagt
 angestellt	werden
 training	ist|für|der|wurde
 ächzt	unter
+suppe	auslöffeln
 sitz	des|in|der|und
 vorteil	der|ist|des|liegt
 tour	de|ist|führt
@@ -2155,12 +2159,13 @@ begangen	werden
 bäume	wurden|und|werden|sind
 leidenschaft	ist|des
 spieler	der|sind|mit|in
-verwendet	werden|die|das|worden
+verwendet	werden|Frames|die|das
 steuern	und|die|betrug|auf
 wieviel	kostet|bieten
 negativ	auf|beeinflusst
 blauen	Augen|Auge|Himmel
 stücke	ist|schneiden|sind|aus
+angela	Merkel
 zentrale	Rolle|Problem|des|Funktion
 jäger	und
 wenden	sie|sich|wir|uns
@@ -2179,7 +2184,7 @@ kindheit	war|in
 vermeiden	sie|wir
 fabrik	werden
 aussagen	sind|der|des
-einfache	Mehrheit|Bedienung|Sache|Installation
+einfache	Mehrheit|Bedienung|Handhabung|Sache
 laufe	der|des|das
 angenehm	überrascht|zu
 planen	sie|die|eine|wir
@@ -2191,7 +2196,7 @@ abgelehnt	worden
 appetit	auf
 zeigte	sich|er|die|eine
 fan	von|der
-hohen	Kosten|Anteil|Preis|Niveau
+hohen	Stellenwert|Kosten|Anteil|Preis
 verkauf	der|von|des|stehen
 sorgt	für|der|das|ein
 berühmt	ist
@@ -2200,7 +2205,7 @@ durfte	er|ich|nicht|weiter
 korrektur	wird
 wirft	dem|der|das|die
 betreten	werden|die|des
-hohe	Qualität|Anforderungen|Kosten|Nachfrage
+hohe	Ölpreis|Qualität|Anforderungen|Kosten
 aufnahme	von|in|der|des
 manager	des
 stellung	nehmen|der
@@ -2315,9 +2320,9 @@ typisch	für
 bietet	die|eine|das|der
 technologie	und|des
 jünger	als
-umso	größer|mehr|wichtiger
+umso	größer|mehr|wichtiger|überraschender
 starben	Menschen|mindestens|noch|sieben
-universität	Leipzig|von|ist|Salzburg
+universität	Augsburg|Leipzig|von|ist
 mai	in|wurde|bis|ist
 heben	sie
 koch	hat
@@ -2361,7 +2366,7 @@ einheiten	der
 wichtigen	Sieg|Informationen|Entscheidungen|Beitrag
 russland	ist|und|hat
 laune	der
-gesamten	Branche
+gesamten	Branche|Bundesrepublik
 stille	im
 asche	wurde
 geflogen	werden
@@ -2411,7 +2416,7 @@ museum	in|hat|ausgestellt|befindet
 existieren	noch|in|keine
 könne	die|er|man|auch
 proben	finden
-gewinne	werden|gemeldet
+gewinne	werden|gemeldet|verbucht
 personal	ist|und|für|der
 fällen	ist|wurden|wird|wurde
 wirkung	des|der|ist|auf
@@ -2424,7 +2429,7 @@ bittet	um|die|der
 ankunft	in|des|ist|der
 abstand	zwischen|von|zu|zur
 kontrolliert	werden|die
-treffer	für|in|zum|fiel
+treffer	für|erzielte|in|zum
 anwälte	und
 kunde	ist|hat|kann|bei
 august	in|wurde|geplant|ist
@@ -2468,10 +2473,10 @@ entgegen	der
 strecke	ist|wurde|in|wird
 version	des|ist|der|von
 hilfreich	sein|bei
-schweren	Verletzungen|Zeiten|Unfall|Schock
+schweren	Verletzungen|Zeiten|Kopfverletzungen|Unfall
 leeren	Straßen
 küste	von|ist
-behörden	haben|hatten|keine|ein
+behörden	haben|warnten|hatten|keine
 grüße	aus|an|von|auch
 geklärt	werden
 kaufte	das
@@ -2512,7 +2517,7 @@ aussicht	auf|gestellt
 werbung	für|und|wird|ist
 warf	der|einen|er|den
 anblick	ist
-einzelnen	Kategorien|Themen|Bereiche|Titel
+einzelnen	Kategorien|Themen|Module|Bereiche
 hielten	sich|die|sie|ihn
 handel	mit|gestartet|gegangen|ausgesetzt
 getrieben	werden
@@ -2653,6 +2658,7 @@ einbruch	in|der|des
 geheilt	werden
 stammen	aus|von|die|vom
 wände	sind|des
+warren	Buffett
 übernommen	werden|worden
 hoffte	auf
 verschieben	sich
@@ -2677,7 +2683,7 @@ kehrt	der|er
 summe	wurde|der|soll|aus
 billig	ist
 juni	in|statt|wurde|geplant
-festgenommen	worden|werden|und
+festgenommen	worden|werden|und|Yahoo
 flog	das|der|er
 nahrung	ist
 liege	bei|die|der|nun
@@ -2711,7 +2717,7 @@ partei	in|ist|hatte|hat
 zentrum	der|des|steht|ist
 testament	ist
 entfernung	von|der
-private	Homepage|feiern|Angelegenheit
+private	Homepage|Initiativen|feiern|Angelegenheit
 welten	aufeinander
 erfuhr	die|der|das
 gelände	ist|des|der|wurde
@@ -2760,7 +2766,7 @@ nochmals	auf
 medien	sind|am|berichteten|in
 dient	der|als|zur|die
 ereignisse	am|werden|der
-zweites	mal
+zweites	mal|Standbein
 leistung	von|der|ist|wird
 stoßen	die|auf
 gekocht	wird
@@ -2824,6 +2830,7 @@ kasse	gebeten|des
 tödlich	verletzt|sein
 oberfläche	des|ist|wird
 bedienen	sie
+jan	Ullrich
 zwang	ihn|die
 politiker	fordern|haben|und|sind
 besuche	von
@@ -2977,7 +2984,7 @@ wacht	über
 weiten	Grenzen
 musiker	sind
 reichweite	von|der
-öffentlichen	Dienst|rechts|Hand|Gebäuden
+öffentlichen	Dienst|rechts|Hand|Verkehrsmittel
 russischen	Soldaten|Truppen|Verfassung
 erschien	der|das|eine|ihr
 wundern	sich
@@ -3004,7 +3011,7 @@ handschuhe	und
 erschießt	sich
 drückt	sich|die|auf|der
 einiger	Zeit
-russische	Markt|Truppen
+russische	Aktienmarkt|Markt|Truppen
 mario	Gomez
 temperatur	und|des
 tickets	sind|gibt
@@ -3015,7 +3022,7 @@ agentur	für
 unbekannte	Richtung|Täter
 sektor	der
 blockiert	die
-öffentliche	Diskussion|Dienst|Aufmerksamkeit|Schule
+öffentliche	Verkehrsmittel|Diskussion|Dienst|Aufmerksamkeit
 schweden	sind
 märz	in|wurde|statt|ist
 vorübergehend	gestoppt|auf|festgenommen|in
@@ -3095,7 +3102,7 @@ option	ist|für
 rettete	sich|die
 befragt	werden
 spielten	die|sich|eine|sie
-gestiegen	ist
+gestiegen	ist|Yahoo
 gewaschen	werden|und
 anzahl	der|von|an
 anhänger	auf|der|wurde
@@ -3107,7 +3114,7 @@ erfindung	der|des
 zwingt	sie|die
 ausgesprochen	werden
 burg	wurde
-gesperrt	werden|worden
+gesperrt	werden|worden|Yahoo
 drehte	sich|ich|sie
 ersparen	sie
 genehmigung	des|der|ist|von
@@ -3279,7 +3286,7 @@ begegnung	mit|der
 steige	die
 feuerwehr	war|musste|wurde|konnte
 beginne	ich
-ähnliches	gilt|Bild
+ähnliches	gilt|Bild|gelte
 grauen	Wolken
 gewann	er|die|der|das
 vertreter	der|des
@@ -3341,6 +3348,7 @@ aktien	von|der|des|stiegen
 gezahlt	werden|worden
 bewegungen	des|werden
 bedarf	der|an|es|keiner
+üblichen	Öffnungszeiten
 umgelegt	werden
 inhalt	der|des|ist|dieser
 messe	ist|in|war|wurde
@@ -3449,6 +3457,7 @@ beschrieben	werden|und
 standpunkt	ist
 visier	der
 rang	eines|folgt|drei|elf
+phoenix	Solar
 schaute	ihn|sich|sie|er
 drängen	sich|auf
 jüngste	Entwicklung
@@ -3469,7 +3478,7 @@ stadtrat	am
 pressekonferenz	der
 komisches	Gefühl
 regie	führt|führte|der
-schweizer	Börse|Markt|Banken|in
+schweizer	Börse|Markt|Banken|Aktienmarkt
 befürchtet	einen|der|eine
 strich	die|durch|verdiente
 termine	werden|und|sind|finden
@@ -3485,12 +3494,13 @@ fielen	um|die|erneut|auf
 blätter	sind
 konzept	der|für|ist|des
 keineswegs	nur|eine
+faden	Beigeschmack
 treffpunkt	ist|für
 britische	Regierung|Zeitung|Forscher
 konzentration	auf|der|und|an
 schaltet	sich
 draht	zu
-höhere	Kosten|Leistung|Löhne|Steuern
+höhere	Kosten|Leistung|Löhne|Umsätze
 gedrückt	werden
 reinigung	der|und
 fordert	eine|die|der|er
@@ -3548,6 +3558,7 @@ vorsitzender	des|der|ist|wurde
 bedürfnisse	der|des
 regieren	die
 ausgemacht	werden
+fritz	Kuhn
 dateien	werden|können|sind
 gegründet	wurde|worden
 wall	Street
@@ -3566,7 +3577,7 @@ vorsprung	auf|der|des
 klarer	Fall|Favorit
 frischen	Anstrich
 höhepunkt	des|war|der|ist
-natürliche	Weise
+natürliche	Weise|Fluktuation
 erzeugen	eine
 veröffentlichen	wir
 scharfe	Kritik
@@ -3640,7 +3651,7 @@ einwohner	pro|und|der
 rekord	für
 erspart	mir
 einschalten	der
-übrigen	werden|hat
+übrigen	werden|Vorstandsmitglieder|hat
 gemietet	werden
 mischung	aus|von
 schwung	in|verloren
@@ -3663,6 +3674,7 @@ aufbewahrt	werden
 sang	er
 einfaches	Beispiel
 angesetzt	werden|sind
+josef	Ackermann
 herrschaft	über|von
 bemüht	sich
 aufgefunden	werden
@@ -3724,7 +3736,7 @@ prügeln	sich
 weichen	für|gestellt|stellen
 verließen	die
 besuchte	er|ich|das|sie
-gewerkschaft	der|fordert|ist|ver
+gewerkschaft	der|Verdi|fordert|ist
 stärken	die|und|sie
 hinzu	kommen|kommt|kamen|kam
 wrack	geborgen
