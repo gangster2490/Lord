@@ -10,6 +10,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -136,6 +140,13 @@ private fun SettingsScreen() {
                 var test by remember { mutableStateOf("") }
                 OutlinedTextField(test, { test = it }, label = { Text("Поле для проверки") }, modifier = Modifier.fillMaxWidth())
                 Hint("Проверка орфографии в других приложениях: Настройки Android → Общее управление → Язык и ввод → Проверка правописания → ROB AI Keyboard.")
+            }
+
+            Section("Дизайн") {
+                Hint("Нажмите на дизайн — клавиатура сразу перекрасится.")
+                com.rob.aikeyboard.keyboard.KeyboardTheme.all.forEach { theme ->
+                    ThemeCard(theme, selected = prefs.theme == theme.id) { update { prefs.theme = theme.id } }
+                }
             }
 
             Section("Языки") {
@@ -311,6 +322,44 @@ private fun SettingsScreen() {
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Отмена") } },
         )
+    }
+}
+
+/** Design preview: a mini keyboard row in the theme's colours. */
+@Composable
+private fun ThemeCard(theme: com.rob.aikeyboard.keyboard.ThemePalette, selected: Boolean, onClick: () -> Unit) {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .border(if (selected) 3.dp else 1.dp, if (selected) Cyan else Color(0xFF444448), shape)
+            .clip(shape)
+            .clickable(onClick = onClick)
+            .background(
+                androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(theme.backgroundTop), Color(theme.backgroundBottom))),
+            )
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text((if (selected) "✓ " else "") + theme.name, color = Color(theme.text), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(theme.subtitle, color = Color(theme.textDim), fontSize = 12.sp)
+        }
+        // Three letter keys and an Enter key.
+        listOf("Й", "Ц", "У").forEach { k ->
+            androidx.compose.foundation.layout.Box(
+                Modifier.padding(2.dp).size(30.dp, 34.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                    .background(Color(theme.key))
+                    .border(1.dp, Color(theme.outline), androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
+                contentAlignment = Alignment.Center,
+            ) { Text(k, color = Color(theme.label), fontSize = 14.sp) }
+        }
+        androidx.compose.foundation.layout.Box(
+            Modifier.padding(2.dp).size(40.dp, 34.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                .background(Color(if (theme.accentKeys) theme.accent else theme.functionKey)),
+            contentAlignment = Alignment.Center,
+        ) { Text("↵", color = Color(if (theme.accentKeys) theme.onAccent else theme.labelOnFunction), fontSize = 16.sp) }
     }
 }
 

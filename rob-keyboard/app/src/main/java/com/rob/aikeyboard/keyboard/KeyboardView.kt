@@ -158,8 +158,16 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
 
     override fun onDraw(canvas: Canvas) {
         // Not drawColor(): inside Compose the canvas is not clipped to this view and would paint over the toolbar.
-        fill.color = KeyboardTheme.background
+        val theme = KeyboardTheme.current
+        if (theme.backgroundTop != theme.backgroundBottom) {
+            fill.shader = android.graphics.LinearGradient(
+                0f, 0f, 0f, height.toFloat(), theme.backgroundTop, theme.backgroundBottom, android.graphics.Shader.TileMode.CLAMP,
+            )
+        } else {
+            fill.color = theme.backgroundTop
+        }
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), fill)
+        fill.shader = null
         val radius = dp(KeyboardTheme.KEY_RADIUS_DP)
         for (kr in keys) drawKey(canvas, kr, radius)
         popup?.let { drawPopup(canvas, it, radius) }
@@ -174,13 +182,21 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
         val r = kr.rect
         val down = key in pressed
         val function = isFunction(key)
+        val theme = KeyboardTheme.current
+        // Newer designs fill Enter (and Shift while active) with the accent colour.
+        val accentFill = theme.accentKeys && (key.type == KeyType.ENTER || key.type == KeyType.SHIFT && shiftState != ShiftState.OFF)
         fill.color = when {
+            accentFill -> theme.accent
             function && down -> KeyboardTheme.functionKeyPressed
             function -> KeyboardTheme.functionKey
             down -> KeyboardTheme.keyPressed
             else -> KeyboardTheme.key
         }
         canvas.drawRoundRect(r, radius, radius, fill)
+        if (function && theme.accentKeys && !accentFill) {
+            stroke.color = KeyboardTheme.outlineDim
+            canvas.drawRoundRect(r, radius, radius, stroke)
+        }
         if (!function) {
             stroke.color = if (down) KeyboardTheme.outline else KeyboardTheme.outlineDim
             canvas.drawRoundRect(r, radius, radius, stroke)
@@ -196,7 +212,11 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
         val cx = r.centerX()
         val cy = r.centerY()
         val h = r.height()
-        val fg = if (function) KeyboardTheme.labelOnFunction else KeyboardTheme.label
+        val fg = when {
+            accentFill -> theme.onAccent
+            function -> KeyboardTheme.labelOnFunction
+            else -> KeyboardTheme.label
+        }
         icon.color = fg
         when (key.type) {
             KeyType.CHAR, KeyType.COMMA, KeyType.PERIOD -> {
@@ -265,9 +285,11 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
         path.lineTo(cx - s * 0.5f, cy)
         path.close()
         if (shiftState != ShiftState.OFF) {
-            fill.color = KeyboardTheme.shiftActive
+            // On an accent-filled key the arrow takes the contrasting colour.
+            val arrow = if (KeyboardTheme.current.accentKeys) KeyboardTheme.current.onAccent else KeyboardTheme.shiftActive
+            fill.color = arrow
             canvas.drawPath(path, fill)
-            icon.color = KeyboardTheme.shiftActive
+            icon.color = arrow
         }
         canvas.drawPath(path, icon)
         if (shiftState == ShiftState.LOCKED) {
@@ -363,7 +385,7 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
                 fill.color = KeyboardTheme.popupSelected
                 canvas.drawRoundRect(c, radius, radius, fill)
             }
-            text.color = if (i == sel) KeyboardTheme.key else KeyboardTheme.label
+            text.color = if (i == sel) KeyboardTheme.current.onAccent else KeyboardTheme.label
             text.textSize = c.height() * 0.45f
             canvas.drawText(opt, c.centerX(), c.centerY() - (text.descent() + text.ascent()) / 2, text)
         }

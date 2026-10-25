@@ -349,6 +349,11 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     private fun applyPrefs() {
         state.autoEmoji = prefs.autoEmoji
+        val theme = com.rob.aikeyboard.keyboard.KeyboardTheme.byId(prefs.theme)
+        if (theme != com.rob.aikeyboard.keyboard.KeyboardTheme.current) {
+            com.rob.aikeyboard.keyboard.KeyboardTheme.current = theme
+            keyboardView.invalidate()
+        }
         if (prefs.autoScreenshots) screenshots.start() else screenshots.stop()
         keyboardView.heightScale = prefs.keyHeightScale
         keyboardView.showHints = prefs.numberHints

@@ -143,7 +143,7 @@ fun EmojiPanel(service: RobKeyboardService, height: Dp) {
             SmallButton("ABC") { service.togglePanel(com.rob.aikeyboard.ime.Panel.EMOJI) }
             Box(
                 Modifier.weight(1f).height(36.dp).padding(horizontal = 8.dp).clip(RoundedCornerShape(8.dp))
-                    .background(ImeColors.key).combinedClickable(onClick = { service.commitText(" ") }),
+                    .background(ImeColors.keyBg).combinedClickable(onClick = { service.commitText(" ") }),
             )
             Box(
                 Modifier.size(48.dp, 36.dp).clip(RoundedCornerShape(8.dp)).background(ImeColors.chip)
@@ -170,7 +170,7 @@ private fun ToneRow(item: EmojiItem, onPick: (String) -> Unit, onClose: () -> Un
     val history = RobApp.instance.emojiHistory
     var fav by remember(item) { mutableStateOf(history.isFavorite(item.emoji)) }
     Row(
-        Modifier.fillMaxWidth().height(50.dp).background(ImeColors.key).padding(horizontal = 6.dp),
+        Modifier.fillMaxWidth().height(50.dp).background(ImeColors.keyBg).padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LazyRow(Modifier.weight(1f)) {

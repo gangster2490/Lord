@@ -56,16 +56,21 @@ import com.rob.aikeyboard.launch.AiApp
 import com.rob.aikeyboard.launch.AiAppLauncher
 import kotlinx.coroutines.delay
 
+/** Toolbar and panel colours; follow the selected design (reads are observed by Compose). */
 object ImeColors {
-    val board = Color(0xFF353537)
-    val bar = Color(0xFF3A3A3D)
-    val key = Color(0xFF141416)
-    val chip = Color(0xFF47474B)
-    val cyan = Color(0xFF2FB8F6)
-    val cyanDim = Color(0xFF0F5F86)
-    val text = Color(0xFFE6E6E8)
-    val textDim = Color(0xFF9A9AA0)
-    val danger = Color(0xFFFF7A7A)
+    private val t get() = com.rob.aikeyboard.keyboard.KeyboardTheme.current
+    val board get() = Color(t.backgroundTop)
+    val bar get() = Color(t.bar)
+    /** Colour for text on accent-filled chips and buttons. */
+    val key get() = Color(t.onAccent)
+    /** Background of cards and fields (same as the keys). */
+    val keyBg get() = Color(t.key)
+    val chip get() = Color(t.chip)
+    val cyan get() = Color(t.accent)
+    val cyanDim get() = Color(t.outlineDim)
+    val text get() = Color(t.text)
+    val textDim get() = Color(t.textDim)
+    val danger = Color(0xFFFF5A5A)
 }
 
 @Composable
@@ -389,7 +394,7 @@ private fun SuggestionStrip(service: RobKeyboardService) {
                 if (word != null) {
                     Text(
                         word,
-                        color = if (i == 1) Color.White else ImeColors.textDim,
+                        color = if (i == 1) ImeColors.text else ImeColors.textDim,
                         fontSize = if (i == 1) 19.sp else 17.sp,
                         fontWeight = if (i == 1) FontWeight.Medium else FontWeight.Normal,
                         maxLines = 1,
@@ -489,7 +494,7 @@ fun InternalFieldBox(text: String, hint: String, modifier: Modifier = Modifier) 
     Box(
         modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(ImeColors.key)
+            .background(ImeColors.keyBg)
             .border(1.dp, ImeColors.cyan, RoundedCornerShape(10.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {

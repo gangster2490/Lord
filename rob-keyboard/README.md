@@ -45,6 +45,7 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 | Полная панель AI Writing | долгое нажатие на ✎ или кнопка на панели |
 | Отмена автокоррекции / Auto Emoji | ⌫ сразу после замены |
 | Двойной пробел | точка и пробел |
+| Дизайн и цвета | Настройки → «Дизайн»: 11 тем (ROB Cyan, Modern Dark, Neon Purple, Nature Green, Sunset Orange, Cute Pink, Light Clean, Red & Black, Ice Blue, Minimal, Premium Gold) |
 
 ## Архитектура
 

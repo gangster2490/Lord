@@ -107,7 +107,7 @@ private fun TextClipRow(service: RobKeyboardService, item: ClipItem) {
             .fillMaxWidth()
             .padding(vertical = 3.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(ImeColors.key)
+            .background(ImeColors.keyBg)
             .border(1.dp, if (item.pinned) ImeColors.cyan else ImeColors.cyanDim, RoundedCornerShape(10.dp))
             .clickable(onClickLabel = "Вставить") { service.pasteClip(item) }
             .padding(start = 10.dp),
@@ -155,7 +155,7 @@ private fun androidx.compose.foundation.layout.BoxScope.ImageGrid(service: RobKe
             var bitmap by remember(item.id) { mutableStateOf<ImageBitmap?>(null) }
             LaunchedEffect(item.id) { bitmap = withContext(Dispatchers.IO) { thumbnail(item) } }
             Box(
-                Modifier.padding(4.dp).aspectRatio(1f).clip(RoundedCornerShape(10.dp)).background(ImeColors.key)
+                Modifier.padding(4.dp).aspectRatio(1f).clip(RoundedCornerShape(10.dp)).background(ImeColors.keyBg)
                     .border(1.dp, if (item.pinned) ImeColors.cyan else ImeColors.cyanDim, RoundedCornerShape(10.dp))
                     .clickable(onClickLabel = "Вставить") { service.pasteClip(item) },
             ) {

@@ -37,6 +37,8 @@ class Prefs(context: Context) {
     var showSuggestions by BoolPref("show_suggestions", true)
     /** With a physical keyboard connected, keep the ROB toolbar and suggestions on screen. */
     var hardKeyboardBar by BoolPref("hard_keyboard_bar", true)
+    /** Selected design, see [com.rob.aikeyboard.keyboard.KeyboardTheme.all]. */
+    var theme by StrPref("theme", "rob_cyan")
     var autoCapitalize by BoolPref("auto_capitalize", true)
     var doubleSpacePeriod by BoolPref("double_space_period", true)
     var numberHints by BoolPref("number_hints", true)
