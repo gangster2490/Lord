@@ -27,6 +27,12 @@ class SuggestionEngineTest {
         assertNull(corrected("hello", Language.EN))
     }
 
+    @Test fun slangIsNotCorrected() {
+        listOf("кринж", "рофл", "вайб", "хайп", "душнила").forEach { assertNull(it, corrected(it, Language.RU)) }
+        listOf("digga", "krass", "wallah", "cringe").forEach { assertNull(it, corrected(it, Language.DE)) }
+        listOf("btw", "tbh", "idk", "brb").forEach { assertNull(it, corrected(it, Language.EN)) }
+    }
+
     @Test fun russianTypos() {
         assertEquals("привет", corrected("пртвет", Language.RU))
         assertEquals("спасибо", corrected("спасиьо", Language.RU))

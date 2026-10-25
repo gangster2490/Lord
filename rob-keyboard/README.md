@@ -29,6 +29,7 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 ```
 
 Словари: русский ≈150 000 слов, немецкий ≈100 000, английский 40 000 (частотные списки FrequencyWords с отсечкой редких опечаток).
+Сленг (кринж, рофл, digga, btw…): свои списки `tools/slang_<язык>.txt` и категории «slang» из Wiktionary (CC BY-SA) в `tools/slang_wikt_<язык>.txt`.
 Данные словарей и Emoji пересоздаются скриптом `tools/build_data.py` (источники описаны в его заголовке).
 
 ## Управление

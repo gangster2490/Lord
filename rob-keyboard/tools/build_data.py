@@ -137,11 +137,36 @@ def build_dict(lang, cap=None, low=None, casing=None):
             rows.append((w, n))
             if len(rows) >= MAX_WORDS[lang]:
                 break
+    print(lang, "slang added", add_slang(lang, rows))
     with open(os.path.join(out, f"dict_{lang}.txt"), "w", encoding="utf-8") as f:
         for w, n in rows:
             f.write(f"{w}\t{n}\n")
     print(lang, len(rows))
     return rows
+
+
+SLANG_FREQ = {"curated": 400, "wikt": 25}
+
+
+def add_slang(lang, rows):
+    """Appends slang missing from the frequency list: hand-picked chat words (slang_<lang>.txt) and
+    Wiktionary slang categories (slang_wikt_<lang>.txt, CC BY-SA) with a low weight."""
+    have = {w.lower() for w, _ in rows}
+    added = 0
+    here = os.path.dirname(os.path.abspath(__file__))
+    for name, freq in (("slang_%s.txt", SLANG_FREQ["curated"]), ("slang_wikt_%s.txt", SLANG_FREQ["wikt"])):
+        path = os.path.join(here, name % lang)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                w = line.strip()
+                if not w or w.lower() in have:
+                    continue
+                have.add(w.lower())
+                rows.append((w, freq))
+                added += 1
+    return added
 
 
 def build_bigrams(lang, rows, pairs):
