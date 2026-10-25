@@ -13,7 +13,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-class AiException(message: String) : Exception(message)
+class AiException(message: String, val rateLimited: Boolean = false) : Exception(message)
 
 /**
  * Calls the official OpenAI and Anthropic HTTP APIs with the user's own key (stored encrypted
@@ -138,7 +138,8 @@ class AiClient(private val prefs: Prefs, private val secure: SecureStore) {
             if (!r.isSuccessful) {
                 val msg = runCatching { JSONObject(text).getJSONObject("error").optString("message") }.getOrNull()
                 throw AiException(
-                    when (r.code) {
+                    rateLimited = r.code == 429,
+                    message = when (r.code) {
                         401, 403 -> "Ключ отклонён (HTTP ${r.code}). Проверьте API-ключ."
                         429 -> "Превышен лимит запросов (HTTP 429). Попробуйте позже."
                         else -> "Ошибка HTTP ${r.code}${msg?.let { ": $it" } ?: ""}"

@@ -459,6 +459,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     private var assistJob: kotlinx.coroutines.Job? = null
     private var lastAssisted: String? = null
+    private var assistBlockedUntil = 0L
 
     /** After a typing pause, asks the AI for a corrected message and continuations. Never per keystroke. */
     private fun scheduleAssist() {
@@ -466,6 +467,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         state.assist = null
         if (!prefs.aiAssistant || isPassword || !suggestionsAllowed || technicalField) return
         val provider = app.ai.configuredProvider() ?: return
+        // After a rate-limit error stay quiet for a minute instead of failing on every pause.
+        if (android.os.SystemClock.elapsedRealtime() < assistBlockedUntil) return
         assistJob = lifecycleScope.launch {
             kotlinx.coroutines.delay(ASSIST_PAUSE_MS)
             val ic = currentInputConnection ?: return@launch
@@ -477,6 +480,15 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                 app.ai.complete(provider, system, user, 400)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
+            } catch (e: com.rob.aikeyboard.ai.AiException) {
+                if (e.rateLimited) {
+                    assistBlockedUntil = android.os.SystemClock.elapsedRealtime() + ASSIST_RATE_LIMIT_PAUSE_MS
+                    lastAssisted = null
+                    state.message = "AI-помощник: лимит запросов ключа исчерпан, пауза 1 мин. (бесплатный Gemini даёт мало запросов в минуту)"
+                } else {
+                    state.message = "AI-помощник: ${e.message}"
+                }
+                return@launch
             } catch (e: Exception) {
                 state.message = "AI-помощник: ${e.message}"
                 return@launch
@@ -1343,7 +1355,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         private const val WORD_SEPARATORS = " .,!?;:\n"
         private const val MAX_CLIP_CHARS = 20_000
         private const val MAX_FIELD = 10_000
-        private const val ASSIST_PAUSE_MS = 1500L
+        private const val ASSIST_PAUSE_MS = 2500L
+        private const val ASSIST_RATE_LIMIT_PAUSE_MS = 60_000L
         private const val MAX_IMAGE_BYTES = 15 * 1024 * 1024
         private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
 
