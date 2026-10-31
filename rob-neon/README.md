@@ -12,7 +12,7 @@ It is **not** a launcher and does not replace One UI. It requests **no permissio
 > this pack on a Galaxy S24 Ultra is **NOT yet verified** — see [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) and
 > [docs/DEVICE_CHECKLIST.md](docs/DEVICE_CHECKLIST.md).
 
-Deliverables: `dist/ROB-Neon-1.0.0-debug.apk` (**signed with the Android debug key**), `dist/icons/`, `dist/wallpapers/`,
+Deliverables: `dist/ROB-Neon-1.0.1-debug.apk` (**signed with the Android debug key**), `dist/icons/`, `dist/wallpapers/`,
 `dist/screenshots/` (Robolectric JVM renders of the real app — not device screenshots), `docs/`.
 
 Build: [docs/BUILD.md](docs/BUILD.md). Asset generator (procedural, no screenshot cut-outs): `tools/`.
