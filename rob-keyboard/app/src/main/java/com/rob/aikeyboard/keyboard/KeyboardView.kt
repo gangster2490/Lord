@@ -192,21 +192,37 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
             down -> KeyboardTheme.keyPressed
             else -> KeyboardTheme.key
         }
-        canvas.drawRoundRect(r, radius, radius, fill)
-        if (function && theme.accentKeys && !accentFill) {
-            stroke.color = KeyboardTheme.outlineDim
-            canvas.drawRoundRect(r, radius, radius, stroke)
+        if (theme.glossy && !accentFill) {
+            fill.shader = android.graphics.LinearGradient(
+                r.left, r.top, r.left, r.bottom, shade(fill.color, 1.5f), shade(fill.color, 0.8f), android.graphics.Shader.TileMode.CLAMP,
+            )
         }
-        if (!function) {
-            stroke.color = if (down) KeyboardTheme.outline else KeyboardTheme.outlineDim
+        canvas.drawRoundRect(r, radius, radius, fill)
+        fill.shader = null
+        if (theme.glossy) {
+            // Glowing top edge fading into a dim outline.
+            val accentEdge = theme.accentFunctionKeys && (key.type == KeyType.ENTER || key.type == KeyType.SHIFT)
+            val top = if (accentEdge || down) theme.accent else withAlpha(theme.accent, 170)
+            val bottom = if (accentEdge) withAlpha(theme.accent, 180) else theme.outlineDim
+            stroke.shader = android.graphics.LinearGradient(r.left, r.top, r.left, r.bottom, top, bottom, android.graphics.Shader.TileMode.CLAMP)
             canvas.drawRoundRect(r, radius, radius, stroke)
-            // Brighter top edge, like the glow on the reference keys.
-            stroke.color = KeyboardTheme.outline
-            tmp.set(r.left, r.top, r.right, r.top + radius * 2)
-            canvas.save()
-            canvas.clipRect(r.left, r.top - dp(1f), r.right, r.top + radius * 0.9f)
-            canvas.drawRoundRect(r, radius, radius, stroke)
-            canvas.restore()
+            stroke.shader = null
+        } else {
+            if (function && theme.accentKeys && !accentFill) {
+                stroke.color = KeyboardTheme.outlineDim
+                canvas.drawRoundRect(r, radius, radius, stroke)
+            }
+            if (!function) {
+                stroke.color = if (down) KeyboardTheme.outline else KeyboardTheme.outlineDim
+                canvas.drawRoundRect(r, radius, radius, stroke)
+                // Brighter top edge, like the glow on the reference keys.
+                stroke.color = KeyboardTheme.outline
+                tmp.set(r.left, r.top, r.right, r.top + radius * 2)
+                canvas.save()
+                canvas.clipRect(r.left, r.top - dp(1f), r.right, r.top + radius * 0.9f)
+                canvas.drawRoundRect(r, radius, radius, stroke)
+                canvas.restore()
+            }
         }
 
         val cx = r.centerX()
@@ -214,6 +230,8 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
         val h = r.height()
         val fg = when {
             accentFill -> theme.onAccent
+            theme.accentFunctionKeys && (key.type == KeyType.ENTER || key.type == KeyType.SHIFT) -> theme.accent
+            key.type == KeyType.DELETE && theme.deleteColor != 0 -> theme.deleteColor
             function -> KeyboardTheme.labelOnFunction
             else -> KeyboardTheme.label
         }
@@ -256,6 +274,16 @@ class KeyboardView(context: Context, private val listener: Listener) : View(cont
             }
         }
     }
+
+    private fun shade(color: Int, factor: Float): Int {
+        fun ch(v: Int) = (v * factor).toInt().coerceIn(0, 255)
+        return android.graphics.Color.argb(
+            android.graphics.Color.alpha(color), ch(android.graphics.Color.red(color)),
+            ch(android.graphics.Color.green(color)), ch(android.graphics.Color.blue(color)),
+        )
+    }
+
+    private fun withAlpha(color: Int, alpha: Int): Int = (color and 0x00FFFFFF) or (alpha.coerceIn(0, 255) shl 24)
 
     private fun displayText(key: Key): String {
         val t = key.text

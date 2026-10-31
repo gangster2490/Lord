@@ -33,6 +33,12 @@ data class ThemePalette(
     val textDim: Int,
     val popup: Int,
     val light: Boolean = false,
+    /** Keys get a light-to-dark gradient and a glowing top edge (the "Obsidian" look). */
+    val glossy: Boolean = false,
+    /** Backspace icon colour; 0 = same as the other function keys. */
+    val deleteColor: Int = 0,
+    /** Shift and Enter stay dark but get an accent outline and accent symbol. */
+    val accentFunctionKeys: Boolean = false,
 )
 
 private fun c(hex: String) = Color.parseColor(hex)
@@ -44,6 +50,13 @@ object KeyboardTheme {
             c("#353537"), c("#353537"), c("#141416"), c("#0E3A52"), c("#4A4A4D"), c("#5E5E62"),
             c("#1AA6E8"), c("#0F5F86"), c("#2FB8F6"), c("#D9D9DC"), c("#7FA9BF"),
             c("#2FB8F6"), c("#141416"), false, c("#3A3A3D"), c("#47474B"), c("#E6E6E8"), c("#9A9AA0"), c("#202024"),
+        ),
+        ThemePalette(
+            "obsidian", "ROB Obsidian", "Тёмный глянец, синяя подсветка",
+            c("#0D1422"), c("#05080F"), c("#161D2B"), c("#22304A"), c("#10161F"), c("#1A2538"),
+            c("#2F7BFF"), c("#26324A"), c("#F2F5FA"), c("#F2F5FA"), c("#7C8AA5"),
+            c("#2F7BFF"), c("#FFFFFF"), false, c("#0A101B"), c("#161D2B"), c("#EAF0FA"), c("#8593AD"), c("#121826"),
+            glossy = true, deleteColor = c("#FF5A5A"), accentFunctionKeys = true,
         ),
         ThemePalette(
             "modern_dark", "Modern Dark", "Современный, чистый, удобный",
