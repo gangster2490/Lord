@@ -205,8 +205,8 @@ private fun Toolbar(service: RobKeyboardService) {
             IconTool(Icons.Outlined.EditNote, "AI Writing", state.panel == Panel.AI) { service.togglePanel(Panel.AI) }
             AutoEmojiToggle(state.autoEmoji) { service.toggleAutoEmoji() }
             ModeToggle("TT", state.tiktokMode, "TikTok-режим") { service.toggleTikTokMode() }
-            FontToggle(state.fontStyle != null) {
-                if (state.fontStyle != null) service.setFontStyle(null) else service.togglePanel(Panel.FONT)
+            FontToggle(state.fontStyle != null || state.translit) {
+                if (state.fontStyle != null || state.translit) service.clearFontMode() else service.togglePanel(Panel.FONT)
             }
             IconTool(Icons.Outlined.EmojiEmotions, "Emoji", state.panel == Panel.EMOJI) { service.togglePanel(Panel.EMOJI) }
             IconTool(Icons.Outlined.Mic, "Микрофон", state.panel == Panel.VOICE) { service.togglePanel(Panel.VOICE) }

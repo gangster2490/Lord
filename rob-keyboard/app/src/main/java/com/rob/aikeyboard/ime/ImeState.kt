@@ -45,6 +45,8 @@ class ImeState {
     var language by mutableStateOf(Language.RU)
     var autoEmoji by mutableStateOf(false)
     var tiktokMode by mutableStateOf(false)
+    var translit by mutableStateOf(false)
+    var fontFavorites by mutableStateOf<List<String>>(emptyList())
     var fontStyle by mutableStateOf<com.rob.aikeyboard.text.FontStyles.Style?>(null)
     var internalField by mutableStateOf<InternalField?>(null)
     var missingApp by mutableStateOf<AiApp?>(null)

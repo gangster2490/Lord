@@ -64,5 +64,47 @@ object FontStyles {
         Style("underline", "Подчёркнутый", combining("̲")),
     )
 
-    fun byId(id: String?): Style? = all.firstOrNull { it.id == id }
+    private val SMALL_CAPS = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ"
+
+    /** Less common looks, shown on their own "Extra" tab. */
+    val extra: List<Style> = listOf(
+        Style("small_caps", "Малые капитель", withUmlauts { c ->
+            when (c.lowercaseChar()) {
+                in 'a'..'z' -> SMALL_CAPS[c.lowercaseChar() - 'a'].toString()
+                else -> null
+            }
+        }),
+        Style("squared", "Квадратный", withUmlauts { c ->
+            when (c) {
+                in 'A'..'Z' -> cp(0x1F130 + (c - 'A'))
+                in 'a'..'z' -> cp(0x1F130 + (c - 'a'))
+                else -> null
+            }
+        }),
+        Style("neg_squared", "Чёрный квадрат", withUmlauts { c ->
+            when (c) {
+                in 'A'..'Z' -> cp(0x1F170 + (c - 'A'))
+                in 'a'..'z' -> cp(0x1F170 + (c - 'a'))
+                else -> null
+            }
+        }),
+        Style("neg_circle", "Чёрный круг", withUmlauts { c ->
+            when (c) {
+                in 'A'..'Z' -> cp(0x1F150 + (c - 'A'))
+                in 'a'..'z' -> cp(0x1F150 + (c - 'a'))
+                else -> null
+            }
+        }),
+        Style("paren", "В скобках", withUmlauts { c ->
+            when (c) {
+                in 'A'..'Z' -> cp(0x249C + (c - 'A'))
+                in 'a'..'z' -> cp(0x249C + (c - 'a'))
+                else -> null
+            }
+        }),
+    )
+
+    fun byId(id: String?): Style? = (all + extra).firstOrNull { it.id == id }
+
+    fun parseFavorites(list: String): List<String> = list.split(',').map { it.trim() }.filter { byId(it) != null }
 }

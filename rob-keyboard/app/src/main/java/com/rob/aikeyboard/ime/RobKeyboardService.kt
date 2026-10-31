@@ -350,6 +350,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     private fun applyPrefs() {
         state.autoEmoji = prefs.autoEmoji
         state.tiktokMode = prefs.tiktokMode
+        state.translit = prefs.translit
+        state.fontFavorites = com.rob.aikeyboard.text.FontStyles.parseFavorites(prefs.fontFavorites)
         maskStems = com.rob.aikeyboard.text.WordMasker.parse(prefs.tiktokWords)
         state.fontStyle = com.rob.aikeyboard.text.FontStyles.byId(prefs.fontStyle)
         val theme = com.rob.aikeyboard.keyboard.KeyboardTheme.byId(prefs.theme)
@@ -381,7 +383,12 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         state.clearedText = null
         scheduleAssist()
         // Decorative font: type the styled characters directly (no suggestions, never in password/URL/e-mail fields).
-        val styled = state.fontStyle?.takeIf { !isPassword && !technicalField }?.apply(text)
+        val decorate = !isPassword && !technicalField
+        var styled: String? = null
+        if (decorate && (state.translit || state.fontStyle != null)) {
+            val latin = if (state.translit) com.rob.aikeyboard.text.Translit.toLatin(text) else text
+            styled = state.fontStyle?.apply(latin) ?: latin
+        }
         if (styled != null && styled != text) {
             commitComposing()
             undo = null
@@ -943,12 +950,30 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         if (state.panel == Panel.KEYBOARD) showPredictions()
     }
 
+    /** Switches the font and the transliteration off together (toolbar toggle). */
+    fun clearFontMode() {
+        setTranslit(false)
+        setFontStyle(null)
+    }
+
     /** Picks a decorative font ([style] null = off) and returns to the keys. */
     fun setFontStyle(style: com.rob.aikeyboard.text.FontStyles.Style?) {
         prefs.fontStyle = style?.id.orEmpty()
         state.fontStyle = style
         if (state.panel == Panel.FONT) state.panel = Panel.KEYBOARD
         state.message = if (style != null) "Шрифт: ${style.label}. Работает для латиницы (EN/DE)" else "Шрифт выключен"
+    }
+
+    fun setTranslit(on: Boolean) {
+        prefs.translit = on
+        state.translit = on
+        state.message = if (on) "Русские буквы печатаются латиницей (privet)" else "Транслит выключен"
+    }
+
+    fun toggleFontFavorite(id: String) {
+        val list = if (id in state.fontFavorites) state.fontFavorites - id else state.fontFavorites + id
+        state.fontFavorites = list
+        prefs.fontFavorites = list.joinToString(",")
     }
 
     fun toggleTikTokMode() {

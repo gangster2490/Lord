@@ -12,8 +12,8 @@ android {
         applicationId = "com.rob.aikeyboard"
         minSdk = 26
         targetSdk = 35
-        versionCode = 155
-        versionName = "1.5.5"
+        versionCode = 156
+        versionName = "1.5.6"
 
         // Samsung Galaxy S24 Ultra / Tab S8+ and virtually all current phones are ARM.
         if (!project.hasProperty("allAbis")) ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
