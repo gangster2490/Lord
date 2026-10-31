@@ -55,8 +55,9 @@ def camera():
 
 
 def gallery():
-    I = Icon("B")
-    I.add("S", lambda d: [pg(d, [(22, 72), (42, 38), (58, 66)]), pg(d, [(46, 72), (62, 46), (78, 72)])], bevel=5)
+    I = Icon()
+    I.add("B", lambda d: [pg(d, [(22, 72), (42, 38), (58, 66)]), pg(d, [(46, 72), (62, 46), (78, 72)])], bevel=6)
+    I.add("S", lambda d: [pg(d, [(42, 38), (47, 47), (42, 45), (37, 47)]), pg(d, [(62, 46), (66.5, 54), (62, 52), (57.5, 54)])], bevel=2, shadow=False)
     I.add("R", lambda d: el(d, 67, 31, 6.5), bevel=6)
     return I
 
@@ -222,7 +223,7 @@ def whatsapp():
 
 
 def telegram():
-    I = Icon("B")
+    I = Icon()
     I.add("S", lambda d: pg(d, [(22, 48), (78, 25), (63, 76), (48, 62), (40, 72), (38, 58), (68, 36)]), bevel=4)
     I.add("S", lambda d: pg(d, [(22, 48), (78, 25), (38, 58)]), bevel=4, shadow=False)
     I.add("R", lambda d: pg(d, [(38, 58), (40, 72), (48, 62)]), bevel=2.6, shadow=False)
@@ -259,13 +260,13 @@ def instagram():
 
 
 def facebook():
-    I = Icon("B")
+    I = Icon()
     def f(d):
         rr(d, 47, 38, 59, 80, 3)
         rr(d, 38, 48, 66, 58, 3)
         pg(d, arcpts(63, 38, 16, 180, 285, 30) + arcpts(63, 38, 5, 285, 180, 30))
         d_ = None
-    I.add("S", f, bevel=4)
+    I.add("B", f, bevel=5)
     return I
 
 

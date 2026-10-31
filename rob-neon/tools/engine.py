@@ -103,11 +103,16 @@ def material(name, n, dist):
     nh = np.clip(n @ _HV, 0, 1)
     ygrad = (0.5 - _YY / S)
     slope = 1 - nz
-    if name in ("S", "steel"):
+    if name == "rim":
+        t = ny * 1.0 + nx * 0.8
+        env = _interp(t, [-1.3, -0.6, -0.1, 0.3, 0.8, 1.3], [1.0, 0.82, 0.38, 0.20, 0.55, 0.85])
+        col = env[..., None] * np.array([205, 216, 235], np.float32) + 10
+        col += (nh ** 45 * 110)[..., None]
+    elif name in ("S", "steel"):
         t = ny * 1.1 + nx * 0.45
         env = _interp(t, [-1.2, -0.7, -0.25, 0.1, 0.5, 1.2], [0.38, 1.0, 0.86, 0.66, 0.32, 0.08])
         flat = (nz > 0.985).astype(np.float32)
-        env = env + flat * (ygrad * 0.30 + _BRUSH * 0.07 + _GRAIN * 0.015)
+        env = env + flat * (ygrad * 0.30 + _BRUSH * 0.025 + _GRAIN * 0.01)
         k = 0.60 if name == "steel" else 1.0
         col = env[..., None] * np.array([214, 220, 230], np.float32) * k
         col += (nh ** 60 * 150)[..., None] * k
@@ -118,7 +123,7 @@ def material(name, n, dist):
         f = np.clip(f, 0, 1)[..., None]
         c0, c1 = np.array([5, 14, 70], np.float32), np.array([38, 108, 250], np.float32)
         col = c0 + (c1 - c0) * f
-        col += (nh ** 38 * 235)[..., None] * np.array([0.65, 0.82, 1.0], np.float32)
+        col += (nh ** 20 * 150 + nh ** 90 * 260)[..., None] * np.array([0.65, 0.82, 1.0], np.float32)
     elif name == "R":
         f = 0.25 + 0.5 * diff + slope * 1.2 + ygrad * 0.25
         f += np.clip(ny - 0.25, 0, 1) * 0.5
@@ -169,10 +174,10 @@ class Icon:
         # bezel
         n, d = height(ringm, W / 2 + 2)
         a = ringm[..., None]
-        comp = comp * (1 - a) + material("steel", n, d) * a
+        comp = comp * (1 - a) + material("rim", n, d) * a * 0.92
         # outer thin dark edge line for separation from any background
-        edge = np.clip(outer - rmask(M + 7, R - 7), 0, 1)
-        comp = comp * (1 - edge[..., None] * 0.55)
+        edge = np.clip(outer - rmask(M + 5, R - 5), 0, 1)
+        comp = comp * (1 - edge[..., None] * 0.45)
 
         # face
         Y = _YY / S
@@ -181,15 +186,16 @@ class Icon:
             g = np.clip(1.15 - Y * 1.1 + 0.25 * np.exp(-((_XX / S - 0.3) ** 2 + (Y - 0.25) ** 2) * 9), 0, 1)
             face = c0 + (c1 - c0) * g[..., None]
         else:
-            top, bot = np.array([44, 47, 55], np.float32), np.array([11, 12, 15], np.float32)
-            g = np.clip((Y - 0.1) / 0.8, 0, 1)
+            top, bot = np.array([62, 69, 84], np.float32), np.array([9, 11, 16], np.float32)
+            g = np.clip((Y - 0.08) / 0.78, 0, 1) ** 0.85
             face = top + (bot - top) * g[..., None]
-            face += (_BRUSH * 5)[..., None] + (_GRAIN * 2.5)[..., None]
+            face += np.array([0, 4, 14], np.float32) * np.exp(-((1 - Y) * 7))[..., None]   # cool glow low in the glass
+            face += (_GRAIN * 1.6)[..., None]
         n, d = height(inner, 26, inset=True)
-        shade = (0.78 + 0.35 * np.clip(n @ LIGHT, 0, 1))[..., None] if self.face != "B" else (0.8 + 0.3 * np.clip(n @ LIGHT, 0, 1))[..., None]
+        shade = (0.62 + 0.70 * np.clip(n @ LIGHT, 0, 1))[..., None] if self.face != "B" else (0.8 + 0.3 * np.clip(n @ LIGHT, 0, 1))[..., None]
         face = face * shade
         # glass sheen on the upper-left of the face
-        sheen = np.clip(1 - (_XX / S * 0.55 + Y * 1.0 - 0.15) * 2.4, 0, 1) * 0.10
+        sheen = np.clip(1 - (_XX / S * 0.55 + Y * 1.0 - 0.10) * 2.1, 0, 1) ** 1.3 * 0.17
         face += sheen[..., None] * 255
         a = inner[..., None]
         comp = comp * (1 - a) + np.clip(face, 0, 255) * a

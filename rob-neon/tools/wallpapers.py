@@ -82,13 +82,13 @@ def render(kind, out_w=1440, ss=2, seed=3):
     if kind == "lock":
         u = np.linspace(0, 2 * math.pi, 14, endpoint=False)
         ctrl = [(0.36 * math.sin(2 * a) - 0.01, 0.10 + 0.62 * math.sin(a + 0.3) * 1.0, 0.38 * math.cos(a)) for a in u]
-        wid = lambda t: 0.15 + 0.04 * np.sin(2 * math.pi * t * 2 + 1)
+        wid = lambda t: 0.17 + 0.04 * np.sin(2 * math.pi * t * 2 + 1)
         tw = lambda t: 2 * math.pi * 2 * t + 0.4
         ctrl = [(x, y * 1.15 + 0.12 * ASPECT / 2 * 0.0, z) for x, y, z in ctrl]
     else:
         u = np.linspace(0, 2 * math.pi, 12, endpoint=False)
         ctrl = [(0.30 * math.sin(2 * a) + 0.10, -0.62 + 0.30 * math.sin(a + 0.3), 0.30 * math.cos(a)) for a in u]
-        wid = lambda t: 0.085 + 0.025 * np.sin(2 * math.pi * t * 2 + 1)
+        wid = lambda t: 0.10 + 0.025 * np.sin(2 * math.pi * t * 2 + 1)
         tw = lambda t: 2 * math.pi * 2 * t + 0.9
     P, Pn, T, Bv, t, v = ribbon_quads(ctrl, wid, tw, 900, 44, 0.0, seed)
     n_, m_ = P.shape[0], P.shape[1] - 1
@@ -123,19 +123,22 @@ def render(kind, out_w=1440, ss=2, seed=3):
     e = env(refl.reshape(-1, 3), seed).reshape(n_, m_)
     # titanium
     tcol = np.zeros((n_, m_, 3), np.float32)
-    tv = e * (0.80 + 0.18 * streak) + 0.05 * nz
+    tv = e * (0.86 + 0.05 * streak) + 0.05 * nz
     tcol[:] = (np.clip(tv, 0, 1.2)[..., None]) * np.array([178, 178, 184], np.float32)
     tcol += 6
     # glass
     fres = (1 - nz) ** 1.4
-    gf = np.clip(0.10 + 0.55 * fres + 0.55 * e ** 1.7 + 0.12 * streak, 0, 1)
+    vfrac = np.abs(np.arange(m_)[None, :] / (m_ - 1) * 2 - 1)
+    rimg = smooth(vfrac, 0.80, 1.0)
+    gf = np.clip(0.06 + 0.50 * fres + 0.55 * e ** 1.7 + 0.04 * streak + 0.55 * rimg, 0, 1)
     c0, c1 = np.array([2, 8, 46], np.float32), np.array([44, 118, 255], np.float32)
     gcol = c0 + (c1 - c0) * gf[..., None]
-    gcol += (np.clip(e - 0.62, 0, 1) ** 1.2 * 230)[..., None] * np.array([0.5, 0.7, 1.0], np.float32)
-    col = np.where(side[..., None], tcol, gcol)
+    gcol += (np.clip(e - 0.62, 0, 1) ** 1.2 * 230 + rimg * 150)[..., None] * np.array([0.6, 0.78, 1.0], np.float32)
+    wmix = (smooth(facing, 0.30, 0.62))[..., None]
+    col = np.where(side[..., None], gcol * (1 - wmix) + tcol * wmix, gcol)
     # red edge lines (outer rows) on the titanium side, soft on glass
-    edge = np.zeros((m_,), bool); edge[0] = edge[-1] = True
-    rcol = np.array([230, 24, 34], np.float32) * (0.45 + 0.7 * e[..., None])
+    edge = np.zeros((m_,), bool); edge[0] = True
+    rcol = np.array([215, 20, 30], np.float32) * (0.35 + 0.7 * e[..., None])
     emask = edge[None, :, None] & (side[..., None] | True)
     col = np.where(emask, np.where(side[..., None], rcol, rcol * 0.8), col)
     col = np.clip(col, 0, 255)
