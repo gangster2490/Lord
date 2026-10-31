@@ -51,6 +51,8 @@ class Prefs(context: Context) {
     var tiktokMode by BoolPref("tiktok_mode", false)
     /** Russian letters are typed as Latin (privet), so the decorative fonts apply to them. */
     var translit by BoolPref("translit", false)
+    /** TikTok mode also types Russian letters as Latin (transliteration). */
+    var tiktokLatin by BoolPref("tiktok_latin", true)
     var fontFavorites by StrPref("font_favorites", "")
     var tiktokWords by StrPref("tiktok_words", com.rob.aikeyboard.text.WordMasker.DEFAULT_STEMS)
     var clipboardHistory by BoolPref("clipboard_history", true)

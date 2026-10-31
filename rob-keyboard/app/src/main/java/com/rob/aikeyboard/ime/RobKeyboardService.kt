@@ -385,9 +385,9 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         // Decorative font: type the styled characters directly (no suggestions, never in password/URL/e-mail fields).
         val decorate = !isPassword && !technicalField
         var styled: String? = null
-        if (decorate && (state.translit || state.fontStyle != null)) {
-            val latin = if (state.translit) com.rob.aikeyboard.text.Translit.toLatin(text) else text
-            styled = state.fontStyle?.apply(latin) ?: latin
+        val style = state.fontStyle
+        if (decorate && style != null) {
+            styled = style.apply(if (latinOutput) com.rob.aikeyboard.text.Translit.toLatin(text) else text)
         }
         if (styled != null && styled != text) {
             commitComposing()
@@ -403,7 +403,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                 undo = null
                 autoSpaceInserted = false
                 composing.append(text)
-                ic.setComposingText(composing, 1)
+                ic.setComposingText(composingDisplay(), 1)
                 if (shift == ShiftState.ON) updateShift(auto = false, force = ShiftState.OFF)
                 updateSuggestions()
             }
@@ -413,7 +413,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                 commitComposing()
                 undo = null
                 autoSpaceInserted = false
-                ic.commitText(text, 1)
+                ic.commitText(if (latinOutput) com.rob.aikeyboard.text.Translit.toLatin(text) else text, 1)
                 if (shift == ShiftState.ON && ch?.isLetter() == true) updateShift(auto = false, force = ShiftState.OFF)
                 updateShift(auto = true)
                 showPredictions()
@@ -599,7 +599,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         if (performUndo(ic)) return
         if (composing.isNotEmpty()) {
             composing.setLength(composing.length - lastGraphemeLength(composing.toString()))
-            if (composing.isEmpty()) ic.commitText("", 1) else ic.setComposingText(composing, 1)
+            if (composing.isEmpty()) ic.commitText("", 1) else ic.setComposingText(composingDisplay(), 1)
             updateSuggestions()
             return
         }
@@ -651,7 +651,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                 ic.deleteSurroundingText(u.corrected.length + u.separator.length, 0)
                 composing.clear()
                 composing.append(u.original)
-                ic.setComposingText(composing, 1)
+                ic.setComposingText(composingDisplay(), 1)
                 ic.endBatchEdit()
                 if (learningAllowed) app.userModel.model.addWord(u.original)
                 updateSuggestions()
@@ -712,7 +712,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                 ?: app.engine.suggest(word, suggestionLanguages(), autoCorrectAllowed)
             val correction = if (autoCorrectAllowed && sep != '\'') result.autoCorrection else null
             finalWord = correction ?: word
-            val shown = maskedForTikTok(finalWord)
+            val shown = outForm(finalWord)
             ic.commitText(shown, 1)
             composing.clear()
             // An undo that deletes by length would be off by the hidden character.
@@ -751,13 +751,25 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     }
 
     /** Keeps the word being typed as-is (no autocorrect), e.g. before a symbol or panel switch. */
-    private fun maskedForTikTok(word: String): String =
-        if (state.tiktokMode && !isPassword && !technicalField) com.rob.aikeyboard.text.WordMasker.mask(word, maskStems) else word
+    /** Russian letters are written as Latin: by the translit switch or by TikTok mode. */
+    private val latinOutput: Boolean
+        get() = !isPassword && !technicalField && (state.translit || (state.tiktokMode && prefs.tiktokLatin))
+
+    /** What goes into the field for [word] (typed on the Russian keys): hidden characters first, then Latin letters. */
+    private fun outForm(word: String): String {
+        var out = if (state.tiktokMode && !isPassword && !technicalField) com.rob.aikeyboard.text.WordMasker.mask(word, maskStems) else word
+        if (latinOutput) out = com.rob.aikeyboard.text.Translit.toLatin(out)
+        return out
+    }
+
+    /** The word being typed as the field shows it while the suggestions still use the Russian letters. */
+    private fun composingDisplay(): CharSequence =
+        if (latinOutput) com.rob.aikeyboard.text.Translit.toLatin(composing.toString()) else composing
 
     private fun commitComposing() {
         if (composing.isEmpty()) return
         val word = composing.toString()
-        val shown = maskedForTikTok(word)
+        val shown = outForm(word)
         if (shown != word) currentInputConnection?.commitText(shown, 1) else currentInputConnection?.finishComposingText()
         learn(word)
         composing.clear()
@@ -903,11 +915,11 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         feedback(null)
         ic.beginBatchEdit()
         if (composing.isNotEmpty()) {
-            ic.commitText("$word ", 1)
+            ic.commitText("${outForm(word)} ", 1)
         } else {
             val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
             val prefix = if (before.isNotEmpty() && !before.last().isWhitespace()) " " else ""
-            ic.commitText("$prefix$word ", 1)
+            ic.commitText("$prefix${outForm(word)} ", 1)
         }
         ic.endBatchEdit()
         composing.clear()
@@ -979,7 +991,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     fun toggleTikTokMode() {
         prefs.tiktokMode = !prefs.tiktokMode
         state.tiktokMode = prefs.tiktokMode
-        state.message = if (state.tiktokMode) "TikTok-режим включён: слова из списка (цена, купить…) скрываются от фильтра" else "TikTok-режим выключен"
+        state.message = if (state.tiktokMode) "TikTok-режим включён" + (if (prefs.tiktokLatin) ": русские буквы печатаются латиницей" else "") else "TikTok-режим выключен"
     }
 
     fun toggleAutoEmoji() {

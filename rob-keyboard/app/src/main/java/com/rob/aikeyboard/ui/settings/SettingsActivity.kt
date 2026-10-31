@@ -185,6 +185,7 @@ private fun SettingsScreen() {
 
             Section("TikTok-режим") {
                 Toggle("Скрывать слова из списка от фильтра (кнопка «TT» на панели)", prefs.tiktokMode) { update { prefs.tiktokMode = it } }
+                Toggle("В TikTok-режиме печатать русские буквы латиницей (привет → privet)", prefs.tiktokLatin) { update { prefs.tiktokLatin = it } }
                 Hint("В список попадают начала слов через запятую: «цен» скроет цена, цены; «куп» — купить, купил. Внутрь слова добавляется невидимый символ, текст выглядит как обычно. Гарантии, что TikTok его не распознает, нет: проверьте на своём аккаунте. Правила TikTok могут запрещать обход фильтров. В полях паролей режим не работает.")
                 ModelField("Слова (начала слов через запятую)", prefs.tiktokWords) { update { prefs.tiktokWords = it } }
                 TextButton(onClick = { update { prefs.tiktokWords = com.rob.aikeyboard.text.WordMasker.DEFAULT_STEMS } }) { Text("Вернуть список по умолчанию") }
