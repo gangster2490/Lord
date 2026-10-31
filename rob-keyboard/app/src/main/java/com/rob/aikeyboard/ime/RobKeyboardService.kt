@@ -349,6 +349,8 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     private fun applyPrefs() {
         state.autoEmoji = prefs.autoEmoji
+        state.tiktokMode = prefs.tiktokMode
+        maskStems = com.rob.aikeyboard.text.WordMasker.parse(prefs.tiktokWords)
         state.fontStyle = com.rob.aikeyboard.text.FontStyles.byId(prefs.fontStyle)
         val theme = com.rob.aikeyboard.keyboard.KeyboardTheme.byId(prefs.theme)
         if (theme != com.rob.aikeyboard.keyboard.KeyboardTheme.current) {
@@ -470,6 +472,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     private var assistJob: kotlinx.coroutines.Job? = null
     private var lastAssisted: String? = null
+    private var maskStems: List<String> = emptyList()
     private var assistBlockedUntil = 0L
 
     /** After a typing pause, asks the AI for a corrected message and continuations. Never per keystroke. */
@@ -601,7 +604,10 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
             if (before.isNullOrEmpty()) {
                 sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             } else {
-                ic.deleteSurroundingText(lastGraphemeLength(before.toString()), 0)
+                var n = lastGraphemeLength(before.toString())
+                // A TikTok-mode hidden character goes together with the letter after it.
+                if (before.length > n && before[before.length - n - 1] == com.rob.aikeyboard.text.WordMasker.ZWSP) n++
+                ic.deleteSurroundingText(n, 0)
             }
         }
         updateShift(auto = true)
@@ -699,9 +705,11 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
                 ?: app.engine.suggest(word, suggestionLanguages(), autoCorrectAllowed)
             val correction = if (autoCorrectAllowed && sep != '\'') result.autoCorrection else null
             finalWord = correction ?: word
-            ic.commitText(finalWord, 1)
+            val shown = maskedForTikTok(finalWord)
+            ic.commitText(shown, 1)
             composing.clear()
-            if (correction != null && correction != word) undo = Undo.AutoCorrect(word, correction, separator)
+            // An undo that deletes by length would be off by the hidden character.
+            if (correction != null && correction != word && shown == finalWord) undo = Undo.AutoCorrect(word, correction, separator)
             learn(finalWord)
             if (prefs.autoComma && autoCorrectAllowed) {
                 val before = ic.getTextBeforeCursor(80, 0)?.toString().orEmpty()
@@ -736,10 +744,15 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
     }
 
     /** Keeps the word being typed as-is (no autocorrect), e.g. before a symbol or panel switch. */
+    private fun maskedForTikTok(word: String): String =
+        if (state.tiktokMode && !isPassword && !technicalField) com.rob.aikeyboard.text.WordMasker.mask(word, maskStems) else word
+
     private fun commitComposing() {
         if (composing.isEmpty()) return
-        currentInputConnection?.finishComposingText()
-        learn(composing.toString())
+        val word = composing.toString()
+        val shown = maskedForTikTok(word)
+        if (shown != word) currentInputConnection?.commitText(shown, 1) else currentInputConnection?.finishComposingText()
+        learn(word)
         composing.clear()
     }
 
@@ -936,6 +949,12 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         state.fontStyle = style
         if (state.panel == Panel.FONT) state.panel = Panel.KEYBOARD
         state.message = if (style != null) "Шрифт: ${style.label}. Работает для латиницы (EN/DE)" else "Шрифт выключен"
+    }
+
+    fun toggleTikTokMode() {
+        prefs.tiktokMode = !prefs.tiktokMode
+        state.tiktokMode = prefs.tiktokMode
+        state.message = if (state.tiktokMode) "TikTok-режим включён: слова из списка (цена, купить…) скрываются от фильтра" else "TikTok-режим выключен"
     }
 
     fun toggleAutoEmoji() {

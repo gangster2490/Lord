@@ -44,6 +44,7 @@ class ImeState {
     var autoCorrectIndex by mutableIntStateOf(-1)
     var language by mutableStateOf(Language.RU)
     var autoEmoji by mutableStateOf(false)
+    var tiktokMode by mutableStateOf(false)
     var fontStyle by mutableStateOf<com.rob.aikeyboard.text.FontStyles.Style?>(null)
     var internalField by mutableStateOf<InternalField?>(null)
     var missingApp by mutableStateOf<AiApp?>(null)

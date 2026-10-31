@@ -47,6 +47,9 @@ class Prefs(context: Context) {
     var autoEmoji by BoolPref("auto_emoji", false)
     /** Id of the active decorative font (see FontStyles), empty = off. */
     var fontStyle by StrPref("font_style", "")
+    /** TikTok mode: hide listed words from keyword filters with an invisible character. */
+    var tiktokMode by BoolPref("tiktok_mode", false)
+    var tiktokWords by StrPref("tiktok_words", com.rob.aikeyboard.text.WordMasker.DEFAULT_STEMS)
     var clipboardHistory by BoolPref("clipboard_history", true)
     var voicePreferOffline by BoolPref("voice_prefer_offline", false)
     var translateWifiOnly by BoolPref("translate_wifi_only", true)
