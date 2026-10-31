@@ -349,6 +349,7 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
 
     private fun applyPrefs() {
         state.autoEmoji = prefs.autoEmoji
+        state.fontStyle = com.rob.aikeyboard.text.FontStyles.byId(prefs.fontStyle)
         val theme = com.rob.aikeyboard.keyboard.KeyboardTheme.byId(prefs.theme)
         if (theme != com.rob.aikeyboard.keyboard.KeyboardTheme.current) {
             com.rob.aikeyboard.keyboard.KeyboardTheme.current = theme
@@ -377,6 +378,16 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         state.showClearAll = false
         state.clearedText = null
         scheduleAssist()
+        // Decorative font: type the styled characters directly (no suggestions, never in password/URL/e-mail fields).
+        val styled = state.fontStyle?.takeIf { !isPassword && !technicalField }?.apply(text)
+        if (styled != null && styled != text) {
+            commitComposing()
+            undo = null
+            autoSpaceInserted = false
+            ic.commitText(styled, 1)
+            if (shift == ShiftState.ON) updateShift(auto = false, force = ShiftState.OFF)
+            return
+        }
         val ch = text.singleOrNull()
         when {
             ch != null && (ch.isLetter() || (ch == '\'' && composing.isNotEmpty())) && suggestionsAllowed -> {
@@ -917,6 +928,14 @@ class RobKeyboardService : InputMethodService(), KeyboardView.Listener, VoiceInp
         state.panel = if (state.panel == panel) Panel.KEYBOARD else panel
         if (state.panel == Panel.VOICE) startVoice()
         if (state.panel == Panel.KEYBOARD) showPredictions()
+    }
+
+    /** Picks a decorative font ([style] null = off) and returns to the keys. */
+    fun setFontStyle(style: com.rob.aikeyboard.text.FontStyles.Style?) {
+        prefs.fontStyle = style?.id.orEmpty()
+        state.fontStyle = style
+        if (state.panel == Panel.FONT) state.panel = Panel.KEYBOARD
+        state.message = if (style != null) "Шрифт: ${style.label}. Работает для латиницы (EN/DE)" else "Шрифт выключен"
     }
 
     fun toggleAutoEmoji() {

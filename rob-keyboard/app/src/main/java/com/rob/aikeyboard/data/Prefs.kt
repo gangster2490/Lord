@@ -45,6 +45,8 @@ class Prefs(context: Context) {
     var soundOnKeypress by BoolPref("sound", false)
     var personalization by BoolPref("personalization", true)
     var autoEmoji by BoolPref("auto_emoji", false)
+    /** Id of the active decorative font (see FontStyles), empty = off. */
+    var fontStyle by StrPref("font_style", "")
     var clipboardHistory by BoolPref("clipboard_history", true)
     var voicePreferOffline by BoolPref("voice_prefer_offline", false)
     var translateWifiOnly by BoolPref("translate_wifi_only", true)

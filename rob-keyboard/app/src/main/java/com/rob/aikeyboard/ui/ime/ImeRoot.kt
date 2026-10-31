@@ -145,6 +145,7 @@ fun ImeRoot(service: RobKeyboardService) {
             Panel.CLIPBOARD -> ClipboardPanel(service, panelHeight)
             Panel.AI -> AiWritingPanel(service, panelHeight)
             Panel.TRANSLATE -> TranslatePanel(service, panelHeight)
+            Panel.FONT -> FontPanel(service, panelHeight)
         }
     }
 }
@@ -203,6 +204,9 @@ private fun Toolbar(service: RobKeyboardService) {
             IconTool(Icons.Outlined.Translate, "Перевод", state.panel == Panel.TRANSLATE) { service.togglePanel(Panel.TRANSLATE) }
             IconTool(Icons.Outlined.EditNote, "AI Writing", state.panel == Panel.AI) { service.togglePanel(Panel.AI) }
             AutoEmojiToggle(state.autoEmoji) { service.toggleAutoEmoji() }
+            FontToggle(state.fontStyle != null) {
+                if (state.fontStyle != null) service.setFontStyle(null) else service.togglePanel(Panel.FONT)
+            }
             IconTool(Icons.Outlined.EmojiEmotions, "Emoji", state.panel == Panel.EMOJI) { service.togglePanel(Panel.EMOJI) }
             IconTool(Icons.Outlined.Mic, "Микрофон", state.panel == Panel.VOICE) { service.togglePanel(Panel.VOICE) }
             IconTool(Icons.Outlined.ContentPaste, "Буфер обмена", state.panel == Panel.CLIPBOARD) { service.togglePanel(Panel.CLIPBOARD) }
@@ -238,6 +242,28 @@ private fun TextTool(label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, color = ImeColors.cyan, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun FontToggle(on: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .padding(horizontal = 2.dp)
+            .height(32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (on) ImeColors.cyan else Color.Transparent)
+            .border(1.dp, if (on) ImeColors.cyan else ImeColors.cyanDim, RoundedCornerShape(16.dp))
+            .clickable(onClickLabel = "Шрифт для TikTok", onClick = onClick)
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            if (on) "𝓐 ON" else "𝓐 OFF",
+            color = if (on) ImeColors.key else ImeColors.cyan,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 

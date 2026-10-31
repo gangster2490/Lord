@@ -7,7 +7,7 @@ import androidx.compose.runtime.setValue
 import com.rob.aikeyboard.launch.AiApp
 import com.rob.aikeyboard.text.Language
 
-enum class Panel { KEYBOARD, EMOJI, CLIPBOARD, AI, TRANSLATE, VOICE }
+enum class Panel { KEYBOARD, EMOJI, CLIPBOARD, AI, TRANSLATE, VOICE, FONT }
 
 /** A text box inside the keyboard (emoji search, translator source) that receives key presses. */
 class InternalField(val hint: String) {
@@ -44,6 +44,7 @@ class ImeState {
     var autoCorrectIndex by mutableIntStateOf(-1)
     var language by mutableStateOf(Language.RU)
     var autoEmoji by mutableStateOf(false)
+    var fontStyle by mutableStateOf<com.rob.aikeyboard.text.FontStyles.Style?>(null)
     var internalField by mutableStateOf<InternalField?>(null)
     var missingApp by mutableStateOf<AiApp?>(null)
     var message by mutableStateOf<String?>(null)
