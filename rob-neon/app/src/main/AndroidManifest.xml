@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- No dangerous permissions, no network, no storage, no accessibility. -->
+
+    <queries>
+        <!-- Launcher activities of other apps, used only by the on-device Diagnostics screen (not QUERY_ALL_PACKAGES). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <package android:name="com.samsung.android.themedesigner" />
+        <package android:name="com.samsung.android.goodlock" />
+        <package android:name="com.sec.android.app.samsungapps" />
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.RobNeon">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.RobNeon">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Icon-pack discovery. Standard ADW/Nova-style actions that launchers and Samsung Theme Park scan for.
+             Whether Theme Park lists this pack is NOT confirmed on a Galaxy S24 Ultra yet (see docs/COMPATIBILITY.md). -->
+        <activity-alias
+            android:name=".IconPackEntry"
+            android:exported="true"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="com.novalauncher.THEME" />
+                <action android:name="org.adw.launcher.THEMES" />
+                <action android:name="com.anddoes.launcher.THEME" />
+                <action android:name="com.dlto.atom.launcher.THEME" />
+                <action android:name="com.gau.go.launcherex.theme" />
+                <action android:name="home.solo.launcher.free.THEME" />
+                <action android:name="ginlemon.smartlauncher.THEMES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

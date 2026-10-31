@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ROB Neon</string>
+
+    <string name="tab_home">Start</string>
+    <string name="tab_icons">Symbole</string>
+    <string name="tab_wallpapers">Wallpaper</string>
+    <string name="tab_howto">Schritte</string>
+    <string name="tab_about">Info</string>
+
+    <string name="home_title">ROB Neon für One UI</string>
+    <string name="home_subtitle">Symbolpaket und Hintergründe. Die Samsung-Oberfläche bleibt unverändert.</string>
+    <string name="preview_home">Startbildschirm</string>
+    <string name="preview_lock">Sperrbildschirm</string>
+    <string name="preview_caption">Die Vorschau besteht aus den Dateien des Pakets. Sie ist ein Entwurf, kein Systemfoto: Uhr und Wetter kommen von den Samsung-Widgets.</string>
+    <string name="home_icons_count">Symbole im Paket: %1$d</string>
+    <string name="home_installed_match">Auf diesem Telefon installiert: %1$d, passend zum Paket: %2$d</string>
+    <string name="btn_open_theme_park">Theme Park öffnen</string>
+    <string name="btn_open_howto">Schritt-für-Schritt-Anleitung</string>
+    <string name="honest_note">Die App wendet Symbole nicht selbst an. Das übernimmt Theme Park; auf dem Galaxy S24 Ultra ist es noch nicht geprüft.</string>
+
+    <string name="icons_search">Symbol oder App suchen</string>
+    <string name="icons_empty">Nichts gefunden</string>
+    <string name="status_not_installed">App nicht installiert</string>
+    <string name="status_matched">Installiert, Symbol zugeordnet</string>
+    <string name="status_mismatch">Installiert, aber Start-Activity nicht in der Liste</string>
+    <string name="detail_packages">Pakete</string>
+    <string name="detail_components">Start-Activities im Paket</string>
+    <string name="detail_launchers">Auf dem Telefon gefunden</string>
+    <string name="detail_none">keine</string>
+    <string name="btn_close">Schließen</string>
+    <string name="diag_hint">Die Status stammen von Ihrem Telefon: Die App vergleicht installierte Apps mit der Liste des Pakets. Unbekannte Apps behalten ihre Originalsymbole.</string>
+
+    <string name="wp_home_title">Startbildschirm</string>
+    <string name="wp_home_desc">Ruhige Flächen für Widgets und Symbole. 1440 × 3120.</string>
+    <string name="wp_lock_title">Sperrbildschirm</string>
+    <string name="wp_lock_desc">Ausdrucksstärkere Komposition. 1440 × 3120.</string>
+    <string name="wp_btn_crop">Über System-Zuschnitt festlegen</string>
+    <string name="wp_btn_chooser">In anderer App öffnen</string>
+    <string name="wp_btn_picker">System-Hintergrundauswahl</string>
+    <string name="wp_hint">Das Ziel (Start, Sperrbildschirm oder beides) wählen Sie im Systemdialog. Die App ändert nichts im Stillen.</string>
+    <string name="wp_error">Der System-Dialog für Hintergründe konnte nicht geöffnet werden.</string>
+
+    <string name="about_title">Über die App</string>
+    <string name="howto_title">Symbole mit Theme Park anwenden</string>
+    <string name="howto_warn">Das Design wird nicht mit einem Tipp angewendet. Bezeichnungen hängen von One UI und Theme Park ab; unten steht die Reihenfolge der manuellen Schritte. Erledigte Schritte können Sie abhaken.</string>
+    <string name="howto_s1_t">1. Good Lock und Theme Park installieren</string>
+    <string name="howto_s1_d">Good Lock und das Modul Theme Park gibt es im Galaxy Store. Ist Theme Park schon installiert, weiter mit Schritt 2.</string>
+    <string name="howto_s2_t">2. Theme Park öffnen</string>
+    <string name="howto_s2_d">Starten Sie Theme Park mit der Schaltfläche unten oder über Good Lock.</string>
+    <string name="howto_s3_t">3. Symbolpaket wählen</string>
+    <string name="howto_s3_d">Öffnen Sie in Theme Park den Bereich für Symbole und suchen Sie „ROB Neon“ unter den installierten Paketen. Fehlt es, erkennt Ihre Theme-Park-Version keine Pakete von Drittanbietern: siehe „Info“.</string>
+    <string name="howto_s4_t">4. Speichern und anwenden</string>
+    <string name="howto_s4_d">Bestätigen Sie die Auswahl in Theme Park und kehren Sie zum Startbildschirm zurück. Prüfen Sie, ob die Symbole die Original-Apps öffnen.</string>
+    <string name="howto_s5_t">5. Hintergründe festlegen</string>
+    <string name="howto_s5_d">Bereich „Hintergründe“: Schaltfläche drücken und das Ziel im Systemdialog wählen. Startbildschirm und Sperrbildschirm nutzen zwei verschiedene Dateien.</string>
+    <string name="howto_s6_t">6. Uhr und Wetter: Samsung-Widgets</string>
+    <string name="howto_s6_d">Leere Stelle auf dem Startbildschirm gedrückt halten, „Widgets“ öffnen, Samsung-Uhr und -Wetter hinzufügen. Uhrstil des Sperrbildschirms: Einstellungen, Sperrbildschirm, Uhrstil. Ein eigenes Widget ist nicht Teil der ersten Version.</string>
+    <string name="btn_open_galaxy_store">Theme Park im Galaxy Store</string>
+    <string name="btn_open_good_lock">Good Lock öffnen</string>
+    <string name="btn_go_wallpapers">Zu den Hintergründen</string>
+    <string name="theme_park_installed">Theme Park ist installiert</string>
+    <string name="theme_park_missing">Theme Park wurde auf diesem Telefon nicht gefunden</string>
+    <string name="open_failed">Die App konnte nicht geöffnet werden. Bitte manuell öffnen.</string>
+
+    <string name="about_version">Version %1$s (%2$d)</string>
+    <string name="about_build">Der Testbuild ist mit dem Debug-Schlüssel signiert. Für den dauerhaften Einsatz mit eigenem Schlüssel signieren.</string>
+    <string name="about_privacy">Keine Werbung, keine Registrierung, keine Analyse, kein Netzwerk. Es werden keine Berechtigungen angefragt: kein Accessibility, kein Root, kein Geräteadministrator, kein Zugriff auf alle Dateien.</string>
+    <string name="about_limits_title">Einschränkungen</string>
+    <string name="about_limit_1">Ein Symbolpaket ersetzt weder One UI noch Schnellleiste, Systemeinstellungen oder Sperrbildschirm.</string>
+    <string name="about_limit_2">Symbole ändern sich nur für Apps aus der Liste und nur, wenn Theme Park dieses Paket akzeptiert. Alle anderen Apps behalten ihre Symbole.</string>
+    <string name="about_limit_3">Apps außerhalb der Liste und neuere Versionen mit anderen Start-Activities bleiben eventuell unverändert: Bereich „Symbole“ prüfen.</string>
+    <string name="about_limit_4">Die Übereinstimmung mit dem Entwurf hängt von Widgets und One UI ab. Uhr, Wetter und Statusleiste zeichnet das System.</string>
+    <string name="about_checked_title">Geprüft und nicht geprüft</string>
+    <string name="about_checked_body">Beim Build geprüft: Paketstruktur, 30 Symbole mit 512 × 512 und Transparenz, Zuordnung zur App-Liste, Activity-Liste gegen zwei offene Datenbanken. Auf dem Galaxy S24 Ultra nicht geprüft: Anzeige des Pakets in Theme Park, tatsächlicher Symbolwechsel, Hintergrund über den Systemdialog.</string>
+</resources>

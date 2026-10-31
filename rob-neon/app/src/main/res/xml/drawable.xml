@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <version>1</version>
+    <category title="ROB Neon" />
+    <item drawable="ic_phone" />
+    <item drawable="ic_contacts" />
+    <item drawable="ic_samsung_messages" />
+    <item drawable="ic_google_messages" />
+    <item drawable="ic_camera" />
+    <item drawable="ic_gallery" />
+    <item drawable="ic_settings" />
+    <item drawable="ic_calendar" />
+    <item drawable="ic_clock" />
+    <item drawable="ic_my_files" />
+    <item drawable="ic_calculator" />
+    <item drawable="ic_samsung_internet" />
+    <item drawable="ic_chrome" />
+    <item drawable="ic_gmail" />
+    <item drawable="ic_maps" />
+    <item drawable="ic_play_store" />
+    <item drawable="ic_galaxy_store" />
+    <item drawable="ic_samsung_notes" />
+    <item drawable="ic_whatsapp" />
+    <item drawable="ic_telegram" />
+    <item drawable="ic_youtube" />
+    <item drawable="ic_tiktok" />
+    <item drawable="ic_instagram" />
+    <item drawable="ic_facebook" />
+    <item drawable="ic_spotify" />
+    <item drawable="ic_chatgpt" />
+    <item drawable="ic_google_drive" />
+    <item drawable="ic_google_photos" />
+    <item drawable="ic_samsung_wallet" />
+    <item drawable="ic_good_lock" />
+</resources>

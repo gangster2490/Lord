@@ -1,0 +1,372 @@
+[
+ {
+  "id": "phone",
+  "ru": "Телефон",
+  "de": "Telefon",
+  "packages": [
+   "com.samsung.android.dialer",
+   "com.google.android.dialer"
+  ],
+  "components": [
+   "com.samsung.android.dialer/com.samsung.android.dialer.DialtactsActivity",
+   "com.google.android.dialer/com.google.android.dialer.DialtactsActivity",
+   "com.google.android.dialer/com.android.dialer.main.impl.MainActivity",
+   "com.google.android.dialer/com.google.android.apps.dialer.extensions.GoogleDialtactsActivity"
+  ]
+ },
+ {
+  "id": "contacts",
+  "ru": "Контакты",
+  "de": "Kontakte",
+  "packages": [
+   "com.samsung.android.app.contacts",
+   "com.google.android.contacts"
+  ],
+  "components": [
+   "com.samsung.android.app.contacts/com.samsung.android.contacts.contactslist.PeopleActivity",
+   "com.google.android.contacts/com.android.contacts.activities.PeopleActivity"
+  ]
+ },
+ {
+  "id": "samsung_messages",
+  "ru": "Samsung Messages",
+  "de": "Samsung Nachrichten",
+  "packages": [
+   "com.samsung.android.messaging"
+  ],
+  "components": [
+   "com.samsung.android.messaging/com.samsung.android.messaging.ui.ConversationListActivity",
+   "com.samsung.android.messaging/com.samsung.android.messaging.ui.ConversationList",
+   "com.samsung.android.messaging/com.android.mms.ui.ConversationComposer"
+  ]
+ },
+ {
+  "id": "google_messages",
+  "ru": "Google Messages",
+  "de": "Google Nachrichten",
+  "packages": [
+   "com.google.android.apps.messaging"
+  ],
+  "components": [
+   "com.google.android.apps.messaging/com.google.android.apps.messaging.ui.ConversationListActivity",
+   "com.google.android.apps.messaging/com.google.android.apps.messaging.main.MainActivity"
+  ]
+ },
+ {
+  "id": "camera",
+  "ru": "Камера",
+  "de": "Kamera",
+  "packages": [
+   "com.sec.android.app.camera",
+   "com.google.android.GoogleCamera"
+  ],
+  "components": [
+   "com.sec.android.app.camera/com.sec.android.app.camera.Camera",
+   "com.google.android.GoogleCamera/com.android.camera.CameraLauncher",
+   "com.google.android.GoogleCamera/com.android.camera.CameraActivity"
+  ]
+ },
+ {
+  "id": "gallery",
+  "ru": "Галерея",
+  "de": "Galerie",
+  "packages": [
+   "com.sec.android.gallery3d"
+  ],
+  "components": [
+   "com.sec.android.gallery3d/com.sec.android.gallery3d.app.GalleryActivity",
+   "com.sec.android.gallery3d/com.sec.android.gallery3d.app.Gallery",
+   "com.sec.android.gallery3d/com.samsung.android.gallery.app.activity.GalleryActivity"
+  ]
+ },
+ {
+  "id": "settings",
+  "ru": "Настройки",
+  "de": "Einstellungen",
+  "packages": [
+   "com.android.settings"
+  ],
+  "components": [
+   "com.android.settings/com.android.settings.Settings",
+   "com.android.settings/com.android.settings.MainSettings"
+  ]
+ },
+ {
+  "id": "calendar",
+  "ru": "Календарь",
+  "de": "Kalender",
+  "packages": [
+   "com.samsung.android.calendar",
+   "com.google.android.calendar"
+  ],
+  "components": [
+   "com.samsung.android.calendar/com.samsung.android.app.calendar.activity.MainActivity",
+   "com.samsung.android.calendar/com.android.calendar.AllInOneActivity",
+   "com.google.android.calendar/com.android.calendar.AllInOneActivity"
+  ]
+ },
+ {
+  "id": "clock",
+  "ru": "Часы",
+  "de": "Uhr",
+  "packages": [
+   "com.sec.android.app.clockpackage",
+   "com.google.android.deskclock"
+  ],
+  "components": [
+   "com.sec.android.app.clockpackage/com.sec.android.app.clockpackage.ClockPackage",
+   "com.google.android.deskclock/com.android.deskclock.DeskClock"
+  ]
+ },
+ {
+  "id": "my_files",
+  "ru": "Мои файлы",
+  "de": "Eigene Dateien",
+  "packages": [
+   "com.sec.android.app.myfiles"
+  ],
+  "components": [
+   "com.sec.android.app.myfiles/com.sec.android.app.myfiles.external.ui.MainActivity",
+   "com.sec.android.app.myfiles/com.sec.android.app.myfiles.common.MainActivity",
+   "com.sec.android.app.myfiles/com.sec.android.app.myfiles.ui.MainActivity",
+   "com.sec.android.app.myfiles/com.sec.android.app.myfiles.external.ui.LaunchActivity"
+  ]
+ },
+ {
+  "id": "calculator",
+  "ru": "Калькулятор",
+  "de": "Rechner",
+  "packages": [
+   "com.sec.android.app.popupcalculator",
+   "com.google.android.calculator"
+  ],
+  "components": [
+   "com.sec.android.app.popupcalculator/com.sec.android.app.popupcalculator.Calculator",
+   "com.google.android.calculator/com.android.calculator2.Calculator"
+  ]
+ },
+ {
+  "id": "samsung_internet",
+  "ru": "Samsung Internet",
+  "de": "Samsung Internet",
+  "packages": [
+   "com.sec.android.app.sbrowser"
+  ],
+  "components": [
+   "com.sec.android.app.sbrowser/com.sec.android.app.sbrowser.SBrowserMainActivity"
+  ]
+ },
+ {
+  "id": "chrome",
+  "ru": "Chrome",
+  "de": "Chrome",
+  "packages": [
+   "com.android.chrome"
+  ],
+  "components": [
+   "com.android.chrome/com.google.android.apps.chrome.Main",
+   "com.android.chrome/com.android.chrome.Main"
+  ]
+ },
+ {
+  "id": "gmail",
+  "ru": "Gmail",
+  "de": "Gmail",
+  "packages": [
+   "com.google.android.gm"
+  ],
+  "components": [
+   "com.google.android.gm/com.google.android.gm.ConversationListActivityGmail",
+   "com.google.android.gm/com.google.android.gm.GmailActivity"
+  ]
+ },
+ {
+  "id": "maps",
+  "ru": "Google Карты",
+  "de": "Google Maps",
+  "packages": [
+   "com.google.android.apps.maps"
+  ],
+  "components": [
+   "com.google.android.apps.maps/com.google.android.maps.MapsActivity"
+  ]
+ },
+ {
+  "id": "play_store",
+  "ru": "Google Play",
+  "de": "Google Play",
+  "packages": [
+   "com.android.vending"
+  ],
+  "components": [
+   "com.android.vending/com.android.vending.AssetBrowserActivity",
+   "com.android.vending/com.google.android.finsky.activities.PlayLauncherActivity"
+  ]
+ },
+ {
+  "id": "galaxy_store",
+  "ru": "Galaxy Store",
+  "de": "Galaxy Store",
+  "packages": [
+   "com.sec.android.app.samsungapps"
+  ],
+  "components": [
+   "com.sec.android.app.samsungapps/com.sec.android.app.samsungapps.Main",
+   "com.sec.android.app.samsungapps/com.sec.android.app.samsungapps.SamsungAppsMainActivity"
+  ]
+ },
+ {
+  "id": "samsung_notes",
+  "ru": "Samsung Notes",
+  "de": "Samsung Notes",
+  "packages": [
+   "com.samsung.android.app.notes"
+  ],
+  "components": [
+   "com.samsung.android.app.notes/com.samsung.android.app.notes.memolist.MemoListActivity"
+  ]
+ },
+ {
+  "id": "whatsapp",
+  "ru": "WhatsApp",
+  "de": "WhatsApp",
+  "packages": [
+   "com.whatsapp"
+  ],
+  "components": [
+   "com.whatsapp/com.whatsapp.Main",
+   "com.whatsapp/com.whatsapp.HomeActivity"
+  ]
+ },
+ {
+  "id": "telegram",
+  "ru": "Telegram",
+  "de": "Telegram",
+  "packages": [
+   "org.telegram.messenger"
+  ],
+  "components": [
+   "org.telegram.messenger/org.telegram.messenger.DefaultIcon",
+   "org.telegram.messenger/org.telegram.messenger.ClassicIcon"
+  ]
+ },
+ {
+  "id": "youtube",
+  "ru": "YouTube",
+  "de": "YouTube",
+  "packages": [
+   "com.google.android.youtube"
+  ],
+  "components": [
+   "com.google.android.youtube/com.google.android.youtube.app.honeycomb.Shell$HomeActivity"
+  ]
+ },
+ {
+  "id": "tiktok",
+  "ru": "TikTok",
+  "de": "TikTok",
+  "packages": [
+   "com.zhiliaoapp.musically",
+   "com.ss.android.ugc.trill"
+  ],
+  "components": [
+   "com.zhiliaoapp.musically/com.ss.android.ugc.aweme.splash.SplashActivity",
+   "com.zhiliaoapp.musically/com.zhiliaoapp.musically.MainActivity",
+   "com.ss.android.ugc.trill/com.ss.android.ugc.aweme.splash.SplashActivity"
+  ]
+ },
+ {
+  "id": "instagram",
+  "ru": "Instagram",
+  "de": "Instagram",
+  "packages": [
+   "com.instagram.android"
+  ],
+  "components": [
+   "com.instagram.android/com.instagram.mainactivity.LauncherActivity",
+   "com.instagram.android/com.instagram.android.activity.MainTabActivity"
+  ]
+ },
+ {
+  "id": "facebook",
+  "ru": "Facebook",
+  "de": "Facebook",
+  "packages": [
+   "com.facebook.katana"
+  ],
+  "components": [
+   "com.facebook.katana/com.facebook.katana.LoginActivity"
+  ]
+ },
+ {
+  "id": "spotify",
+  "ru": "Spotify",
+  "de": "Spotify",
+  "packages": [
+   "com.spotify.music"
+  ],
+  "components": [
+   "com.spotify.music/com.spotify.music.MainActivity",
+   "com.spotify.music/com.spotify.music.main.MainScreenActivity",
+   "com.spotify.music/com.spotify.music.MainActivityAlias"
+  ]
+ },
+ {
+  "id": "chatgpt",
+  "ru": "ChatGPT",
+  "de": "ChatGPT",
+  "packages": [
+   "com.openai.chatgpt"
+  ],
+  "components": [
+   "com.openai.chatgpt/com.openai.chatgpt.MainActivity"
+  ]
+ },
+ {
+  "id": "google_drive",
+  "ru": "Google Диск",
+  "de": "Google Drive",
+  "packages": [
+   "com.google.android.apps.docs"
+  ],
+  "components": [
+   "com.google.android.apps.docs/com.google.android.apps.docs.app.NewMainProxyActivity",
+   "com.google.android.apps.docs/com.google.android.apps.docs.app.HomeScreenActivity"
+  ]
+ },
+ {
+  "id": "google_photos",
+  "ru": "Google Фото",
+  "de": "Google Fotos",
+  "packages": [
+   "com.google.android.apps.photos"
+  ],
+  "components": [
+   "com.google.android.apps.photos/com.google.android.apps.photos.home.HomeActivity"
+  ]
+ },
+ {
+  "id": "samsung_wallet",
+  "ru": "Samsung Wallet",
+  "de": "Samsung Wallet",
+  "packages": [
+   "com.samsung.android.spay"
+  ],
+  "components": [
+   "com.samsung.android.spay/com.samsung.android.spay.ui.SpayMainActivity",
+   "com.samsung.android.spay/com.samsung.android.spay.InitActivity"
+  ]
+ },
+ {
+  "id": "good_lock",
+  "ru": "Good Lock",
+  "de": "Good Lock",
+  "packages": [
+   "com.samsung.android.goodlock"
+  ],
+  "components": [
+   "com.samsung.android.goodlock/com.samsung.android.goodlock.presentation.view.LaunchActivity",
+   "com.samsung.android.goodlock/com.samsung.android.goodlock.MainActivity"
+  ]
+ }
+]

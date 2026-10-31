@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ROB Neon</string>
+
+    <string name="tab_home">Главная</string>
+    <string name="tab_icons">Иконки</string>
+    <string name="tab_wallpapers">Обои</string>
+    <string name="tab_howto">Шаги</string>
+    <string name="tab_about">Инфо</string>
+
+    <string name="home_title">ROB Neon для One UI</string>
+    <string name="home_subtitle">Пакет иконок и обои. Интерфейс Samsung остаётся стандартным.</string>
+    <string name="preview_home">Главный экран</string>
+    <string name="preview_lock">Экран блокировки</string>
+    <string name="preview_caption">Предпросмотр собран из файлов пакета. Это макет, а не снимок вашей системы: часы и погода зависят от виджетов Samsung.</string>
+    <string name="home_icons_count">Иконок в наборе: %1$d</string>
+    <string name="home_installed_match">Установлено на этом телефоне: %1$d, совпадают с набором: %2$d</string>
+    <string name="btn_open_theme_park">Открыть Theme Park</string>
+    <string name="btn_open_howto">Пошаговая инструкция</string>
+    <string name="honest_note">Приложение не применяет иконки само. Их выбирает Theme Park, а применение пока не проверено на Galaxy S24 Ultra.</string>
+
+    <string name="icons_search">Поиск иконки или приложения</string>
+    <string name="icons_empty">Ничего не найдено</string>
+    <string name="status_not_installed">Приложение не установлено</string>
+    <string name="status_matched">Установлено, иконка сопоставлена</string>
+    <string name="status_mismatch">Установлено, но запускаемая активность не в списке</string>
+    <string name="detail_packages">Пакеты</string>
+    <string name="detail_components">Запускаемые активности в наборе</string>
+    <string name="detail_launchers">Найдено на телефоне</string>
+    <string name="detail_none">нет</string>
+    <string name="btn_close">Закрыть</string>
+    <string name="diag_hint">Статусы берутся с вашего телефона: приложение сравнивает установленные приложения со списком набора. Неизвестные приложения сохраняют исходные иконки.</string>
+
+    <string name="wp_home_title">Главный экран</string>
+    <string name="wp_home_desc">Спокойные зоны под виджеты и значки. 1440 × 3120.</string>
+    <string name="wp_lock_title">Экран блокировки</string>
+    <string name="wp_lock_desc">Более выразительная композиция. 1440 × 3120.</string>
+    <string name="wp_btn_crop">Установить через системный кроп</string>
+    <string name="wp_btn_chooser">Открыть в другом приложении</string>
+    <string name="wp_btn_picker">Системный выбор обоев</string>
+    <string name="wp_hint">Назначение (главный экран, блокировка или оба) выбирается в системном окне. Приложение ничего не меняет молча.</string>
+    <string name="wp_error">Не удалось открыть системный экран установки обоев.</string>
+
+    <string name="howto_title">Как применить иконки через Theme Park</string>
+    <string name="about_title">О приложении</string>
+    <string name="howto_warn">Тема не применится нажатием одной кнопки. Названия пунктов зависят от версии One UI и Theme Park; ниже порядок действий, которые нужно сделать вручную. Отмечайте выполненные шаги.</string>
+    <string name="howto_s1_t">1. Установите Good Lock и Theme Park</string>
+    <string name="howto_s1_d">Good Lock и модуль Theme Park доступны в Galaxy Store. Если Theme Park уже установлен, переходите к шагу 2.</string>
+    <string name="howto_s2_t">2. Откройте Theme Park</string>
+    <string name="howto_s2_d">Запустите Theme Park кнопкой ниже или из Good Lock.</string>
+    <string name="howto_s3_t">3. Выберите набор иконок</string>
+    <string name="howto_s3_d">В Theme Park откройте раздел значков и найдите «ROB Neon» среди установленных наборов. Если набора в списке нет, Theme Park на вашей версии не видит сторонние наборы: см. «О приложении».</string>
+    <string name="howto_s4_t">4. Сохраните и примените тему</string>
+    <string name="howto_s4_d">Подтвердите выбор в Theme Park и вернитесь на главный экран. Проверьте, что иконки открывают исходные приложения.</string>
+    <string name="howto_s5_t">5. Установите обои</string>
+    <string name="howto_s5_d">Раздел «Обои»: нажмите кнопку установки и выберите назначение в системном окне. Для главного экрана и блокировки используются два разных файла.</string>
+    <string name="howto_s6_t">6. Часы и погода: штатные виджеты</string>
+    <string name="howto_s6_d">Удерживайте пустое место на главном экране, откройте «Виджеты», добавьте виджет Часов и Погоды Samsung. Стиль часов блокировки: Настройки, Экран блокировки, Стиль часов. Собственный виджет не входит в первый выпуск.</string>
+    <string name="btn_open_galaxy_store">Theme Park в Galaxy Store</string>
+    <string name="btn_open_good_lock">Открыть Good Lock</string>
+    <string name="btn_go_wallpapers">К обоям</string>
+    <string name="theme_park_installed">Theme Park установлен</string>
+    <string name="theme_park_missing">Theme Park не найден на этом телефоне</string>
+    <string name="open_failed">Не удалось открыть приложение. Откройте его вручную.</string>
+
+    <string name="about_version">Версия %1$s (%2$d)</string>
+    <string name="about_build">Тестовая сборка подписана отладочным ключом. Для постоянного использования подпишите её своим ключом.</string>
+    <string name="about_privacy">Без рекламы, регистрации, аналитики и сети. Разрешения не запрашиваются: нет Accessibility, root, администратора устройства и доступа ко всем файлам.</string>
+    <string name="about_limits_title">Ограничения</string>
+    <string name="about_limit_1">Пакет иконок не заменяет интерфейс One UI, шторку, системные настройки и экран блокировки.</string>
+    <string name="about_limit_2">Иконки меняются только у приложений из списка, и только если Theme Park принимает этот набор. Остальные приложения сохраняют свои иконки.</string>
+    <string name="about_limit_3">Сторонние приложения вне списка и обновлённые версии с другими активностями запуска могут остаться без замены: проверьте раздел «Иконки».</string>
+    <string name="about_limit_4">Совпадение с макетом зависит от виджетов и возможностей One UI. Часы, погода и панель состояния рисуются системой.</string>
+    <string name="about_checked_title">Что проверено, а что нет</string>
+    <string name="about_checked_body">Проверено при сборке: структура набора, 30 иконок 512 × 512 с прозрачностью, соответствие списку приложений, список активностей по двум открытым базам. Не проверено на Galaxy S24 Ultra: показ набора в Theme Park, фактическая замена иконок, установка обоев через системное окно.</string>
+</resources>
